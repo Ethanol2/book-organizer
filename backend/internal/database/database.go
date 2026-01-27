@@ -1,9 +1,17 @@
 package database
 
-import "database/sql"
+import (
+	"database/sql"
+	"encoding/json"
+)
 
 type Client struct {
 	db *sql.DB
+}
+type BookFiles struct {
+	AudioFiles FileList `json:"audio_files"`
+	TextFiles  FileList `json:"text_files"`
+	Cover      string   `json:"cover"`
 }
 type FileList struct {
 	Files []string `json:"files"`
@@ -36,4 +44,18 @@ func (client *Client) handleMigration() error {
 	`
 	_, err := client.db.Exec(downloadsTable)
 	return err
+}
+
+func (files BookFiles) ToJson() (string, string, string, error) {
+
+	audioBytes, err := json.Marshal(files.AudioFiles)
+	if err != nil {
+		return "", "", "", err
+	}
+	textBytes, err := json.Marshal(files.TextFiles)
+	if err != nil {
+		return "", "", "", err
+	}
+
+	return string(audioBytes), string(textBytes), files.Cover, nil
 }

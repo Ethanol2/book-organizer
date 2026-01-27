@@ -11,24 +11,20 @@ import (
 )
 
 type Download struct {
-	Id         uuid.UUID `json:"id"`
-	CreatedAt  time.Time `json:"created_at"`
-	Title      string    `json:"title"`
-	AudioFiles FileList  `json:"audio_files"`
-	TextFiles  FileList  `json:"text_files"`
-	Cover      string    `json:"cover"`
-	DirName    string    `json:"directory_name"`
+	Id        uuid.UUID `json:"id"`
+	CreatedAt time.Time `json:"created_at"`
+	Title     string    `json:"title"`
+	DirName   string    `json:"directory_name"`
+	Files     BookFiles `json:"files"`
 }
 
-func (c Client) CreateDownload(dirPath, title, cover string, audioFiles, textFiles []string) (*Download, error) {
+//#region Setters
+
+func (c Client) CreateDownload(dirPath, title string, files BookFiles) (*Download, error) {
 
 	id := uuid.New()
 
-	audioBytes, err := json.Marshal(FileList{audioFiles})
-	if err != nil {
-		return nil, err
-	}
-	textBytes, err := json.Marshal(FileList{textFiles})
+	audio, text, cover, err := files.ToJson()
 	if err != nil {
 		return nil, err
 	}
@@ -39,7 +35,7 @@ func (c Client) CreateDownload(dirPath, title, cover string, audioFiles, textFil
 	VALUES
 		(?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
 	`
-	_, err = c.db.Exec(query, id.String(), title, dirPath, string(audioBytes), string(textBytes), cover)
+	_, err = c.db.Exec(query, id, title, dirPath, audio, text, cover)
 	if err != nil {
 		return nil, err
 	}
@@ -48,6 +44,39 @@ func (c Client) CreateDownload(dirPath, title, cover string, audioFiles, textFil
 
 	return c.GetDownload(id)
 }
+
+func (c Client) UpdateDownloadFiles(id uuid.UUID, files BookFiles) error {
+
+	audio, text, cover, err := files.ToJson()
+	if err != nil {
+		return err
+	}
+
+	query := `
+		UPDATE downloads
+		SET
+			audio_files = ?,
+			text_files = ?,
+			cover = ?
+		WHERE id = ?
+	`
+	_, err = c.db.Exec(query, audio, text, cover, id)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (c Client) DeleteDownload(id uuid.UUID) error {
+	_, err := c.db.Exec("DELETE FROM downloads WHERE id = ?", id)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+//#region Getters
 
 func (c Client) GetDownload(id uuid.UUID) (*Download, error) {
 
@@ -68,6 +97,44 @@ func (c Client) GetDownloadByDirectory(dir string) (*Download, error) {
 
 }
 
+func (c Client) GetAllDownloadsIdsAndDirs() ([]uuid.UUID, []string, error) {
+
+	query := `
+		SELECT id, dir_name FROM downloads
+	`
+
+	rows, err := c.db.Query(query)
+	if err != nil {
+		return []uuid.UUID{}, []string{}, err
+	}
+	defer rows.Close()
+
+	var ids []uuid.UUID
+	var dirs []string
+
+	for rows.Next() {
+		var idStr string
+		var dir string
+
+		if err := rows.Scan(&idStr, &dir); err != nil {
+			return []uuid.UUID{}, []string{}, err
+		}
+
+		id, err := uuid.Parse(idStr)
+		if err != nil {
+			log.Println(err)
+			continue
+		}
+
+		ids = append(ids, id)
+		dirs = append(dirs, dir)
+	}
+
+	return ids, dirs, nil
+}
+
+//#region Helpers
+
 func (c Client) getDownloadWithQuery(query string, args ...any) (*Download, error) {
 
 	var download Download
@@ -75,7 +142,7 @@ func (c Client) getDownloadWithQuery(query string, args ...any) (*Download, erro
 	var audioJson string
 	var textJson string
 
-	err := c.db.QueryRow(query, args...).Scan(&idStr, &download.Title, &download.DirName, &audioJson, &textJson, &download.Cover, &download.CreatedAt)
+	err := c.db.QueryRow(query, args...).Scan(&idStr, &download.Title, &download.DirName, &audioJson, &textJson, &download.Files.Cover, &download.CreatedAt)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, nil
@@ -88,16 +155,50 @@ func (c Client) getDownloadWithQuery(query string, args ...any) (*Download, erro
 		return nil, err
 	}
 
-	err = json.Unmarshal([]byte(audioJson), &download.AudioFiles)
+	err = json.Unmarshal([]byte(audioJson), &download.Files.AudioFiles)
 	if err != nil {
 		return nil, err
 	}
 
-	err = json.Unmarshal([]byte(textJson), &download.TextFiles)
+	err = json.Unmarshal([]byte(textJson), &download.Files.TextFiles)
 	if err != nil {
 		return nil, err
 	}
 
 	return &download, err
+
+}
+
+func (c Client) getDownloadFilesWithQuery(query string, args ...any) (uuid.UUID, *BookFiles, error) {
+
+	var files BookFiles
+	var idStr string
+	var audioJson string
+	var textJson string
+
+	err := c.db.QueryRow(query, args...).Scan(&idStr, &audioJson, &textJson, &files.Cover)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return uuid.Nil, nil, nil
+		}
+		return uuid.Nil, nil, err
+	}
+
+	id, err := uuid.Parse(idStr)
+	if err != nil {
+		return uuid.Nil, nil, err
+	}
+
+	err = json.Unmarshal([]byte(audioJson), &files.AudioFiles)
+	if err != nil {
+		return uuid.Nil, nil, err
+	}
+
+	err = json.Unmarshal([]byte(textJson), &files.TextFiles)
+	if err != nil {
+		return uuid.Nil, nil, err
+	}
+
+	return id, &files, err
 
 }
