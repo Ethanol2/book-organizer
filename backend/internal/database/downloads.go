@@ -2,7 +2,6 @@ package database
 
 import (
 	"database/sql"
-	"encoding/json"
 	"errors"
 	"log"
 	"time"
@@ -133,6 +132,50 @@ func (c Client) GetAllDownloadsIdsAndDirs() ([]uuid.UUID, []string, error) {
 	return ids, dirs, nil
 }
 
+func (c Client) GetDownloads() ([]Download, error) {
+
+	rows, err := c.db.Query("SELECT * FROM downloads")
+	if err != nil {
+		return []Download{}, err
+	}
+
+	var downloads []Download
+
+	for rows.Next() {
+		var download Download
+		var idStr string
+		var audioJson string
+		var textJson string
+
+		err := rows.Scan(&idStr, &download.Title, &download.DirName, &audioJson, &textJson, &download.Files.Cover, &download.CreatedAt)
+		if err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				return nil, nil
+			}
+			return nil, err
+		}
+
+		download.Id, err = uuid.Parse(idStr)
+		if err != nil {
+			return nil, err
+		}
+
+		err = download.Files.ParseAudioJson(audioJson)
+		if err != nil {
+			return nil, err
+		}
+
+		err = download.Files.ParseTextJson(textJson)
+		if err != nil {
+			return nil, err
+		}
+
+		downloads = append(downloads, download)
+	}
+
+	return downloads, nil
+}
+
 //#region Helpers
 
 func (c Client) getDownloadWithQuery(query string, args ...any) (*Download, error) {
@@ -155,12 +198,12 @@ func (c Client) getDownloadWithQuery(query string, args ...any) (*Download, erro
 		return nil, err
 	}
 
-	err = json.Unmarshal([]byte(audioJson), &download.Files.AudioFiles)
+	err = download.Files.ParseAudioJson(audioJson)
 	if err != nil {
 		return nil, err
 	}
 
-	err = json.Unmarshal([]byte(textJson), &download.Files.TextFiles)
+	err = download.Files.ParseTextJson(textJson)
 	if err != nil {
 		return nil, err
 	}
@@ -189,16 +232,15 @@ func (c Client) getDownloadFilesWithQuery(query string, args ...any) (uuid.UUID,
 		return uuid.Nil, nil, err
 	}
 
-	err = json.Unmarshal([]byte(audioJson), &files.AudioFiles)
+	err = files.ParseAudioJson(audioJson)
 	if err != nil {
 		return uuid.Nil, nil, err
 	}
 
-	err = json.Unmarshal([]byte(textJson), &files.TextFiles)
+	err = files.ParseTextJson(textJson)
 	if err != nil {
 		return uuid.Nil, nil, err
 	}
 
 	return id, &files, err
-
 }

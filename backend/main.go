@@ -43,6 +43,9 @@ func main() {
 	fHandler := http.FileServer(http.Dir(config.frontendPath))
 	mux.Handle("/", fHandler)
 
+	// Downloads Endpoints
+	mux.HandleFunc("GET /api/downloads", config.handlerGetDownloads)
+
 	srv := &http.Server{
 		Addr:    ":" + config.port,
 		Handler: mux,
