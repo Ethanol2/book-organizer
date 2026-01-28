@@ -12,14 +12,13 @@ import (
 type Download struct {
 	Id        uuid.UUID `json:"id"`
 	CreatedAt time.Time `json:"created_at"`
-	Title     string    `json:"title"`
 	DirName   string    `json:"directory_name"`
 	Files     BookFiles `json:"files"`
 }
 
 //#region Setters
 
-func (c Client) CreateDownload(dirPath, title string, files BookFiles) (*Download, error) {
+func (c Client) CreateDownload(dirPath string, files BookFiles) (*Download, error) {
 
 	id := uuid.New()
 
@@ -30,16 +29,16 @@ func (c Client) CreateDownload(dirPath, title string, files BookFiles) (*Downloa
 
 	query := `
 	INSERT INTO downloads
-		(id, title, dir_name, audio_files, text_files, cover, created_at)
+		(id, dir_name, audio_files, text_files, cover, created_at)
 	VALUES
-		(?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+		(?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
 	`
-	_, err = c.db.Exec(query, id, title, dirPath, audio, text, cover)
+	_, err = c.db.Exec(query, id, dirPath, audio, text, cover)
 	if err != nil {
 		return nil, err
 	}
 
-	log.Println("Added \"", title, "\" to downloads")
+	log.Println("Added \"", dirPath, "\" to downloads")
 
 	return c.GetDownload(id)
 }
@@ -147,7 +146,7 @@ func (c Client) GetDownloads() ([]Download, error) {
 		var audioJson string
 		var textJson string
 
-		err := rows.Scan(&idStr, &download.Title, &download.DirName, &audioJson, &textJson, &download.Files.Cover, &download.CreatedAt)
+		err := rows.Scan(&idStr, &download.DirName, &audioJson, &textJson, &download.Files.Cover, &download.CreatedAt)
 		if err != nil {
 			if errors.Is(err, sql.ErrNoRows) {
 				return nil, nil
@@ -185,7 +184,7 @@ func (c Client) getDownloadWithQuery(query string, args ...any) (*Download, erro
 	var audioJson string
 	var textJson string
 
-	err := c.db.QueryRow(query, args...).Scan(&idStr, &download.Title, &download.DirName, &audioJson, &textJson, &download.Files.Cover, &download.CreatedAt)
+	err := c.db.QueryRow(query, args...).Scan(&idStr, &download.DirName, &audioJson, &textJson, &download.Files.Cover, &download.CreatedAt)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, nil
