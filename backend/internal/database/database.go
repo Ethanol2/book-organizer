@@ -17,7 +17,7 @@ func NewClient(dbPath string) (Client, error) {
 	c := Client{db}
 	err = c.handleMigration()
 	if err != nil {
-		return Client{db}, err
+		return Client{}, err
 	}
 	return c, nil
 }
@@ -43,7 +43,6 @@ func (client *Client) handleMigration() error {
 		id TEXT PRIMARY KEY,
 		title TEXT NOT NULL,
 		publish_year INTEGER,
-		series_index INTEGER,
 		description TEXT,
 		tags TEXT,
 		isbn TEXT,
@@ -63,7 +62,7 @@ func (client *Client) handleMigration() error {
 
 	authorsTable := `
 	CREATE TABLE IF NOT EXISTS authors (
-		id TEXT PRIMARY KEY,
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
 		name TEXT UNIQUE NOT NULL	
 	);	
 	`
@@ -74,7 +73,7 @@ func (client *Client) handleMigration() error {
 
 	narratorsTable := `
 	CREATE TABLE IF NOT EXISTS narrators (
-		id TEXT PRIMARY KEY,
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
 		name TEXT UNIQUE NOT NULL
 	);
 	`
@@ -85,7 +84,7 @@ func (client *Client) handleMigration() error {
 
 	seriesTable := `
 	CREATE TABLE IF NOT EXISTS series (
-		id TEXT PRIMARY KEY,
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
 		name TEXT UNIQUE NOT NULL
 	);
 	`
@@ -96,7 +95,7 @@ func (client *Client) handleMigration() error {
 
 	genresTable := `
 	CREATE TABLE IF NOT EXISTS genres (
-		id TEXT PRIMARY KEY,
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
 		name TEXT UNIQUE NOT NULL
 	);
 	`
@@ -107,22 +106,33 @@ func (client *Client) handleMigration() error {
 
 	// Joining Tables
 
-	err = client.generateJoiningTableQuery("book", "books", "series", "series")
+	booksSeriestable :=
+		`
+		CREATE TABLE IF NOT EXISTS books_series (
+			book_id TEXT NOT NULL,
+			series_id TEXT NOT NULL,
+			series_index INTEGER,
+			PRIMARY KEY (book_id, series_id),
+			FOREIGN KEY (book_id) REFERENCES books(id) ON DELETE CASCADE,
+			FOREIGN KEY (series_id) REFERENCES series(id)
+		);
+		`
+	_, err = client.db.Exec(booksSeriestable)
 	if err != nil {
 		return err
 	}
 
-	err = client.generateJoiningTableQuery("book", "books", "author", "authors")
+	err = client.generateJoiningTable("book", "books", string(Authors), categorySingular[Authors])
 	if err != nil {
 		return err
 	}
 
-	err = client.generateJoiningTableQuery("book", "books", "narrator", "narrators")
+	err = client.generateJoiningTable("book", "books", string(Narrators), categorySingular[Narrators])
 	if err != nil {
 		return err
 	}
 
-	err = client.generateJoiningTableQuery("book", "books", "genre", "genres")
+	err = client.generateJoiningTable("book", "books", string(Genres), categorySingular[Genres])
 	if err != nil {
 		return err
 	}
@@ -130,7 +140,7 @@ func (client *Client) handleMigration() error {
 	return nil
 }
 
-func (c Client) generateJoiningTableQuery(type1, type1Table, type2, type2Table string) error {
+func (c Client) generateJoiningTable(type1, type1Table, type2, type2Table string) error {
 	table := fmt.Sprintf(
 		`
 		CREATE TABLE IF NOT EXISTS %s_%s (
@@ -145,4 +155,85 @@ func (c Client) generateJoiningTableQuery(type1, type1Table, type2, type2Table s
 	)
 	_, err := c.db.Exec(table)
 	return err
+}
+
+func (c Client) InsertTestData() error {
+
+	genres := []string{
+		"Romance", "Comedy", "Drama",
+	}
+
+	authors := []string{
+		"John Scalzi", "Andy Weir", "Shakespear", "Zogarth", "James S.A. Corey",
+	}
+
+	narrators := []string{
+		"Wil Wheaton", "Heath Miller", "Eric Mock",
+	}
+
+	series := []string{
+		"The Expanse", "Old Man's War", "Primal Hunter",
+	}
+
+	createCategories := func(categoryType CategoryType, values []string) error {
+
+		for _, value := range values {
+			_, err := c.AddCategory(categoryType, value)
+			if err != nil {
+				return err
+			}
+		}
+		return nil
+	}
+
+	err := createCategories(Genres, genres)
+	if err != nil {
+		return err
+	}
+
+	err = createCategories(Authors, authors)
+	if err != nil {
+		return err
+	}
+
+	err = createCategories(Narrators, narrators)
+	if err != nil {
+		return err
+	}
+
+	err = createCategories(Series, series)
+	if err != nil {
+		return err
+	}
+
+	// 1. The Martian by Andy Weir
+	theMartian := CreateBookParams{
+		Title:       "The Martian",
+		Description: "A stranded astronaut must use his ingenuity to survive on Mars.",
+		Year:        IntPtr(2011),
+		ISBN:        "9780553418026",
+		Tags:        []string{"Sci-Fi", "Survival", "Space"},
+		Publisher:   "Crown",
+		Authors:     []Category{{Value: "Andy Weir"}},
+		Genres:      []Category{{Value: "Sci-Fi"}},
+		Narrators:   []Category{{Value: "R.C. Bray"}},
+	}
+
+	// 2. The Primal Hunter by Zogarth
+	thePrimalHunter := CreateBookParams{
+		Title:       "The Primal Hunter",
+		Description: "A fast-paced LitRPG adventure where the world undergoes a tutorial.",
+		Year:        IntPtr(2022),
+		ASIN:        "B09MTY98S8",
+		Tags:        []string{"LitRPG", "Progression Fantasy", "Action"},
+		Publisher:   "Aethon Books",
+		Authors:     []Category{{Value: "Zogarth"}},
+		Genres:      []Category{{Value: "Fantasy"}},
+		Series:      []Category{{Value: "The Primal Hunter"}},
+	}
+
+	_, err = c.AddBook(CreateBookParams{
+		Title: "The Martian",
+	})
+
 }

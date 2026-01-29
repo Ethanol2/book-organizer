@@ -27,12 +27,23 @@ func main() {
 	log.Println("Starting book organizer")
 
 	dbReset := false
-	if len(os.Args) > 1 && os.Args[1] == "-r" {
-		log.Println("Reset flag")
-		dbReset = true
+	dbTestData := false
+
+	for i, _ := range os.Args[1:] {
+
+		switch os.Args[i] {
+		case "-r":
+			log.Println("Reset flag (-r)")
+			dbReset = true
+
+		case "-t":
+			log.Println("Test Data Insertion flag (-t)")
+			dbTestData = true
+		}
+
 	}
 
-	config, err := initConfig(dbReset)
+	cfg, err := initConfig(dbReset, dbTestData)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -40,19 +51,24 @@ func main() {
 	log.Println("Environment variables and database loaded successfully")
 
 	mux := http.NewServeMux()
-	fHandler := http.FileServer(http.Dir(config.frontendPath))
+	fHandler := http.FileServer(http.Dir(cfg.frontendPath))
 	mux.Handle("/", fHandler)
 
 	// Downloads Endpoints
-	mux.HandleFunc("GET /api/downloads", config.handlerGetDownloads)
+	mux.HandleFunc("GET /api/downloads", cfg.handlerGetDownloads)
+	mux.HandleFunc("GET /api/downloads/{id}", cfg.handlerGetDownload)
+
+	// Category Endpoints
+	mux.HandleFunc("POST /api/categories/{categoryType}", cfg.handlerPutCategory)
+	mux.HandleFunc("GET /api/categories/{categoryType}", cfg.handlerGetAllOfCategory)
 
 	srv := &http.Server{
-		Addr:    ":" + config.port,
+		Addr:    ":" + cfg.port,
 		Handler: mux,
 	}
 
-	scanner := fileScanner.CreateNew(time.Second*5, config.downloadsPath)
-	err = scanner.Start(context.Background(), &config.db)
+	scanner := fileScanner.CreateNew(time.Second*5, cfg.downloadsPath)
+	err = scanner.Start(context.Background(), &cfg.db)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -60,11 +76,11 @@ func main() {
 	log.Println("File scanning started")
 	log.Println("Starting server")
 
-	log.Printf("Serving on: http://localhost:%s/\n", config.port)
+	log.Printf("Serving on: http://localhost:%s/\n", cfg.port)
 	log.Fatal(srv.ListenAndServe())
 }
 
-func initConfig(dbReset bool) (*apiConfig, error) {
+func initConfig(dbReset, insertTestData bool) (*apiConfig, error) {
 
 	godotenv.Load(".env")
 
@@ -103,6 +119,13 @@ func initConfig(dbReset bool) (*apiConfig, error) {
 	port := os.Getenv("PORT")
 	if port == "" {
 		return nil, fmt.Errorf("PORT must be set")
+	}
+
+	if insertTestData {
+		err = db.InsertTestData()
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	return &apiConfig{

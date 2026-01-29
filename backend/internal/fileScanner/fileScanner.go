@@ -112,7 +112,7 @@ func (scan *Scanner) ScanNew(db *database.Client) error {
 			continue
 		}
 
-		_, err = db.CreateDownload(book.Name(), files)
+		_, err = db.AddDownload(book.Name(), files)
 	}
 
 	return nil

@@ -18,7 +18,7 @@ type Download struct {
 
 //#region Setters
 
-func (c Client) CreateDownload(dirPath string, files BookFiles) (*Download, error) {
+func (c Client) AddDownload(dirPath string, files BookFiles) (*Download, error) {
 
 	id := uuid.New()
 
