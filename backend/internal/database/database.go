@@ -122,17 +122,17 @@ func (client *Client) handleMigration() error {
 		return err
 	}
 
-	err = client.generateJoiningTable("book", "books", string(Authors), categorySingular[Authors])
+	err = client.generateJoiningTable("book", "books", categorySingular[Authors], string(Authors))
 	if err != nil {
 		return err
 	}
 
-	err = client.generateJoiningTable("book", "books", string(Narrators), categorySingular[Narrators])
+	err = client.generateJoiningTable("book", "books", categorySingular[Narrators], string(Narrators))
 	if err != nil {
 		return err
 	}
 
-	err = client.generateJoiningTable("book", "books", string(Genres), categorySingular[Genres])
+	err = client.generateJoiningTable("book", "books", categorySingular[Genres], string(Genres))
 	if err != nil {
 		return err
 	}
@@ -159,6 +159,8 @@ func (c Client) generateJoiningTable(type1, type1Table, type2, type2Table string
 
 func (c Client) InsertTestData() error {
 
+	fmt.Print("\n======= Inserting Test Data =======\n\n")
+
 	genres := []string{
 		"Romance", "Comedy", "Drama",
 	}
@@ -172,7 +174,7 @@ func (c Client) InsertTestData() error {
 	}
 
 	series := []string{
-		"The Expanse", "Old Man's War", "Primal Hunter",
+		"The Expanse", "Old Man's War", "The Primal Hunter",
 	}
 
 	createCategories := func(categoryType CategoryType, values []string) error {
@@ -206,34 +208,48 @@ func (c Client) InsertTestData() error {
 		return err
 	}
 
+	intPtr := func(i int) *int {
+		return &i
+	}
+
 	// 1. The Martian by Andy Weir
 	theMartian := CreateBookParams{
 		Title:       "The Martian",
 		Description: "A stranded astronaut must use his ingenuity to survive on Mars.",
-		Year:        IntPtr(2011),
+		Year:        intPtr(2011),
 		ISBN:        "9780553418026",
 		Tags:        []string{"Sci-Fi", "Survival", "Space"},
 		Publisher:   "Crown",
-		Authors:     []Category{{Value: "Andy Weir"}},
-		Genres:      []Category{{Value: "Sci-Fi"}},
-		Narrators:   []Category{{Value: "R.C. Bray"}},
+		Authors:     []Category{{Name: "Andy Weir"}},
+		Genres:      []Category{{Name: "Sci-Fi"}},
+		Narrators:   []Category{{Name: "R.C. Bray"}},
 	}
 
 	// 2. The Primal Hunter by Zogarth
 	thePrimalHunter := CreateBookParams{
 		Title:       "The Primal Hunter",
 		Description: "A fast-paced LitRPG adventure where the world undergoes a tutorial.",
-		Year:        IntPtr(2022),
+		Year:        intPtr(2022),
 		ASIN:        "B09MTY98S8",
 		Tags:        []string{"LitRPG", "Progression Fantasy", "Action"},
 		Publisher:   "Aethon Books",
-		Authors:     []Category{{Value: "Zogarth"}},
-		Genres:      []Category{{Value: "Fantasy"}},
-		Series:      []Category{{Value: "The Primal Hunter"}},
+		Authors:     []Category{{Name: "Zogarth"}},
+		Genres:      []Category{{Name: "Fantasy"}},
+		Series:      []Category{{Name: "The Primal Hunter", Index: intPtr(1)}},
+		Narrators:   []Category{{Name: "Travis Baldree"}},
 	}
 
-	_, err = c.AddBook(CreateBookParams{
-		Title: "The Martian",
-	})
+	_, err = c.AddBook(theMartian)
+	if err != nil {
+		return err
+	}
 
+	_, err = c.AddBook(thePrimalHunter)
+	if err != nil {
+		return err
+	}
+
+	fmt.Print("\n======= Finished Inserting Test Data =======\n\n")
+
+	return nil
 }

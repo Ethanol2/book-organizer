@@ -10,6 +10,7 @@ import (
 
 	"github.com/Ethanol2/book-organizer/internal/database"
 	"github.com/Ethanol2/book-organizer/internal/fileScanner"
+	"github.com/google/uuid"
 	"github.com/joho/godotenv"
 	_ "github.com/mattn/go-sqlite3"
 )
@@ -29,9 +30,9 @@ func main() {
 	dbReset := false
 	dbTestData := false
 
-	for i, _ := range os.Args[1:] {
+	for _, arg := range os.Args[1:] {
 
-		switch os.Args[i] {
+		switch arg {
 		case "-r":
 			log.Println("Reset flag (-r)")
 			dbReset = true
@@ -56,11 +57,15 @@ func main() {
 
 	// Downloads Endpoints
 	mux.HandleFunc("GET /api/downloads", cfg.handlerGetDownloads)
-	mux.HandleFunc("GET /api/downloads/{id}", cfg.handlerGetDownload)
+	mux.HandleFunc("GET /api/downloads/{id}", uuidMiddleware(cfg.handlerGetDownload))
 
 	// Category Endpoints
 	mux.HandleFunc("POST /api/categories/{categoryType}", cfg.handlerPutCategory)
 	mux.HandleFunc("GET /api/categories/{categoryType}", cfg.handlerGetAllOfCategory)
+
+	// Book Endpoints
+	mux.HandleFunc("GET /api/books", cfg.handlerGetBooks)
+	mux.HandleFunc("GET /api/books/{id}", uuidMiddleware(cfg.handlerGetBook))
 
 	srv := &http.Server{
 		Addr:    ":" + cfg.port,
@@ -135,4 +140,20 @@ func initConfig(dbReset, insertTestData bool) (*apiConfig, error) {
 		libraryPath:   lPath,
 		port:          port,
 	}, nil
+}
+
+func uuidMiddleware(handler func(uuid.UUID, http.ResponseWriter, *http.Request)) func(http.ResponseWriter, *http.Request) {
+
+	return func(w http.ResponseWriter, r *http.Request) {
+
+		idStr := r.PathValue("id")
+		id, err := uuid.Parse(idStr)
+		if err != nil {
+			respondWithError(w, http.StatusBadRequest, "Invalid id", err)
+			return
+		}
+
+		handler(id, w, r)
+	}
+
 }

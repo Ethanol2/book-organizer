@@ -17,14 +17,7 @@ func (cfg *apiConfig) handlerGetDownloads(w http.ResponseWriter, r *http.Request
 	respondWithJson(w, http.StatusOK, downloads)
 }
 
-func (cfg *apiConfig) handlerGetDownload(w http.ResponseWriter, r *http.Request) {
-
-	idStr := r.PathValue("id")
-	id, err := uuid.Parse(idStr)
-	if err != nil {
-		respondWithError(w, http.StatusBadRequest, "Invalid video ID", err)
-		return
-	}
+func (cfg *apiConfig) handlerGetDownload(id uuid.UUID, w http.ResponseWriter, r *http.Request) {
 
 	download, err := cfg.db.GetDownload(id)
 	if err != nil {

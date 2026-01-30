@@ -58,7 +58,7 @@ func (c Client) AddBook(params CreateBookParams) (Book, error) {
 	INSERT INTO books
 		(id, title, publish_year, description, tags, isbn, asin, publisher, audio_files, text_files, cover, created_at, updated_at)
 	VALUES
-		(?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, NULL, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)	
+		(?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, NULL, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)	
 	`
 
 	_, err = c.db.Exec(query, id, params.Title, params.Year, params.Description, tagsJson, params.ISBN, params.ASIN, params.Publisher)
@@ -69,14 +69,27 @@ func (c Client) AddBook(params CreateBookParams) (Book, error) {
 	log.Println("Added \"", params.Title, "\" to books")
 
 	sortCats := func(catType CategoryType, cats []Category) {
-		for _, cat := range cats {
+		log.Println("Associating", catType)
 
+		for _, cat := range cats {
 			if cat.Id == nil {
-				cat, err = c.AddCategory(catType, cat.Value)
+				value := cat.Name
+				index := cat.Index
+				cat, err = c.GetCategoryByValue(catType, value)
+
 				if err != nil {
 					log.Println(err)
 					continue
 				}
+
+				if err == nil && cat == (Category{}) {
+					cat, err = c.AddCategory(catType, value)
+					if err != nil {
+						log.Println(err)
+						continue
+					}
+				}
+				cat.Index = index
 			}
 
 			err := c.associateBookAndCategoryType(id.String(), cat)
@@ -97,9 +110,9 @@ func (c Client) AddBook(params CreateBookParams) (Book, error) {
 func (c Client) GetBook(id uuid.UUID) (Book, error) {
 
 	var book Book
-	var tagsStr string
-	var audioStr string
-	var textStr string
+	var tagsStr *string
+	var audioStr *string
+	var textStr *string
 
 	err := c.db.QueryRow("SELECT * FROM books WHERE id = ?", id).Scan(
 		&book.Id,
@@ -120,40 +133,128 @@ func (c Client) GetBook(id uuid.UUID) (Book, error) {
 		return Book{}, err
 	}
 
-	err = json.Unmarshal([]byte(tagsStr), &book.Tags)
-	if err != nil {
-		return Book{}, err
+	if tagsStr != nil {
+		err = json.Unmarshal([]byte(*tagsStr), &book.Tags)
+		if err != nil {
+			return Book{}, err
+		}
 	}
 
-	err = book.Files.ParseAudioJson(audioStr)
-	if err != nil {
-		return Book{}, err
+	if audioStr != nil {
+		err = book.Files.ParseAudioJson(*audioStr)
+		if err != nil {
+			return Book{}, err
+		}
 	}
 
-	err = book.Files.ParseTextJson(textStr)
-	if err != nil {
-		return Book{}, err
+	if textStr != nil {
+		err = book.Files.ParseTextJson(*textStr)
+		if err != nil {
+			return Book{}, err
+		}
 	}
 
-	book.Authors, err = c.getCategoryTypesAssociatedWithBook(id.String(), Authors)
-	if err != nil {
-		return Book{}, err
-	}
-
-	book.Genres, err = c.getCategoryTypesAssociatedWithBook(id.String(), Genres)
-	if err != nil {
-		return Book{}, err
-	}
-
-	book.Series, err = c.getCategoryTypesAssociatedWithBook(id.String(), Series)
-	if err != nil {
-		return Book{}, err
-	}
-
-	book.Narrators, err = c.getCategoryTypesAssociatedWithBook(id.String(), Narrators)
+	err = book.getBookCategories(c)
 	if err != nil {
 		return Book{}, err
 	}
 
 	return book, nil
+}
+
+func (c Client) GetBooks() ([]Book, error) {
+
+	books := []Book{}
+
+	rows, err := c.db.Query("SELECT * FROM books")
+	if err != nil {
+		return []Book{}, err
+	}
+
+	for rows.Next() {
+		var book Book
+		var tagsStr *string
+		var audioStr *string
+		var textStr *string
+
+		err := rows.Scan(
+			&book.Id,
+			&book.Title,
+			&book.Year,
+			&book.Description,
+			&tagsStr,
+			&book.ISBN,
+			&book.ASIN,
+			&book.Publisher,
+			&audioStr,
+			&textStr,
+			&book.Files.Cover,
+			&book.CreatedAt,
+			&book.UpdatedAt,
+		)
+		if err != nil {
+			log.Println(err)
+			continue
+		}
+
+		if tagsStr != nil {
+			err = json.Unmarshal([]byte(*tagsStr), &book.Tags)
+			if err != nil {
+				log.Println(err)
+				continue
+			}
+		}
+
+		if audioStr != nil {
+			err = book.Files.ParseAudioJson(*audioStr)
+			if err != nil {
+				log.Println(err)
+				continue
+			}
+		}
+
+		if textStr != nil {
+			err = book.Files.ParseTextJson(*textStr)
+			if err != nil {
+				log.Println(err)
+				continue
+			}
+		}
+
+		err = book.getBookCategories(c)
+		if err != nil {
+			log.Println(err)
+			continue
+		}
+
+		books = append(books, book)
+	}
+
+	return books, nil
+}
+
+func (book *Book) getBookCategories(c Client) error {
+	var err error
+
+	book.Authors, err = c.getCategoryTypesAssociatedWithBook(book.Id.String(), Authors)
+	if err != nil {
+		return err
+	}
+
+	book.Genres, err = c.getCategoryTypesAssociatedWithBook(book.Id.String(), Genres)
+	if err != nil {
+		return err
+	}
+
+	book.Series, err = c.getCategoryTypesAssociatedWithBook(book.Id.String(), Series)
+	if err != nil {
+		return err
+	}
+
+	book.Narrators, err = c.getCategoryTypesAssociatedWithBook(book.Id.String(), Narrators)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }

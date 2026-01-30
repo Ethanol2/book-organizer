@@ -1,6 +1,8 @@
 package database
 
 import (
+	"database/sql"
+	"errors"
 	"fmt"
 	"log"
 )
@@ -17,7 +19,7 @@ const (
 
 type Category struct {
 	Id    *int         `json:"id"`
-	Value string       `json:"value"`
+	Name  string       `json:"name"`
 	Index *int         `json:"index,omitempty"`
 	Type  CategoryType `json:"-"`
 }
@@ -29,7 +31,7 @@ var categorySingular = map[CategoryType]string{
 	Narrators: "narrator",
 }
 
-func (c Client) AddCategory(categoryType CategoryType, value string) (Category, error) {
+func (c Client) AddCategory(categoryType CategoryType, name string) (Category, error) {
 
 	query := fmt.Sprintf(`
 	INSERT INTO %s
@@ -38,12 +40,12 @@ func (c Client) AddCategory(categoryType CategoryType, value string) (Category, 
 		(NULL, ?)
 	`, categoryType)
 
-	result, err := c.db.Exec(query, value)
+	result, err := c.db.Exec(query, name)
 	if err != nil {
 		return Category{}, err
 	}
 
-	log.Println("Added \"", value, "\" to", categoryType)
+	log.Println("Added \"", name, "\" to", categoryType)
 
 	id, err := result.LastInsertId()
 	if err != nil {
@@ -87,12 +89,35 @@ func (c Client) GetCategory(categoryType CategoryType, id int) (Category, error)
 	`, categoryType)
 
 	cat := Category{Type: categoryType}
-	err := c.db.QueryRow(query, id).Scan(&cat.Id, &cat.Value)
+	err := c.db.QueryRow(query, id).Scan(&cat.Id, &cat.Name)
 	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return Category{}, nil
+		}
 		return Category{}, err
 	}
 
-	defer log.Println("Retrieved \"", cat.Value, "\" from", categoryType)
+	defer log.Println("Retrieved \"", cat.Name, "\" from", categoryType)
+
+	return cat, err
+}
+
+func (c Client) GetCategoryByValue(categoryType CategoryType, name string) (Category, error) {
+
+	query := fmt.Sprintf(`
+	SELECT * FROM %s WHERE name = ?
+	`, categoryType)
+
+	cat := Category{Type: categoryType}
+	err := c.db.QueryRow(query, name).Scan(&cat.Id, &cat.Name)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return Category{}, nil
+		}
+		return Category{}, err
+	}
+
+	defer log.Println("Retrieved \"", cat.Name, "\" from", categoryType)
 
 	return cat, err
 }
@@ -108,7 +133,7 @@ func (c Client) GetAllOfCategory(categoryType CategoryType) ([]Category, error) 
 	for rows.Next() {
 		cat := Category{Type: categoryType}
 
-		err = rows.Scan(&cat.Id, &cat.Value)
+		err = rows.Scan(&cat.Id, &cat.Name)
 		if err != nil {
 			return []Category{}, err
 		}
@@ -121,16 +146,26 @@ func (c Client) GetAllOfCategory(categoryType CategoryType) ([]Category, error) 
 
 func (c Client) associateBookAndCategoryType(bookId string, category Category) error {
 
-	query := fmt.Sprintf(`
-	INSERT INTO books_%s (book_id, %s_id)
-	SELECT b.id, c.id,
-	FROM books b
-	CROSS JOIN %s c
-	WHERE b.id = ? AND c.id = ?
-	`, category.Type, categorySingular[category.Type], category.Type)
+	insertLine := ""
+	var args []any
+	if category.Type == Series {
+		insertLine = fmt.Sprintf("INSERT INTO books_%s (book_id, %s_id, series_index)\nSELECT b.id, c.id, ?", category.Type, categorySingular[category.Type])
+		args = []any{category.Index, bookId, category.Id}
+	} else {
+		insertLine = fmt.Sprintf("INSERT INTO books_%s (book_id, %s_id)\nSELECT b.id, c.id", category.Type, categorySingular[category.Type])
+		args = []any{bookId, category.Id}
+	}
 
-	_, err := c.db.Exec(query, bookId, category.Id)
+	query := fmt.Sprintf(`
+	%s
+	FROM books AS b
+	CROSS JOIN %s AS c
+	WHERE b.id = ? AND c.id = ?
+	`, insertLine, category.Type)
+
+	_, err := c.db.Exec(query, args...)
 	if err != nil {
+		fmt.Println(query)
 		return err
 	}
 
@@ -148,26 +183,34 @@ func (c Client) getCategoryTypesAssociatedWithBook(bookId string, categoryType C
 
 	selectLine := ""
 	if categoryType == Series {
-		selectLine = fmt.Sprintf("SELECT cat.*, books_%s.series_index FROM %s AS cat", categoryType, categoryType)
+		selectLine = fmt.Sprintf("SELECT cat.*, jn.series_index FROM %s AS cat", categoryType)
 	} else {
 		selectLine = fmt.Sprintf("SELECT cat.* FROM %s AS cat", categoryType)
 	}
 
 	query := fmt.Sprintf(`
 	%s
-	INNER JOIN books_%s AS join ON cat.id = join.%s_id
-	INNER JOIN books ON join.books_id = ?;
+	INNER JOIN books_%s AS jn 
+		ON cat.id = jn.%s_id
+	WHERE jn.book_id = ?;
 	`, selectLine, categoryType, categorySingular[categoryType])
 
 	rows, err := c.db.Query(query, bookId)
 	if err != nil {
+		//fmt.Println(query)
 		return []Category{}, err
 	}
 
 	cats := []Category{}
 	for rows.Next() {
 		cat := Category{Type: categoryType}
-		err = rows.Scan(&cat.Id, &cat.Value)
+
+		if categoryType == Series {
+			err = rows.Scan(&cat.Id, &cat.Name, &cat.Index)
+		} else {
+			err = rows.Scan(&cat.Id, &cat.Name)
+		}
+
 		if err != nil {
 			return []Category{}, err
 		}

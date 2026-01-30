@@ -134,7 +134,7 @@ func (scan *Scanner) ScanExisting(db *database.Client) error {
 			if err != nil {
 				log.Println(err)
 			}
-			log.Println("Book \"", dir, "\" was not found and removed from the database")
+			log.Println("Download \"", dir, "\" was not found and removed from the database")
 			continue
 		}
 
@@ -222,9 +222,9 @@ func getFiles(dir string) (database.BookFiles, error) {
 	}
 
 	return database.BookFiles{
-		AudioFiles: database.FileList{Files: audio},
-		TextFiles:  database.FileList{Files: text},
-		Cover:      cover,
+		AudioFiles: &database.FileList{Files: audio},
+		TextFiles:  &database.FileList{Files: text},
+		Cover:      &cover,
 	}, nil
 
 }

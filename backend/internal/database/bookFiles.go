@@ -3,9 +3,9 @@ package database
 import "encoding/json"
 
 type BookFiles struct {
-	AudioFiles FileList `json:"audio_files"`
-	TextFiles  FileList `json:"text_files"`
-	Cover      string   `json:"cover"`
+	AudioFiles *FileList `json:"audio_files"`
+	TextFiles  *FileList `json:"text_files"`
+	Cover      *string   `json:"cover"`
 }
 type FileList struct {
 	Files []string `json:"files"`
@@ -22,7 +22,7 @@ func (files BookFiles) ToJson() (string, string, string, error) {
 		return "", "", "", err
 	}
 
-	return string(audioBytes), string(textBytes), files.Cover, nil
+	return string(audioBytes), string(textBytes), *files.Cover, nil
 }
 
 func (files BookFiles) ParseAudioJson(audioJson string) error {
