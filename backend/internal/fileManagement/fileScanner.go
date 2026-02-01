@@ -1,4 +1,4 @@
-package fileScanner
+package fileManagement
 
 import (
 	"context"
@@ -69,7 +69,7 @@ func (scan *Scanner) Start(ctx context.Context, db *database.Client) error {
 
 func (scan *Scanner) Scan(db *database.Client) error {
 
-	log.Println("Scanning...")
+	//log.Println("Scanning...")
 
 	err := scan.ScanExisting(db)
 	if err != nil {

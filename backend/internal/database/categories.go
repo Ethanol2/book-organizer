@@ -20,7 +20,7 @@ const (
 type Category struct {
 	Id    *int         `json:"id"`
 	Name  string       `json:"name"`
-	Index *int         `json:"index,omitempty"`
+	Index *string      `json:"index,omitempty"`
 	Type  CategoryType `json:"-"`
 }
 
@@ -31,7 +31,13 @@ var categorySingular = map[CategoryType]string{
 	Narrators: "narrator",
 }
 
-func (c Client) AddCategory(categoryType CategoryType, name string) (Category, error) {
+func (c Client) AddCategory(tx *sql.Tx, categoryType CategoryType, name string) (Category, error) {
+
+	indyTx := tx == nil
+	if indyTx {
+		tx, _ = c.db.Begin()
+		defer tx.Rollback()
+	}
 
 	query := fmt.Sprintf(`
 	INSERT INTO %s
@@ -50,6 +56,13 @@ func (c Client) AddCategory(categoryType CategoryType, name string) (Category, e
 	id, err := result.LastInsertId()
 	if err != nil {
 		return Category{}, err
+	}
+
+	if indyTx {
+		err = tx.Commit()
+		if err != nil {
+			return Category{}, err
+		}
 	}
 
 	return c.GetCategory(categoryType, int(id))
@@ -144,7 +157,7 @@ func (c Client) GetAllOfCategory(categoryType CategoryType) ([]Category, error) 
 	return categories, nil
 }
 
-func (c Client) associateBookAndCategoryType(bookId string, category Category) error {
+func (c Client) associateBookAndCategoryType(tx *sql.Tx, bookId string, category Category) error {
 
 	insertLine := ""
 	var args []any
@@ -163,14 +176,14 @@ func (c Client) associateBookAndCategoryType(bookId string, category Category) e
 	WHERE b.id = ? AND c.id = ?
 	`, insertLine, category.Type)
 
-	_, err := c.db.Exec(query, args...)
+	_, err := tx.Exec(query, args...)
 	if err != nil {
 		fmt.Println(query)
 		return err
 	}
 
 	if category.Type == Series {
-		_, err := c.db.Exec("UPDATE books_series SET series_index = ? WHERE book_id = ? AND series_id = ?", category.Index, bookId, category.Id)
+		_, err := tx.Exec("UPDATE books_series SET series_index = ? WHERE book_id = ? AND series_id = ?", category.Index, bookId, category.Id)
 		if err != nil {
 			return err
 		}
@@ -179,7 +192,7 @@ func (c Client) associateBookAndCategoryType(bookId string, category Category) e
 	return nil
 }
 
-func (c Client) getCategoryTypesAssociatedWithBook(bookId string, categoryType CategoryType) ([]Category, error) {
+func (c Client) GetCategoryTypesAssociatedWithBook(bookId string, categoryType CategoryType) ([]Category, error) {
 
 	selectLine := ""
 	if categoryType == Series {

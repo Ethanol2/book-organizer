@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/Ethanol2/book-organizer/internal/database"
-	"github.com/Ethanol2/book-organizer/internal/fileScanner"
+	"github.com/Ethanol2/book-organizer/internal/fileManagement"
 	"github.com/google/uuid"
 	"github.com/joho/godotenv"
 	_ "github.com/mattn/go-sqlite3"
@@ -56,6 +56,7 @@ func main() {
 	mux.Handle("/", fHandler)
 
 	// Downloads Endpoints
+	mux.HandleFunc("POST /api/downloads/{id}/associate", uuidMiddleware(cfg.handlerAssociateDownloadToBook))
 	mux.HandleFunc("GET /api/downloads", cfg.handlerGetDownloads)
 	mux.HandleFunc("GET /api/downloads/{id}", uuidMiddleware(cfg.handlerGetDownload))
 
@@ -64,6 +65,7 @@ func main() {
 	mux.HandleFunc("GET /api/categories/{categoryType}", cfg.handlerGetAllOfCategory)
 
 	// Book Endpoints
+	mux.HandleFunc("POST /api/books", cfg.handlerPostBook)
 	mux.HandleFunc("GET /api/books", cfg.handlerGetBooks)
 	mux.HandleFunc("GET /api/books/{id}", uuidMiddleware(cfg.handlerGetBook))
 
@@ -72,7 +74,7 @@ func main() {
 		Handler: mux,
 	}
 
-	scanner := fileScanner.CreateNew(time.Second*5, cfg.downloadsPath)
+	scanner := fileManagement.CreateNew(time.Second*5, cfg.downloadsPath)
 	err = scanner.Start(context.Background(), &cfg.db)
 	if err != nil {
 		log.Fatal(err)

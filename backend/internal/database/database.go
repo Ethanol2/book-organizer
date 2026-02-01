@@ -45,8 +45,8 @@ func (client *Client) handleMigration() error {
 		publish_year INTEGER,
 		description TEXT,
 		tags TEXT,
-		isbn TEXT,
-		asin TEXT,
+		isbn TEXT UNIQUE,
+		asin TEXT UNIQUE,
 		publisher TEXT,
 		audio_files TEXT,
 		text_files TEXT,
@@ -111,7 +111,7 @@ func (client *Client) handleMigration() error {
 		CREATE TABLE IF NOT EXISTS books_series (
 			book_id TEXT NOT NULL,
 			series_id TEXT NOT NULL,
-			series_index INTEGER,
+			series_index TEXT,
 			PRIMARY KEY (book_id, series_id),
 			FOREIGN KEY (book_id) REFERENCES books(id) ON DELETE CASCADE,
 			FOREIGN KEY (series_id) REFERENCES series(id)
@@ -159,6 +159,9 @@ func (c Client) generateJoiningTable(type1, type1Table, type2, type2Table string
 
 func (c Client) InsertTestData() error {
 
+	tx, _ := c.db.Begin()
+	defer tx.Rollback()
+
 	fmt.Print("\n======= Inserting Test Data =======\n\n")
 
 	genres := []string{
@@ -180,7 +183,7 @@ func (c Client) InsertTestData() error {
 	createCategories := func(categoryType CategoryType, values []string) error {
 
 		for _, value := range values {
-			_, err := c.AddCategory(categoryType, value)
+			_, err := c.AddCategory(tx, categoryType, value)
 			if err != nil {
 				return err
 			}
@@ -208,8 +211,16 @@ func (c Client) InsertTestData() error {
 		return err
 	}
 
+	err = tx.Commit()
+	if err != nil {
+		return err
+	}
+
 	intPtr := func(i int) *int {
 		return &i
+	}
+	strPtr := func(s string) *string {
+		return &s
 	}
 
 	// 1. The Martian by Andy Weir
@@ -235,7 +246,7 @@ func (c Client) InsertTestData() error {
 		Publisher:   "Aethon Books",
 		Authors:     []Category{{Name: "Zogarth"}},
 		Genres:      []Category{{Name: "Fantasy"}},
-		Series:      []Category{{Name: "The Primal Hunter", Index: intPtr(1)}},
+		Series:      []Category{{Name: "The Primal Hunter", Index: strPtr("1")}},
 		Narrators:   []Category{{Name: "Travis Baldree"}},
 	}
 

@@ -45,7 +45,19 @@ type CreateBookParams struct {
 	Narrators []Category `json:"narrators"`
 }
 
+func (c Client) CheckBookExists(id uuid.UUID) (bool, error) {
+	var exists bool
+	err := c.db.QueryRow("SELECT EXISTS(SELECT 1 FROM books WHERE id = ?)", id).Scan(&exists)
+	if err != nil {
+		return false, err
+	}
+	return exists, nil
+}
+
 func (c Client) AddBook(params CreateBookParams) (Book, error) {
+
+	tx, _ := c.db.Begin()
+	defer tx.Rollback()
 
 	id := uuid.New()
 
@@ -61,7 +73,7 @@ func (c Client) AddBook(params CreateBookParams) (Book, error) {
 		(?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, NULL, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)	
 	`
 
-	_, err = c.db.Exec(query, id, params.Title, params.Year, params.Description, tagsJson, params.ISBN, params.ASIN, params.Publisher)
+	_, err = tx.Exec(query, id, params.Title, params.Year, params.Description, tagsJson, params.ISBN, params.ASIN, params.Publisher)
 	if err != nil {
 		return Book{}, err
 	}
@@ -83,7 +95,7 @@ func (c Client) AddBook(params CreateBookParams) (Book, error) {
 				}
 
 				if err == nil && cat == (Category{}) {
-					cat, err = c.AddCategory(catType, value)
+					cat, err = c.AddCategory(tx, catType, value)
 					if err != nil {
 						log.Println(err)
 						continue
@@ -92,7 +104,7 @@ func (c Client) AddBook(params CreateBookParams) (Book, error) {
 				cat.Index = index
 			}
 
-			err := c.associateBookAndCategoryType(id.String(), cat)
+			err := c.associateBookAndCategoryType(tx, id.String(), cat)
 			if err != nil {
 				log.Println(err)
 			}
@@ -104,7 +116,12 @@ func (c Client) AddBook(params CreateBookParams) (Book, error) {
 	sortCats(Narrators, params.Narrators)
 	sortCats(Authors, params.Authors)
 
-	return Book{}, nil
+	err = tx.Commit()
+	if err != nil {
+		return Book{}, err
+	}
+
+	return c.GetBook(id)
 }
 
 func (c Client) GetBook(id uuid.UUID) (Book, error) {
@@ -158,6 +175,8 @@ func (c Client) GetBook(id uuid.UUID) (Book, error) {
 	if err != nil {
 		return Book{}, err
 	}
+
+	defer log.Println("Retrieved \"", book.Title, "\" from books")
 
 	return book, nil
 }
@@ -233,25 +252,56 @@ func (c Client) GetBooks() ([]Book, error) {
 	return books, nil
 }
 
+func (c Client) AssociateBookAndDownload(bookId, downloadId uuid.UUID) (Book, error) {
+
+	tx, _ := c.db.Begin()
+	defer tx.Rollback()
+
+	_, err := tx.Exec(`
+	UPDATE books
+	SET
+		audio_files = downloads.audio_files,
+		text_files = downloads.text_files,
+		cover = downloads.cover
+	FROM downloads
+	WHERE books.id = ? AND downloads.id = ?
+	`, bookId, downloadId)
+	if err != nil {
+		return Book{}, err
+	}
+
+	_, err = tx.Exec("UPDATE books SET updated_at = CURRENT_TIMESTAMP WHERE id = ?", bookId)
+	if err != nil {
+		return Book{}, err
+	}
+
+	err = tx.Commit()
+	if err != nil {
+		return Book{}, err
+	}
+
+	return c.GetBook(bookId)
+}
+
 func (book *Book) getBookCategories(c Client) error {
 	var err error
 
-	book.Authors, err = c.getCategoryTypesAssociatedWithBook(book.Id.String(), Authors)
+	book.Authors, err = c.GetCategoryTypesAssociatedWithBook(book.Id.String(), Authors)
 	if err != nil {
 		return err
 	}
 
-	book.Genres, err = c.getCategoryTypesAssociatedWithBook(book.Id.String(), Genres)
+	book.Genres, err = c.GetCategoryTypesAssociatedWithBook(book.Id.String(), Genres)
 	if err != nil {
 		return err
 	}
 
-	book.Series, err = c.getCategoryTypesAssociatedWithBook(book.Id.String(), Series)
+	book.Series, err = c.GetCategoryTypesAssociatedWithBook(book.Id.String(), Series)
 	if err != nil {
 		return err
 	}
 
-	book.Narrators, err = c.getCategoryTypesAssociatedWithBook(book.Id.String(), Narrators)
+	book.Narrators, err = c.GetCategoryTypesAssociatedWithBook(book.Id.String(), Narrators)
 	if err != nil {
 		return err
 	}

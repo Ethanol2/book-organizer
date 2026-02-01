@@ -175,6 +175,16 @@ func (c Client) GetDownloads() ([]Download, error) {
 	return downloads, nil
 }
 
+func (c Client) GetDownloadDir(id uuid.UUID) (string, error) {
+	var dir string
+	err := c.db.QueryRow("SELECT dir_name FROM downloads WHERE id = ?", id).Scan(&dir)
+	if err != nil {
+		return "", err
+	}
+
+	return dir, nil
+}
+
 //#region Helpers
 
 func (c Client) getDownloadWithQuery(query string, args ...any) (*Download, error) {
