@@ -2,6 +2,7 @@ package database
 
 import (
 	"database/sql"
+	"encoding/json"
 	"fmt"
 )
 
@@ -112,9 +113,10 @@ func (client *Client) handleMigration() error {
 			book_id TEXT NOT NULL,
 			series_id TEXT NOT NULL,
 			series_index TEXT,
+			rank INTEGER NOT NULL,
 			PRIMARY KEY (book_id, series_id),
 			FOREIGN KEY (book_id) REFERENCES books(id) ON DELETE CASCADE,
-			FOREIGN KEY (series_id) REFERENCES series(id)
+			FOREIGN KEY (series_id) REFERENCES series(id) ON DELETE CASCADE
 		);
 		`
 	_, err = client.db.Exec(booksSeriestable)
@@ -146,9 +148,10 @@ func (c Client) generateJoiningTable(type1, type1Table, type2, type2Table string
 		CREATE TABLE IF NOT EXISTS %s_%s (
 			%s_id TEXT NOT NULL,
 			%s_id TEXT NOT NULL,
+			rank INTEGER NOT NULL,
 			PRIMARY KEY (%s_id, %s_id),
 			FOREIGN KEY (%s_id) REFERENCES %s(id) ON DELETE CASCADE,
-			FOREIGN KEY (%s_id) REFERENCES %s(id)
+			FOREIGN KEY (%s_id) REFERENCES %s(id) ON DELETE CASCADE
 		);
 		`,
 		type1Table, type2Table, type1, type2, type1, type2, type1, type1Table, type2, type2Table,
@@ -216,38 +219,53 @@ func (c Client) InsertTestData() error {
 		return err
 	}
 
-	intPtr := func(i int) *int {
-		return &i
-	}
-	strPtr := func(s string) *string {
-		return &s
-	}
-
 	// 1. The Martian by Andy Weir
-	theMartian := CreateBookParams{
-		Title:       "The Martian",
-		Description: "A stranded astronaut must use his ingenuity to survive on Mars.",
-		Year:        intPtr(2011),
-		ISBN:        "9780553418026",
-		Tags:        []string{"Sci-Fi", "Survival", "Space"},
-		Publisher:   "Crown",
-		Authors:     []Category{{Name: "Andy Weir"}},
-		Genres:      []Category{{Name: "Sci-Fi"}},
-		Narrators:   []Category{{Name: "R.C. Bray"}},
+	theMartianJson := `
+	{
+		"title": "The Martian",
+		"description": "Six days ago, astronaut Mark Watney became one of the first people to walk on Mars. Now, he's sure he'll be the first person to die there.",
+		"year": 2011,
+		"isbn": "9780553418026",
+		"asin": "B00EMXBDMA",
+		"tags": ["Sci-Fi", "Survival", "Hard Science Fiction"],
+		"publisher": "Crown",
+		"series": [],
+		"authors": [{"name": "Andy Weir"}],
+		"genres": [{"name": "Science Fiction"}],
+		"narrators": [{"name": "R.C. Bray"}]
+	  }	  
+	`
+	var theMartian BookParams
+	err = json.Unmarshal([]byte(theMartianJson), &theMartian)
+	if err != nil {
+		return err
 	}
 
 	// 2. The Primal Hunter by Zogarth
-	thePrimalHunter := CreateBookParams{
-		Title:       "The Primal Hunter",
-		Description: "A fast-paced LitRPG adventure where the world undergoes a tutorial.",
-		Year:        intPtr(2022),
-		ASIN:        "B09MTY98S8",
-		Tags:        []string{"LitRPG", "Progression Fantasy", "Action"},
-		Publisher:   "Aethon Books",
-		Authors:     []Category{{Name: "Zogarth"}},
-		Genres:      []Category{{Name: "Fantasy"}},
-		Series:      []Category{{Name: "The Primal Hunter", Index: strPtr("1")}},
-		Narrators:   []Category{{Name: "Travis Baldree"}},
+	thePrimalHunterJson := `
+	{
+		"title": "The Primal Hunter",
+		"description": "A world changed. An ancient system awakened. Jake, a corporate drone, finds himself in a tutorial that will change his life forever.",
+		"year": 2022,
+		"isbn": "9798834943709",
+		"asin": "B09MV5TTSM",
+		"tags": ["LitRPG", "Progression Fantasy", "Action"],
+		"publisher": "Aethon Books",
+		"series": [
+		  {
+			"name": "The Primal Hunter",
+			"index": "1"
+		  }
+		],
+		"authors": [{"name": "Zogarth"}],
+		"genres": [{"name": "Fantasy"}, {"name": "LitRPG"}],
+		"narrators": [{"name": "Travis Baldree"}]
+	  }	  
+	`
+	var thePrimalHunter BookParams
+	err = json.Unmarshal([]byte(thePrimalHunterJson), &thePrimalHunter)
+	if err != nil {
+		return err
 	}
 
 	_, err = c.AddBook(theMartian)

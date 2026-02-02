@@ -25,7 +25,7 @@ func (files BookFiles) ToJson() (string, string, string, error) {
 	return string(audioBytes), string(textBytes), *files.Cover, nil
 }
 
-func (files BookFiles) ParseAudioJson(audioJson string) error {
+func (files *BookFiles) ParseAudioJson(audioJson string) error {
 	err := json.Unmarshal([]byte(audioJson), &files.AudioFiles)
 	if err != nil {
 		return err
@@ -33,7 +33,7 @@ func (files BookFiles) ParseAudioJson(audioJson string) error {
 	return nil
 }
 
-func (files BookFiles) ParseTextJson(textJson string) error {
+func (files *BookFiles) ParseTextJson(textJson string) error {
 	err := json.Unmarshal([]byte(textJson), &files.TextFiles)
 	if err != nil {
 		return err

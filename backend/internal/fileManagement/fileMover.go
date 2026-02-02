@@ -5,9 +5,9 @@ import (
 	"path"
 )
 
-func MoveFiles(targetDir, fromDir, toDir, author, series string) (string, string, error) {
+func MoveFiles(targetDir, oldDir, newDir, author, series string) (string, string, error) {
 
-	authorDir := path.Join(toDir, author)
+	authorDir := path.Join(newDir, author)
 	if _, err := os.Stat(authorDir); os.IsNotExist(err) {
 		err = os.Mkdir(authorDir, os.ModePerm)
 		if err != nil {
@@ -25,19 +25,19 @@ func MoveFiles(targetDir, fromDir, toDir, author, series string) (string, string
 		}
 	}
 
-	fromPath := path.Join(fromDir, targetDir)
-	toPath := path.Join(seriesDir, targetDir)
+	oldPath := path.Join(oldDir, targetDir)
+	newPath := path.Join(seriesDir, targetDir)
 
-	err := os.Rename(fromPath, toPath)
+	err := os.Rename(oldPath, newPath)
 	if err != nil {
 		return "", "", err
 	}
 
-	return fromPath, toPath, nil
+	return oldPath, newPath, nil
 }
 
-func MoveFilesWithPaths(fromPath, toPath string) error {
-	err := os.Rename(fromPath, toPath)
+func MoveFilesWithPaths(oldPath, newPath string) error {
+	err := os.Rename(oldPath, newPath)
 	if err != nil {
 		return err
 	}

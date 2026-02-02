@@ -38,8 +38,9 @@ func main() {
 			dbReset = true
 
 		case "-t":
-			log.Println("Test Data Insertion flag (-t)")
+			log.Println("Test Data Insertion flag (Resets db) (-t)")
 			dbTestData = true
+			dbReset = true
 		}
 
 	}
@@ -68,6 +69,7 @@ func main() {
 	mux.HandleFunc("POST /api/books", cfg.handlerPostBook)
 	mux.HandleFunc("GET /api/books", cfg.handlerGetBooks)
 	mux.HandleFunc("GET /api/books/{id}", uuidMiddleware(cfg.handlerGetBook))
+	mux.HandleFunc("PATCH /api/books/{id}", uuidMiddleware(cfg.handlerUpdateBook))
 
 	srv := &http.Server{
 		Addr:    ":" + cfg.port,

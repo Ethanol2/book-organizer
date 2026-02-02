@@ -54,7 +54,7 @@ func (cfg *apiConfig) handlerAssociateDownloadToBook(downloadId uuid.UUID, w htt
 		return
 	}
 
-	bookExists, err := cfg.db.CheckBookExists(downloadId)
+	bookExists, err := cfg.db.CheckBookExists(bookIdStruct.BookId)
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, "Database error", err)
 		return
@@ -65,7 +65,7 @@ func (cfg *apiConfig) handlerAssociateDownloadToBook(downloadId uuid.UUID, w htt
 	}
 
 	authorDir := "Unknown"
-	authors, err := cfg.db.GetCategoryTypesAssociatedWithBook(bookIdStruct.BookId.String(), database.Authors)
+	authors, err := cfg.db.GetCategoryTypesAssociatedWithBook(nil, bookIdStruct.BookId.String(), database.Authors)
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, "Database error", err)
 		return
@@ -75,7 +75,7 @@ func (cfg *apiConfig) handlerAssociateDownloadToBook(downloadId uuid.UUID, w htt
 	}
 
 	seriesDir := ""
-	series, err := cfg.db.GetCategoryTypesAssociatedWithBook(bookIdStruct.BookId.String(), database.Series)
+	series, err := cfg.db.GetCategoryTypesAssociatedWithBook(nil, bookIdStruct.BookId.String(), database.Series)
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, "Database error", err)
 		return
@@ -84,7 +84,7 @@ func (cfg *apiConfig) handlerAssociateDownloadToBook(downloadId uuid.UUID, w htt
 		seriesDir = series[0].Name
 	}
 
-	oldPath, newPath, err := fileManagement.MoveFiles(downloadDir, cfg.libraryPath, cfg.downloadsPath, authorDir, seriesDir)
+	oldPath, newPath, err := fileManagement.MoveFiles(downloadDir, cfg.downloadsPath, cfg.libraryPath, authorDir, seriesDir)
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, "Something went wrong moving files", err)
 		return

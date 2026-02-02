@@ -46,14 +46,15 @@ func (c Client) AddCategory(tx *sql.Tx, categoryType CategoryType, name string) 
 		(NULL, ?)
 	`, categoryType)
 
-	result, err := c.db.Exec(query, name)
+	result, err := tx.Exec(query, name)
 	if err != nil {
 		return Category{}, err
 	}
 
 	log.Println("Added \"", name, "\" to", categoryType)
 
-	id, err := result.LastInsertId()
+	id64, err := result.LastInsertId()
+	id := int(id64)
 	if err != nil {
 		return Category{}, err
 	}
@@ -65,7 +66,11 @@ func (c Client) AddCategory(tx *sql.Tx, categoryType CategoryType, name string) 
 		}
 	}
 
-	return c.GetCategory(categoryType, int(id))
+	return Category{
+		Id:   &id,
+		Name: name,
+		Type: categoryType,
+	}, nil
 }
 
 func (c Client) DeleteCategory(category Category) error {
@@ -95,14 +100,20 @@ func (c Client) DeleteCategoryWithID(categoryType CategoryType, id int) error {
 	return nil
 }
 
-func (c Client) GetCategory(categoryType CategoryType, id int) (Category, error) {
+func (c Client) GetCategory(tx *sql.Tx, categoryType CategoryType, id int) (Category, error) {
+
+	indyTx := tx == nil
+	if indyTx {
+		tx, _ = c.db.Begin()
+		defer tx.Rollback()
+	}
 
 	query := fmt.Sprintf(`
 	SELECT * FROM %s WHERE id = ?
 	`, categoryType)
 
 	cat := Category{Type: categoryType}
-	err := c.db.QueryRow(query, id).Scan(&cat.Id, &cat.Name)
+	err := tx.QueryRow(query, id).Scan(&cat.Id, &cat.Name)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return Category{}, nil
@@ -110,12 +121,25 @@ func (c Client) GetCategory(categoryType CategoryType, id int) (Category, error)
 		return Category{}, err
 	}
 
+	if indyTx {
+		err = tx.Commit()
+		if err != nil {
+			return Category{}, err
+		}
+	}
+
 	defer log.Println("Retrieved \"", cat.Name, "\" from", categoryType)
 
 	return cat, err
 }
 
-func (c Client) GetCategoryByValue(categoryType CategoryType, name string) (Category, error) {
+func (c Client) GetCategoryByValue(tx *sql.Tx, categoryType CategoryType, name string) (Category, error) {
+
+	indyTx := tx == nil
+	if indyTx {
+		tx, _ = c.db.Begin()
+		defer tx.Rollback()
+	}
 
 	query := fmt.Sprintf(`
 	SELECT * FROM %s WHERE name = ?
@@ -131,6 +155,13 @@ func (c Client) GetCategoryByValue(categoryType CategoryType, name string) (Cate
 	}
 
 	defer log.Println("Retrieved \"", cat.Name, "\" from", categoryType)
+
+	if indyTx {
+		err = tx.Commit()
+		if err != nil {
+			return Category{}, err
+		}
+	}
 
 	return cat, err
 }
@@ -157,16 +188,16 @@ func (c Client) GetAllOfCategory(categoryType CategoryType) ([]Category, error) 
 	return categories, nil
 }
 
-func (c Client) associateBookAndCategoryType(tx *sql.Tx, bookId string, category Category) error {
+func (c Client) associateBookAndCategoryType(tx *sql.Tx, bookId string, category Category, rank int) error {
 
 	insertLine := ""
 	var args []any
 	if category.Type == Series {
-		insertLine = fmt.Sprintf("INSERT INTO books_%s (book_id, %s_id, series_index)\nSELECT b.id, c.id, ?", category.Type, categorySingular[category.Type])
-		args = []any{category.Index, bookId, category.Id}
+		insertLine = fmt.Sprintf("INSERT INTO books_%s (book_id, %s_id, series_index, rank)\nSELECT b.id, c.id, ?, ?", category.Type, categorySingular[category.Type])
+		args = []any{category.Index, rank, bookId, category.Id}
 	} else {
-		insertLine = fmt.Sprintf("INSERT INTO books_%s (book_id, %s_id)\nSELECT b.id, c.id", category.Type, categorySingular[category.Type])
-		args = []any{bookId, category.Id}
+		insertLine = fmt.Sprintf("INSERT INTO books_%s (book_id, %s_id, rank)\nSELECT b.id, c.id, ?", category.Type, categorySingular[category.Type])
+		args = []any{rank, bookId, category.Id}
 	}
 
 	query := fmt.Sprintf(`
@@ -192,7 +223,13 @@ func (c Client) associateBookAndCategoryType(tx *sql.Tx, bookId string, category
 	return nil
 }
 
-func (c Client) GetCategoryTypesAssociatedWithBook(bookId string, categoryType CategoryType) ([]Category, error) {
+func (c Client) GetCategoryTypesAssociatedWithBook(tx *sql.Tx, bookId string, categoryType CategoryType) ([]Category, error) {
+
+	indyTx := tx == nil
+	if indyTx {
+		tx, _ = c.db.Begin()
+		defer tx.Rollback()
+	}
 
 	selectLine := ""
 	if categoryType == Series {
@@ -205,10 +242,11 @@ func (c Client) GetCategoryTypesAssociatedWithBook(bookId string, categoryType C
 	%s
 	INNER JOIN books_%s AS jn 
 		ON cat.id = jn.%s_id
-	WHERE jn.book_id = ?;
+	WHERE jn.book_id = ?
+	ORDER BY jn.rank ASC;
 	`, selectLine, categoryType, categorySingular[categoryType])
 
-	rows, err := c.db.Query(query, bookId)
+	rows, err := tx.Query(query, bookId)
 	if err != nil {
 		//fmt.Println(query)
 		return []Category{}, err
@@ -230,5 +268,12 @@ func (c Client) GetCategoryTypesAssociatedWithBook(bookId string, categoryType C
 		cats = append(cats, cat)
 	}
 
-	return cats, err
+	if indyTx {
+		err = tx.Commit()
+		if err != nil {
+			return []Category{}, err
+		}
+	}
+
+	return cats, nil
 }

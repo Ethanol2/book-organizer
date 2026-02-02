@@ -34,7 +34,7 @@ func (cfg *apiConfig) handlerGetBooks(w http.ResponseWriter, r *http.Request) {
 
 func (cfg *apiConfig) handlerPostBook(w http.ResponseWriter, r *http.Request) {
 
-	var bookParams database.CreateBookParams
+	var bookParams database.BookParams
 	err := json.NewDecoder(r.Body).Decode(&bookParams)
 	if err != nil {
 		respondWithError(w, http.StatusBadRequest, "Couldn't read body", err)
@@ -50,6 +50,24 @@ func (cfg *apiConfig) handlerPostBook(w http.ResponseWriter, r *http.Request) {
 		}
 
 		respondWithError(w, http.StatusInternalServerError, "Couldn't add book to db", err)
+		return
+	}
+
+	respondWithJson(w, http.StatusOK, book)
+}
+
+func (cfg *apiConfig) handlerUpdateBook(id uuid.UUID, w http.ResponseWriter, r *http.Request) {
+
+	var update database.BookParams
+	err := json.NewDecoder(r.Body).Decode(&update)
+	if err != nil {
+		respondWithError(w, http.StatusBadRequest, "Failed to read body", err)
+		return
+	}
+
+	book, err := cfg.db.UpdateBook(id, update)
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Failed to update database", err)
 		return
 	}
 
