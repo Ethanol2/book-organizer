@@ -191,7 +191,3 @@ Below are the current HTTP endpoints and the JSON structures they expect and ret
   - Flags available at startup:
     - `-r` — reset (remove) the DB file before starting
     - `-t` — insert test data (implies reset)
-
----
-
-If you'd like, I can also add example curl commands or small example responses to each endpoint. 💡
