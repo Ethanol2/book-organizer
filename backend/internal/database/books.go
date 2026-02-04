@@ -12,16 +12,16 @@ import (
 )
 
 type Book struct {
-	Id          uuid.UUID `json:"id"`
-	Title       string    `json:"title"`
-	Description string    `json:"description"`
-	Year        *int      `json:"year"`
-	ISBN        string    `json:"isbn"`
-	ASIN        string    `json:"asin"`
-	Tags        []string  `json:"tags"`
-	Publisher   string    `json:"publisher"`
-	CreatedAt   time.Time `json:"created_at"`
-	UpdatedAt   time.Time `json:"updated_at"`
+	Id          *uuid.UUID `json:"id,omitempty"`
+	Title       string     `json:"title"`
+	Description string     `json:"description"`
+	Year        *int       `json:"year"`
+	ISBN        string     `json:"isbn"`
+	ASIN        string     `json:"asin"`
+	Tags        []string   `json:"tags"`
+	Publisher   string     `json:"publisher"`
+	CreatedAt   *time.Time `json:"created_at,omitempty"`
+	UpdatedAt   *time.Time `json:"updated_at,omitempty"`
 
 	// Categories
 	Series    []Category `json:"series"`
@@ -29,7 +29,7 @@ type Book struct {
 	Genres    []Category `json:"genres"`
 	Narrators []Category `json:"narrators"`
 
-	Files BookFiles `json:"files"`
+	Files *BookFiles `json:"files,omitempty"`
 }
 
 type BookParams struct {

@@ -18,7 +18,7 @@ const (
 )
 
 type Category struct {
-	Id    *int         `json:"id"`
+	Id    *int         `json:"id,omitempty"`
 	Name  string       `json:"name"`
 	Index *string      `json:"index,omitempty"`
 	Type  CategoryType `json:"-"`

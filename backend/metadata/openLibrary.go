@@ -7,6 +7,8 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+
+	"github.com/Ethanol2/book-organizer/internal/database"
 )
 
 type OpenLibrarySearchResults struct {
@@ -37,17 +39,7 @@ type OpenLibrarySearchResults struct {
 	} `json:"docs"`
 }
 
-type OpenLibrarySearchParams struct {
-	Title     *string   `json:"title"`
-	Author    *string   `json:"author"`
-	Year      *string   `json:"year"`
-	Publisher *string   `json:"publisher"`
-	Subjects  *[]string `json:"subjects"`
-	Languages *[]string `json:"languages"`
-	Page      *string   `json:"page"`
-}
-
-func SearchOpenLibrary(params OpenLibrarySearchParams) (OpenLibrarySearchResults, error) {
+func SearchOpenLibrary(params SearchParams) (SearchResults, error) {
 
 	u := url.URL{
 		Scheme: "https",
@@ -68,9 +60,9 @@ func SearchOpenLibrary(params OpenLibrarySearchParams) (OpenLibrarySearchResults
 	if params.Year != nil {
 		searchItems = append(searchItems, "publish_year:"+*params.Year)
 	}
-	if params.Subjects != nil {
+	if params.Genres != nil {
 		subjects := "subject:"
-		for _, subject := range *params.Subjects {
+		for _, subject := range *params.Genres {
 			subjects += subject + " "
 		}
 		searchItems = append(searchItems, subjects[:len(subjects)-1])
@@ -87,7 +79,10 @@ func SearchOpenLibrary(params OpenLibrarySearchParams) (OpenLibrarySearchResults
 	q.Add("q", strings.Join(searchItems, " "))
 
 	if params.Page != nil {
-		q.Add("page", *params.Page)
+		q.Add("page", fmt.Sprint(*params.Page))
+	}
+	if params.Sort != nil {
+		q.Add("sort", *params.Sort)
 	}
 
 	u.RawQuery = q.Encode()
@@ -96,19 +91,61 @@ func SearchOpenLibrary(params OpenLibrarySearchParams) (OpenLibrarySearchResults
 
 	resp, err := http.Get(u.String())
 	if err != nil {
-		return OpenLibrarySearchResults{}, err
+		return SearchResults{}, err
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return OpenLibrarySearchResults{}, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
+		return SearchResults{}, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
 	}
 
 	var results OpenLibrarySearchResults
 	err = json.NewDecoder(resp.Body).Decode(&results)
 	if err != nil {
-		return OpenLibrarySearchResults{}, err
+		return SearchResults{}, err
 	}
 
-	return results, nil
+	return results.Parse(params.Genres), nil
+}
+
+func (results *OpenLibrarySearchResults) Parse(genres *[]string) SearchResults {
+
+	standardResults := SearchResults{
+		TotalCount: results.NumFound,
+		Count:      len(results.Docs),
+		Offset:     results.Start,
+	}
+
+	genresCats := []database.Category{}
+	if genres != nil {
+		for _, genre := range *genres {
+			genresCats = append(genresCats, database.Category{
+				Name: genre,
+			})
+		}
+	}
+
+	for _, result := range results.Docs {
+
+		authors := []database.Category{}
+		for _, author := range result.AuthorName {
+			authors = append(authors, database.Category{
+				Name: author,
+			})
+		}
+
+		book := database.Book{
+			Title:   result.Title,
+			Year:    &result.FirstPublishYear,
+			Authors: authors,
+		}
+
+		if len(genresCats) > 0 {
+			book.Genres = genresCats
+		}
+
+		standardResults.Items = append(standardResults.Items, book)
+	}
+
+	return standardResults
 }

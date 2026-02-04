@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
@@ -10,6 +11,7 @@ import (
 
 	"github.com/Ethanol2/book-organizer/internal/database"
 	"github.com/Ethanol2/book-organizer/internal/fileManagement"
+	"github.com/Ethanol2/book-organizer/metadata"
 	"github.com/google/uuid"
 	"github.com/joho/godotenv"
 	_ "github.com/mattn/go-sqlite3"
@@ -21,6 +23,8 @@ type apiConfig struct {
 	downloadsPath string
 	libraryPath   string
 	port          string
+
+	googleBooksApiKey string
 }
 
 func main() {
@@ -72,7 +76,8 @@ func main() {
 	mux.HandleFunc("PATCH /api/books/{id}", uuidMiddleware(cfg.handlerUpdateBook))
 
 	// Metadata
-	mux.HandleFunc("GET /api/metadata/openlibrary", cfg.handlerSearchOpenLibrary)
+	mux.HandleFunc("GET /api/metadata/openlibrary", metadataSearchMiddleware(cfg.handlerSearchOpenLibrary))
+	mux.HandleFunc("GET /api/metadata/googlebooks", metadataSearchMiddleware(cfg.handlerSearchGoogleBooks))
 
 	srv := &http.Server{
 		Addr:    ":" + cfg.port,
@@ -133,6 +138,11 @@ func initConfig(dbReset, insertTestData bool) (*apiConfig, error) {
 		return nil, fmt.Errorf("PORT must be set")
 	}
 
+	gbApiKey := os.Getenv("GOOGLE_BOOKS_API_KEY")
+	if gbApiKey == "" {
+		log.Println("no google books api key in env variables. Google books search won't work")
+	}
+
 	if insertTestData {
 		err = db.InsertTestData()
 		if err != nil {
@@ -141,11 +151,12 @@ func initConfig(dbReset, insertTestData bool) (*apiConfig, error) {
 	}
 
 	return &apiConfig{
-		db:            db,
-		frontendPath:  fPath,
-		downloadsPath: dPath,
-		libraryPath:   lPath,
-		port:          port,
+		db:                db,
+		frontendPath:      fPath,
+		downloadsPath:     dPath,
+		libraryPath:       lPath,
+		port:              port,
+		googleBooksApiKey: gbApiKey,
 	}, nil
 }
 
@@ -163,4 +174,18 @@ func uuidMiddleware(handler func(uuid.UUID, http.ResponseWriter, *http.Request))
 		handler(id, w, r)
 	}
 
+}
+
+func metadataSearchMiddleware(handler func(metadata.SearchParams, http.ResponseWriter, *http.Request)) func(http.ResponseWriter, *http.Request) {
+
+	return func(w http.ResponseWriter, r *http.Request) {
+		var searchParams metadata.SearchParams
+		err := json.NewDecoder(r.Body).Decode(&searchParams)
+		if err != nil {
+			respondWithError(w, http.StatusBadRequest, "couldn't read body", err)
+			return
+		}
+
+		handler(searchParams, w, r)
+	}
 }
