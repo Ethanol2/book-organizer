@@ -1,5 +1,14 @@
 package metadata
 
+import (
+	"encoding/json"
+	"fmt"
+	"log"
+	"net/http"
+	"net/url"
+	"strings"
+)
+
 type OpenLibrarySearchResults struct {
 	Start            int         `json:"start"`
 	NumFoundExact    bool        `json:"numFoundExact"`
@@ -29,12 +38,77 @@ type OpenLibrarySearchResults struct {
 }
 
 type OpenLibrarySearchParams struct {
-	Title     *string `json:"title"`
-	Author    *string `json:"author"`
-	Year      *int    `json:"year"`
-	ISBN      *string `json:"isbn"`
-	ASIN      *string `json:"asin"`
-	Publisher *string `json:"publisher"`
+	Title     *string   `json:"title"`
+	Author    *string   `json:"author"`
+	Year      *string   `json:"year"`
+	Publisher *string   `json:"publisher"`
+	Subjects  *[]string `json:"subjects"`
+	Languages *[]string `json:"languages"`
+	Page      *string   `json:"page"`
 }
 
-func SearchOpenLibrary()
+func SearchOpenLibrary(params OpenLibrarySearchParams) (OpenLibrarySearchResults, error) {
+
+	u := url.URL{
+		Scheme: "https",
+		Host:   "openlibrary.org",
+		Path:   "search.json",
+	}
+
+	searchItems := []string{}
+	if params.Title != nil {
+		searchItems = append(searchItems, "title:"+*params.Title)
+	}
+	if params.Author != nil {
+		searchItems = append(searchItems, "author:"+*params.Author)
+	}
+	if params.Publisher != nil {
+		searchItems = append(searchItems, "publisher:"+*params.Publisher)
+	}
+	if params.Year != nil {
+		searchItems = append(searchItems, "publish_year:"+*params.Year)
+	}
+	if params.Subjects != nil {
+		subjects := "subject:"
+		for _, subject := range *params.Subjects {
+			subjects += subject + " "
+		}
+		searchItems = append(searchItems, subjects[:len(subjects)-1])
+	}
+	if params.Languages != nil {
+		languages := "language:"
+		for _, lang := range *params.Languages {
+			languages += lang + " "
+		}
+		searchItems = append(searchItems, languages[:len(languages)-1])
+	}
+
+	q := u.Query()
+	q.Add("q", strings.Join(searchItems, " "))
+
+	if params.Page != nil {
+		q.Add("page", *params.Page)
+	}
+
+	u.RawQuery = q.Encode()
+
+	log.Println("Querying OpenLibrary:", u.String())
+
+	resp, err := http.Get(u.String())
+	if err != nil {
+		return OpenLibrarySearchResults{}, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return OpenLibrarySearchResults{}, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
+	}
+
+	var results OpenLibrarySearchResults
+	err = json.NewDecoder(resp.Body).Decode(&results)
+	if err != nil {
+		return OpenLibrarySearchResults{}, err
+	}
+
+	return results, nil
+}

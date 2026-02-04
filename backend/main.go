@@ -71,6 +71,9 @@ func main() {
 	mux.HandleFunc("GET /api/books/{id}", uuidMiddleware(cfg.handlerGetBook))
 	mux.HandleFunc("PATCH /api/books/{id}", uuidMiddleware(cfg.handlerUpdateBook))
 
+	// Metadata
+	mux.HandleFunc("GET /api/metadata/openlibrary", cfg.handlerSearchOpenLibrary)
+
 	srv := &http.Server{
 		Addr:    ":" + cfg.port,
 		Handler: mux,
