@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/Ethanol2/book-organizer/internal/database"
+	"github.com/google/uuid"
 )
 
 type Scanner struct {
@@ -100,19 +101,26 @@ func (scan *Scanner) ScanNew(db *database.Client) error {
 		return err
 	}
 
-	for _, book := range dirItems {
+	downloads := map[string]database.BookFiles{}
 
-		if !book.Type().IsDir() || slices.Contains(knownDirs, book.Name()) {
+	for _, download := range dirItems {
+
+		if !download.Type().IsDir() || slices.Contains(knownDirs, download.Name()) {
 			continue
 		}
 
-		files, err := getFiles(path.Join(scan.Directory, book.Name()))
+		files, err := getFiles(path.Join(scan.Directory, download.Name()))
 		if err != nil {
 			log.Println(err)
 			continue
 		}
 
-		_, err = db.AddDownload(book.Name(), files)
+		downloads[download.Name()] = files
+	}
+
+	err = db.AddDownloads(downloads)
+	if err != nil {
+		return err
 	}
 
 	return nil
@@ -124,6 +132,8 @@ func (scan *Scanner) ScanExisting(db *database.Client) error {
 	if err != nil {
 		return err
 	}
+
+	files := map[uuid.UUID]database.BookFiles{}
 
 	for i, dir := range dirs {
 
@@ -144,11 +154,14 @@ func (scan *Scanner) ScanExisting(db *database.Client) error {
 			continue
 		}
 
-		err = db.UpdateDownloadFiles(ids[i], newFiles)
-		if err != nil {
-			log.Println(err)
-		}
+		files[ids[i]] = newFiles
 	}
+
+	err = db.UpdateDownloadsFiles(files)
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 

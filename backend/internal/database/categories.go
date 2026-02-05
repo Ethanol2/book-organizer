@@ -32,10 +32,13 @@ var categorySingular = map[CategoryType]string{
 }
 
 func (c Client) AddCategory(tx *sql.Tx, categoryType CategoryType, name string) (Category, error) {
-
+	var err error
 	indyTx := tx == nil
 	if indyTx {
-		tx, _ = c.db.Begin()
+		tx, err = c.db.Begin()
+		if err != nil {
+			return Category{}, err
+		}
 		defer tx.Rollback()
 	}
 
@@ -101,10 +104,13 @@ func (c Client) DeleteCategoryWithID(categoryType CategoryType, id int) error {
 }
 
 func (c Client) GetCategory(tx *sql.Tx, categoryType CategoryType, id int) (Category, error) {
-
+	var err error
 	indyTx := tx == nil
 	if indyTx {
-		tx, _ = c.db.Begin()
+		tx, err = c.db.Begin()
+		if err != nil {
+			return Category{}, err
+		}
 		defer tx.Rollback()
 	}
 
@@ -113,7 +119,7 @@ func (c Client) GetCategory(tx *sql.Tx, categoryType CategoryType, id int) (Cate
 	`, categoryType)
 
 	cat := Category{Type: categoryType}
-	err := tx.QueryRow(query, id).Scan(&cat.Id, &cat.Name)
+	err = tx.QueryRow(query, id).Scan(&cat.Id, &cat.Name)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return Category{}, nil
@@ -134,10 +140,13 @@ func (c Client) GetCategory(tx *sql.Tx, categoryType CategoryType, id int) (Cate
 }
 
 func (c Client) GetCategoryByValue(tx *sql.Tx, categoryType CategoryType, name string) (Category, error) {
-
+	var err error
 	indyTx := tx == nil
 	if indyTx {
-		tx, _ = c.db.Begin()
+		tx, err = c.db.Begin()
+		if err != nil {
+			return Category{}, err
+		}
 		defer tx.Rollback()
 	}
 
@@ -146,7 +155,7 @@ func (c Client) GetCategoryByValue(tx *sql.Tx, categoryType CategoryType, name s
 	`, categoryType)
 
 	cat := Category{Type: categoryType}
-	err := c.db.QueryRow(query, name).Scan(&cat.Id, &cat.Name)
+	err = c.db.QueryRow(query, name).Scan(&cat.Id, &cat.Name)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return Category{}, nil
@@ -224,10 +233,13 @@ func (c Client) associateBookAndCategoryType(tx *sql.Tx, bookId string, category
 }
 
 func (c Client) GetCategoryTypesAssociatedWithBook(tx *sql.Tx, bookId string, categoryType CategoryType) ([]Category, error) {
-
+	var err error
 	indyTx := tx == nil
 	if indyTx {
-		tx, _ = c.db.Begin()
+		tx, err = c.db.Begin()
+		if err != nil {
+			return []Category{}, err
+		}
 		defer tx.Rollback()
 	}
 

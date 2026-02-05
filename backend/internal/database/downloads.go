@@ -18,7 +18,17 @@ type Download struct {
 
 //#region Setters
 
-func (c Client) AddDownload(dirPath string, files BookFiles) (*Download, error) {
+func (c Client) AddDownload(tx *sql.Tx, dirPath string, files BookFiles) (*Download, error) {
+	var err error
+
+	indyTx := tx == nil
+	if indyTx {
+		tx, err = c.db.Begin()
+		if err != nil {
+			return nil, err
+		}
+		defer tx.Rollback()
+	}
 
 	id := uuid.New()
 
@@ -33,9 +43,16 @@ func (c Client) AddDownload(dirPath string, files BookFiles) (*Download, error) 
 	VALUES
 		(?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
 	`
-	_, err = c.db.Exec(query, id, dirPath, audio, text, cover)
+	_, err = tx.Exec(query, id, dirPath, audio, text, cover)
 	if err != nil {
 		return nil, err
+	}
+
+	if indyTx {
+		err = tx.Commit()
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	log.Println("Added \"", dirPath, "\" to downloads")
@@ -43,7 +60,35 @@ func (c Client) AddDownload(dirPath string, files BookFiles) (*Download, error) 
 	return c.GetDownload(id)
 }
 
-func (c Client) UpdateDownloadFiles(id uuid.UUID, files BookFiles) error {
+func (c Client) AddDownloads(downloads map[string]BookFiles) error {
+
+	tx, err := c.db.Begin()
+	if err != nil {
+		return err
+	}
+
+	for name := range downloads {
+		_, err = c.AddDownload(tx, name, downloads[name])
+		if err != nil {
+			return err
+		}
+	}
+
+	tx.Commit()
+
+	return nil
+}
+
+func (c Client) UpdateDownloadFiles(tx *sql.Tx, id uuid.UUID, files BookFiles) error {
+	var err error
+	indyTx := tx == nil
+	if indyTx {
+		tx, err = c.db.Begin()
+		if err != nil {
+			return err
+		}
+		defer tx.Rollback()
+	}
 
 	audio, text, cover, err := files.ToJson()
 	if err != nil {
@@ -58,7 +103,37 @@ func (c Client) UpdateDownloadFiles(id uuid.UUID, files BookFiles) error {
 			cover = ?
 		WHERE id = ?
 	`
-	_, err = c.db.Exec(query, audio, text, cover, id)
+	_, err = tx.Exec(query, audio, text, cover, id)
+	if err != nil {
+		return err
+	}
+
+	if indyTx {
+		err = tx.Commit()
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (c Client) UpdateDownloadsFiles(files map[uuid.UUID]BookFiles) error {
+
+	tx, err := c.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	for id := range files {
+		err = c.UpdateDownloadFiles(tx, id, files[id])
+		if err != nil {
+			return err
+		}
+	}
+
+	err = tx.Commit()
 	if err != nil {
 		return err
 	}
