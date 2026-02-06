@@ -282,6 +282,8 @@ func (c Client) getDownloadWithQuery(query string, args ...any) (*Download, erro
 		return nil, err
 	}
 
+	download.Files.Directory = &download.DirName
+
 	err = download.Files.ParseAudioJson(audioJson)
 	if err != nil {
 		return nil, err
@@ -294,37 +296,4 @@ func (c Client) getDownloadWithQuery(query string, args ...any) (*Download, erro
 
 	return &download, err
 
-}
-
-func (c Client) getDownloadFilesWithQuery(query string, args ...any) (uuid.UUID, *BookFiles, error) {
-
-	var files BookFiles
-	var idStr string
-	var audioJson string
-	var textJson string
-
-	err := c.db.QueryRow(query, args...).Scan(&idStr, &audioJson, &textJson, &files.Cover)
-	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return uuid.Nil, nil, nil
-		}
-		return uuid.Nil, nil, err
-	}
-
-	id, err := uuid.Parse(idStr)
-	if err != nil {
-		return uuid.Nil, nil, err
-	}
-
-	err = files.ParseAudioJson(audioJson)
-	if err != nil {
-		return uuid.Nil, nil, err
-	}
-
-	err = files.ParseTextJson(textJson)
-	if err != nil {
-		return uuid.Nil, nil, err
-	}
-
-	return id, &files, err
 }

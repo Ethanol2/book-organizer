@@ -64,6 +64,7 @@ func main() {
 	mux.HandleFunc("POST /api/downloads/{id}/associate", uuidMiddleware(cfg.handlerAssociateDownloadToBook))
 	mux.HandleFunc("GET /api/downloads", cfg.handlerGetDownloads)
 	mux.HandleFunc("GET /api/downloads/{id}", uuidMiddleware(cfg.handlerGetDownload))
+	mux.HandleFunc("GET /api/downloads/{id}/cover", uuidMiddleware(cfg.handlerGetDownloadCover))
 
 	// Category Endpoints
 	mux.HandleFunc("POST /api/categories/{categoryType}", cfg.handlerPutCategory)
@@ -73,6 +74,7 @@ func main() {
 	mux.HandleFunc("POST /api/books", cfg.handlerPostBook)
 	mux.HandleFunc("GET /api/books", cfg.handlerGetBooks)
 	mux.HandleFunc("GET /api/books/{id}", uuidMiddleware(cfg.handlerGetBook))
+	mux.HandleFunc("GET /api/books/{id}/cover", uuidMiddleware(cfg.handlerGetBookCover))
 	mux.HandleFunc("PATCH /api/books/{id}", uuidMiddleware(cfg.handlerUpdateBook))
 
 	// Metadata

@@ -3,6 +3,7 @@ package database
 import (
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"log"
 	"slices"
 	"strings"
@@ -71,9 +72,9 @@ func (c Client) AddBook(params BookParams) (Book, error) {
 
 	query := `
 	INSERT INTO books
-		(id, title, publish_year, description, tags, isbn, asin, publisher, audio_files, text_files, cover, created_at, updated_at)
+		(id, title, publish_year, description, tags, isbn, asin, publisher, directory, audio_files, text_files, cover, created_at, updated_at)
 	VALUES
-		(?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, NULL, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)	
+		(?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, NULL, NULL, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)	
 	`
 
 	_, err = tx.Exec(query, id, params.Title, params.Year, params.Description, string(tagsJson), params.ISBN, params.ASIN, params.Publisher)
@@ -148,6 +149,8 @@ func (c Client) GetBook(id uuid.UUID) (Book, error) {
 	var tagsStr *string
 	var audioStr *string
 	var textStr *string
+	var directory *string
+	var cover *string
 
 	err := c.db.QueryRow("SELECT * FROM books WHERE id = ?", id).Scan(
 		&book.Id,
@@ -158,13 +161,17 @@ func (c Client) GetBook(id uuid.UUID) (Book, error) {
 		&book.ISBN,
 		&book.ASIN,
 		&book.Publisher,
+		&directory,
 		&audioStr,
 		&textStr,
-		&book.Files.Cover,
+		&cover,
 		&book.CreatedAt,
 		&book.UpdatedAt,
 	)
 	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return Book{}, nil
+		}
 		return Book{}, err
 	}
 
@@ -175,18 +182,28 @@ func (c Client) GetBook(id uuid.UUID) (Book, error) {
 		}
 	}
 
-	if audioStr != nil {
-		err = book.Files.ParseAudioJson(*audioStr)
-		if err != nil {
-			return Book{}, err
-		}
-	}
+	if directory != nil || cover != nil || audioStr != nil || textStr != nil {
 
-	if textStr != nil {
-		err = book.Files.ParseTextJson(*textStr)
-		if err != nil {
-			return Book{}, err
+		files := BookFiles{
+			Directory: directory,
+			Cover:     cover,
 		}
+
+		if audioStr != nil {
+			err = files.ParseAudioJson(*audioStr)
+			if err != nil {
+				return Book{}, err
+			}
+		}
+
+		if textStr != nil {
+			err = files.ParseTextJson(*textStr)
+			if err != nil {
+				return Book{}, err
+			}
+		}
+
+		book.Files = &files
 	}
 
 	err = book.getBookCategories(c, nil)
@@ -226,6 +243,7 @@ func (c Client) GetBooks() ([]Book, error) {
 			&book.ISBN,
 			&book.ASIN,
 			&book.Publisher,
+			&book.Files.Directory,
 			&audioStr,
 			&textStr,
 			&book.Files.Cover,
@@ -280,12 +298,16 @@ func (c Client) GetBooks() ([]Book, error) {
 
 func (c Client) AssociateBookAndDownload(bookId, downloadId uuid.UUID) (Book, error) {
 
-	tx, _ := c.db.Begin()
+	tx, err := c.db.Begin()
+	if err != nil {
+		return Book{}, err
+	}
 	defer tx.Rollback()
 
-	_, err := tx.Exec(`
+	_, err = tx.Exec(`
 	UPDATE books
 	SET
+		directory = downloads.dir_name,
 		audio_files = downloads.audio_files,
 		text_files = downloads.text_files,
 		cover = downloads.cover
@@ -466,4 +488,26 @@ func (book *Book) getBookCategories(c Client, tx *sql.Tx) error {
 	}
 
 	return nil
+}
+
+func (c Client) GetPrimaryAuthorAndSeries(id uuid.UUID) (string, string, error) {
+	authorDir := "Unknown"
+	authors, err := c.GetCategoryTypesAssociatedWithBook(nil, id.String(), Authors)
+	if err != nil {
+		return "", "", err
+	}
+	if len(authors) > 0 {
+		authorDir = authors[0].Name
+	}
+
+	seriesDir := ""
+	series, err := c.GetCategoryTypesAssociatedWithBook(nil, id.String(), Series)
+	if err != nil {
+		return "", "", err
+	}
+	if len(series) > 0 {
+		seriesDir = series[0].Name
+	}
+
+	return authorDir, seriesDir, nil
 }

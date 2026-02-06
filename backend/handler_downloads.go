@@ -1,15 +1,15 @@
 package main
 
 import (
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"log"
 	"net/http"
+	"path"
 
-	"github.com/Ethanol2/book-organizer/internal/database"
 	"github.com/Ethanol2/book-organizer/internal/fileManagement"
 	"github.com/google/uuid"
-	"github.com/mattn/go-sqlite3"
 )
 
 func (cfg *apiConfig) handlerGetDownloads(w http.ResponseWriter, r *http.Request) {
@@ -37,7 +37,7 @@ func (cfg *apiConfig) handlerAssociateDownloadToBook(downloadId uuid.UUID, w htt
 
 	downloadDir, err := cfg.db.GetDownloadDir(downloadId)
 	if err != nil {
-		if errors.Is(err, sqlite3.ErrNotFound) {
+		if errors.Is(err, sql.ErrNoRows) {
 			respondWithError(w, http.StatusBadRequest, "Download not found", err)
 			return
 		}
@@ -64,24 +64,10 @@ func (cfg *apiConfig) handlerAssociateDownloadToBook(downloadId uuid.UUID, w htt
 		return
 	}
 
-	authorDir := "Unknown"
-	authors, err := cfg.db.GetCategoryTypesAssociatedWithBook(nil, bookIdStruct.BookId.String(), database.Authors)
+	authorDir, seriesDir, err := cfg.db.GetPrimaryAuthorAndSeries(bookIdStruct.BookId)
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, "Database error", err)
 		return
-	}
-	if len(authors) > 0 {
-		authorDir = authors[0].Name
-	}
-
-	seriesDir := ""
-	series, err := cfg.db.GetCategoryTypesAssociatedWithBook(nil, bookIdStruct.BookId.String(), database.Series)
-	if err != nil {
-		respondWithError(w, http.StatusInternalServerError, "Database error", err)
-		return
-	}
-	if len(series) > 0 {
-		seriesDir = series[0].Name
 	}
 
 	oldPath, newPath, err := fileManagement.MoveFiles(downloadDir, cfg.downloadsPath, cfg.libraryPath, authorDir, seriesDir)
@@ -92,6 +78,7 @@ func (cfg *apiConfig) handlerAssociateDownloadToBook(downloadId uuid.UUID, w htt
 
 	book, err := cfg.db.AssociateBookAndDownload(bookIdStruct.BookId, downloadId)
 	if err != nil {
+		log.Println(err)
 		err = fileManagement.MoveFilesWithPaths(newPath, oldPath)
 		if err != nil {
 			respondWithError(w, http.StatusInternalServerError, "Failed to associate the book and files, and failed to move files back from the library to downloads", err)
@@ -102,4 +89,21 @@ func (cfg *apiConfig) handlerAssociateDownloadToBook(downloadId uuid.UUID, w htt
 	}
 
 	respondWithJson(w, http.StatusOK, book)
+}
+
+func (cfg *apiConfig) handlerGetDownloadCover(id uuid.UUID, w http.ResponseWriter, r *http.Request) {
+	download, err := cfg.db.GetDownload(id)
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Database error", err)
+		return
+	}
+	if download == nil {
+		respondWithError(w, http.StatusBadRequest, "Download not found", err)
+		return
+	}
+
+	coverPath := path.Join(cfg.downloadsPath, download.DirName, *download.Files.Cover)
+	log.Println("Serving download cover from", coverPath)
+
+	http.ServeFile(w, r, coverPath)
 }

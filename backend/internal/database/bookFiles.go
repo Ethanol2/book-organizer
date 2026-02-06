@@ -3,6 +3,7 @@ package database
 import "encoding/json"
 
 type BookFiles struct {
+	Directory  *string
 	AudioFiles *FileList `json:"audio_files"`
 	TextFiles  *FileList `json:"text_files"`
 	Cover      *string   `json:"cover"`

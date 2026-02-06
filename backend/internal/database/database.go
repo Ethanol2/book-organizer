@@ -49,6 +49,7 @@ func (client *Client) handleMigration() error {
 		isbn TEXT UNIQUE,
 		asin TEXT UNIQUE,
 		publisher TEXT,
+		directory TEXT,
 		audio_files TEXT,
 		text_files TEXT,
 		cover TEXT,

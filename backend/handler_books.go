@@ -3,7 +3,9 @@ package main
 import (
 	"encoding/json"
 	"errors"
+	"log"
 	"net/http"
+	"path"
 
 	"github.com/Ethanol2/book-organizer/internal/database"
 	"github.com/google/uuid"
@@ -72,4 +74,32 @@ func (cfg *apiConfig) handlerUpdateBook(id uuid.UUID, w http.ResponseWriter, r *
 	}
 
 	respondWithJson(w, http.StatusOK, book)
+}
+
+func (cfg *apiConfig) handlerGetBookCover(id uuid.UUID, w http.ResponseWriter, r *http.Request) {
+
+	book, err := cfg.db.GetBook(id)
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Database error", err)
+		return
+	}
+	if book.Id == nil {
+		respondWithError(w, http.StatusBadRequest, "Book not found", err)
+		return
+	}
+	if book.Files.Directory == nil {
+		respondWithError(w, http.StatusNoContent, "Book doesn't have a cover associated", err)
+		return
+	}
+
+	author, series, err := cfg.db.GetPrimaryAuthorAndSeries(id)
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Database error", err)
+		return
+	}
+
+	coverPath := path.Join(cfg.libraryPath, author, series, *book.Files.Directory, *book.Files.Cover)
+	log.Println("Serving book cover from", coverPath)
+
+	http.ServeFile(w, r, coverPath)
 }
