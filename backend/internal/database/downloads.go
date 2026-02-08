@@ -12,13 +12,12 @@ import (
 type Download struct {
 	Id        uuid.UUID `json:"id"`
 	CreatedAt time.Time `json:"created_at"`
-	DirName   string    `json:"directory_name"`
 	Files     BookFiles `json:"files"`
 }
 
 //#region Setters
 
-func (c Client) AddDownload(tx *sql.Tx, dirPath string, files BookFiles) (*Download, error) {
+func (c Client) AddDownload(tx *sql.Tx, files BookFiles) (*Download, error) {
 	var err error
 
 	indyTx := tx == nil
@@ -43,7 +42,7 @@ func (c Client) AddDownload(tx *sql.Tx, dirPath string, files BookFiles) (*Downl
 	VALUES
 		(?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
 	`
-	_, err = tx.Exec(query, id, dirPath, audio, text, cover)
+	_, err = tx.Exec(query, id, files.Root, audio, text, cover)
 	if err != nil {
 		return nil, err
 	}
@@ -55,12 +54,12 @@ func (c Client) AddDownload(tx *sql.Tx, dirPath string, files BookFiles) (*Downl
 		}
 	}
 
-	log.Println("Added \"", dirPath, "\" to downloads")
+	log.Println("Added \"", files.Root, "\" to downloads")
 
 	return c.GetDownload(id)
 }
 
-func (c Client) AddDownloads(downloads map[string]BookFiles) error {
+func (c Client) AddDownloads(downloads []BookFiles) error {
 
 	tx, err := c.db.Begin()
 	if err != nil {
@@ -68,7 +67,7 @@ func (c Client) AddDownloads(downloads map[string]BookFiles) error {
 	}
 
 	for name := range downloads {
-		_, err = c.AddDownload(tx, name, downloads[name])
+		_, err = c.AddDownload(tx, downloads[name])
 		if err != nil {
 			return err
 		}
@@ -221,7 +220,7 @@ func (c Client) GetDownloads() ([]Download, error) {
 		var audioJson string
 		var textJson string
 
-		err := rows.Scan(&idStr, &download.DirName, &audioJson, &textJson, &download.Files.Cover, &download.CreatedAt)
+		err := rows.Scan(&idStr, &download.Files.Root, &audioJson, &textJson, &download.Files.Cover, &download.CreatedAt)
 		if err != nil {
 			if errors.Is(err, sql.ErrNoRows) {
 				return nil, nil
@@ -269,7 +268,7 @@ func (c Client) getDownloadWithQuery(query string, args ...any) (*Download, erro
 	var audioJson string
 	var textJson string
 
-	err := c.db.QueryRow(query, args...).Scan(&idStr, &download.DirName, &audioJson, &textJson, &download.Files.Cover, &download.CreatedAt)
+	err := c.db.QueryRow(query, args...).Scan(&idStr, &download.Files.Root, &audioJson, &textJson, &download.Files.Cover, &download.CreatedAt)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, nil
@@ -281,8 +280,6 @@ func (c Client) getDownloadWithQuery(query string, args ...any) (*Download, erro
 	if err != nil {
 		return nil, err
 	}
-
-	download.Files.Directory = &download.DirName
 
 	err = download.Files.ParseAudioJson(audioJson)
 	if err != nil {

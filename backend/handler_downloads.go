@@ -19,6 +19,11 @@ func (cfg *apiConfig) handlerGetDownloads(w http.ResponseWriter, r *http.Request
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, "something went wrong retrieving downloads", err)
 	}
+
+	for i := range downloads {
+		downloads[i].Files.Prepend(cfg.downloadsName)
+	}
+
 	respondWithJson(w, http.StatusOK, downloads)
 }
 
@@ -29,6 +34,8 @@ func (cfg *apiConfig) handlerGetDownload(id uuid.UUID, w http.ResponseWriter, r 
 		respondWithError(w, http.StatusInternalServerError, "Couldn't get download", err)
 		return
 	}
+
+	download.Files.Prepend(cfg.downloadsName)
 
 	respondWithJson(w, http.StatusOK, download)
 }
@@ -76,7 +83,7 @@ func (cfg *apiConfig) handlerAssociateDownloadToBook(downloadId uuid.UUID, w htt
 		return
 	}
 
-	book, err := cfg.db.AssociateBookAndDownload(bookIdStruct.BookId, downloadId)
+	book, err := cfg.db.AssociateBookAndDownload(bookIdStruct.BookId, downloadId, authorDir, seriesDir)
 	if err != nil {
 		log.Println(err)
 		err = fileManagement.MoveFilesWithPaths(newPath, oldPath)
@@ -86,6 +93,10 @@ func (cfg *apiConfig) handlerAssociateDownloadToBook(downloadId uuid.UUID, w htt
 		}
 		respondWithError(w, http.StatusInternalServerError, "Failed to associate the book and files. Files have been returned to downloads", err)
 		return
+	}
+
+	if book.Files != nil {
+		book.Files.Prepend(cfg.libraryName)
 	}
 
 	respondWithJson(w, http.StatusOK, book)
@@ -102,7 +113,7 @@ func (cfg *apiConfig) handlerGetDownloadCover(id uuid.UUID, w http.ResponseWrite
 		return
 	}
 
-	coverPath := path.Join(cfg.downloadsPath, download.DirName, *download.Files.Cover)
+	coverPath := path.Join(cfg.downloadsPath, download.Files.Root, *download.Files.Cover)
 	log.Println("Serving download cover from", coverPath)
 
 	http.ServeFile(w, r, coverPath)

@@ -20,6 +20,10 @@ func (cfg *apiConfig) handlerGetBook(id uuid.UUID, w http.ResponseWriter, r *htt
 		return
 	}
 
+	if book.Files != nil {
+		book.Files.Prepend(cfg.libraryName)
+	}
+
 	respondWithJson(w, http.StatusOK, book)
 }
 
@@ -29,6 +33,12 @@ func (cfg *apiConfig) handlerGetBooks(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, "Couldn't get books", err)
 		return
+	}
+
+	for _, b := range books {
+		if b.Files != nil {
+			b.Files.Prepend(cfg.libraryName)
+		}
 	}
 
 	respondWithJson(w, http.StatusOK, books)
@@ -55,6 +65,10 @@ func (cfg *apiConfig) handlerPostBook(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if book.Files != nil {
+		book.Files.Prepend(cfg.libraryName)
+	}
+
 	respondWithJson(w, http.StatusOK, book)
 }
 
@@ -73,6 +87,10 @@ func (cfg *apiConfig) handlerUpdateBook(id uuid.UUID, w http.ResponseWriter, r *
 		return
 	}
 
+	if book.Files != nil {
+		book.Files.Prepend(cfg.libraryName)
+	}
+
 	respondWithJson(w, http.StatusOK, book)
 }
 
@@ -87,7 +105,7 @@ func (cfg *apiConfig) handlerGetBookCover(id uuid.UUID, w http.ResponseWriter, r
 		respondWithError(w, http.StatusBadRequest, "Book not found", err)
 		return
 	}
-	if book.Files.Directory == nil {
+	if book.Files.Cover == nil {
 		respondWithError(w, http.StatusNoContent, "Book doesn't have a cover associated", err)
 		return
 	}
@@ -98,7 +116,7 @@ func (cfg *apiConfig) handlerGetBookCover(id uuid.UUID, w http.ResponseWriter, r
 		return
 	}
 
-	coverPath := path.Join(cfg.libraryPath, author, series, *book.Files.Directory, *book.Files.Cover)
+	coverPath := path.Join(cfg.libraryPath, author, series, book.Files.Root, *book.Files.Cover)
 	log.Println("Serving book cover from", coverPath)
 
 	http.ServeFile(w, r, coverPath)

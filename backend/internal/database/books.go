@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"log"
+	"path"
 	"slices"
 	"strings"
 	"time"
@@ -182,11 +183,11 @@ func (c Client) GetBook(id uuid.UUID) (Book, error) {
 		}
 	}
 
-	if directory != nil || cover != nil || audioStr != nil || textStr != nil {
+	if directory != nil {
 
 		files := BookFiles{
-			Directory: directory,
-			Cover:     cover,
+			Root:  *directory,
+			Cover: cover,
 		}
 
 		if audioStr != nil {
@@ -230,9 +231,11 @@ func (c Client) GetBooks() ([]Book, error) {
 
 	for rows.Next() {
 		var book Book
+		var directory *string
 		var tagsStr *string
 		var audioStr *string
 		var textStr *string
+		var cover *string
 
 		err := rows.Scan(
 			&book.Id,
@@ -243,10 +246,10 @@ func (c Client) GetBooks() ([]Book, error) {
 			&book.ISBN,
 			&book.ASIN,
 			&book.Publisher,
-			&book.Files.Directory,
+			&directory,
 			&audioStr,
 			&textStr,
-			&book.Files.Cover,
+			&cover,
 			&book.CreatedAt,
 			&book.UpdatedAt,
 		)
@@ -255,28 +258,28 @@ func (c Client) GetBooks() ([]Book, error) {
 			continue
 		}
 
-		if tagsStr != nil {
-			err = json.Unmarshal([]byte(*tagsStr), &book.Tags)
-			if err != nil {
-				log.Println(err)
-				continue
-			}
-		}
+		if directory != nil {
 
-		if audioStr != nil {
-			err = book.Files.ParseAudioJson(*audioStr)
-			if err != nil {
-				log.Println(err)
-				continue
+			files := BookFiles{
+				Root:  *directory,
+				Cover: cover,
 			}
-		}
 
-		if textStr != nil {
-			err = book.Files.ParseTextJson(*textStr)
-			if err != nil {
-				log.Println(err)
-				continue
+			if audioStr != nil {
+				err = files.ParseAudioJson(*audioStr)
+				if err != nil {
+					return []Book{}, err
+				}
 			}
+
+			if textStr != nil {
+				err = files.ParseTextJson(*textStr)
+				if err != nil {
+					return []Book{}, err
+				}
+			}
+
+			book.Files = &files
 		}
 
 		err = book.getBookCategories(c, tx)
@@ -296,7 +299,7 @@ func (c Client) GetBooks() ([]Book, error) {
 	return books, nil
 }
 
-func (c Client) AssociateBookAndDownload(bookId, downloadId uuid.UUID) (Book, error) {
+func (c Client) AssociateBookAndDownload(bookId, downloadId uuid.UUID, author, series string) (Book, error) {
 
 	tx, err := c.db.Begin()
 	if err != nil {
@@ -304,21 +307,47 @@ func (c Client) AssociateBookAndDownload(bookId, downloadId uuid.UUID) (Book, er
 	}
 	defer tx.Rollback()
 
-	_, err = tx.Exec(`
-	UPDATE books
-	SET
-		directory = downloads.dir_name,
-		audio_files = downloads.audio_files,
-		text_files = downloads.text_files,
-		cover = downloads.cover
-	FROM downloads
-	WHERE books.id = ? AND downloads.id = ?
-	`, bookId, downloadId)
+	var dbFiles struct {
+		Root  string
+		Audio *string
+		Text  *string
+		Cover *string
+	}
+	err = tx.QueryRow(`
+	SELECT dir_name, audio_files, text_files, cover FROM downloads WHERE id = ?
+	`, downloadId).Scan(&dbFiles.Root, &dbFiles.Audio, &dbFiles.Text, &dbFiles.Cover)
 	if err != nil {
 		return Book{}, err
 	}
 
-	_, err = tx.Exec("UPDATE books SET updated_at = CURRENT_TIMESTAMP WHERE id = ?", bookId)
+	files := BookFiles{
+		Root:  dbFiles.Root,
+		Cover: dbFiles.Cover,
+	}
+	err = files.ParseAudioJson(*dbFiles.Audio)
+	if err != nil {
+		return Book{}, err
+	}
+	err = files.ParseTextJson(*dbFiles.Text)
+	if err != nil {
+		return Book{}, err
+	}
+
+	files.Prepend(path.Join(author, series))
+	audio, text, cover, err := files.ToJson()
+	if err != nil {
+		return Book{}, err
+	}
+
+	_, err = tx.Exec(`
+	UPDATE books 
+	SET 
+		updated_at = CURRENT_TIMESTAMP,
+		directory = ?,
+		audio_files = ?,
+		text_files = ?,
+		cover = ?
+	WHERE id = ?`, dbFiles.Root, audio, text, cover, bookId)
 	if err != nil {
 		return Book{}, err
 	}

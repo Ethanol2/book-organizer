@@ -101,21 +101,21 @@ func (scan *Scanner) ScanNew(db *database.Client) error {
 		return err
 	}
 
-	downloads := map[string]database.BookFiles{}
+	downloads := []database.BookFiles{}
 
-	for _, download := range dirItems {
+	for _, item := range dirItems {
 
-		if !download.Type().IsDir() || slices.Contains(knownDirs, download.Name()) {
+		if !item.Type().IsDir() || slices.Contains(knownDirs, item.Name()) {
 			continue
 		}
 
-		files, err := getFiles(path.Join(scan.Directory, download.Name()))
+		files, err := getFiles(scan.Directory, item.Name())
 		if err != nil {
 			log.Println(err)
 			continue
 		}
 
-		downloads[download.Name()] = files
+		downloads = append(downloads, files)
 	}
 
 	err = db.AddDownloads(downloads)
@@ -148,7 +148,7 @@ func (scan *Scanner) ScanExisting(db *database.Client) error {
 			continue
 		}
 
-		newFiles, err := getFiles(path)
+		newFiles, err := getFiles(scan.Directory, dir)
 		if err != nil {
 			log.Println(err)
 			continue
@@ -185,13 +185,15 @@ func getFileType(filename string) FileType {
 	return Other
 }
 
-func getFiles(dir string) (database.BookFiles, error) {
+func getFiles(root, folder string) (database.BookFiles, error) {
+
+	p := path.Join(root, folder)
 
 	var audio []string
 	var text []string
 	var images []string
 
-	bookItems, err := os.ReadDir(dir)
+	bookItems, err := os.ReadDir(p)
 	if err != nil {
 		log.Println(err)
 		return database.BookFiles{}, nil
@@ -205,13 +207,13 @@ func getFiles(dir string) (database.BookFiles, error) {
 		switch fileType {
 
 		case Image:
-			images = append(images, item.Name())
+			images = append(images, path.Join(folder, item.Name()))
 
 		case Text:
-			text = append(text, item.Name())
+			text = append(text, path.Join(folder, item.Name()))
 
 		case Audio:
-			audio = append(audio, item.Name())
+			audio = append(audio, path.Join(folder, item.Name()))
 		}
 	}
 
@@ -220,7 +222,7 @@ func getFiles(dir string) (database.BookFiles, error) {
 	if len(images) > 1 {
 
 		for _, img := range images {
-			if strings.Contains("cover", strings.ToLower(img)) {
+			if strings.Contains(strings.ToLower(img), "cover") {
 				cover = img
 				break
 			}
@@ -235,9 +237,9 @@ func getFiles(dir string) (database.BookFiles, error) {
 	}
 
 	return database.BookFiles{
-		AudioFiles: &database.FileList{Files: audio},
-		TextFiles:  &database.FileList{Files: text},
+		Root:       folder,
+		AudioFiles: &audio,
+		TextFiles:  &text,
 		Cover:      &cover,
 	}, nil
-
 }

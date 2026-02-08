@@ -21,7 +21,9 @@ type apiConfig struct {
 	db            database.Client
 	frontendPath  string
 	downloadsPath string
+	downloadsName string
 	libraryPath   string
+	libraryName   string
 	port          string
 
 	googleBooksApiKey string
@@ -80,6 +82,10 @@ func main() {
 	// Metadata
 	mux.HandleFunc("GET /api/metadata/openlibrary", metadataSearchMiddleware(cfg.handlerSearchOpenLibrary))
 	mux.HandleFunc("GET /api/metadata/googlebooks", metadataSearchMiddleware(cfg.handlerSearchGoogleBooks))
+
+	// Media
+	mux.Handle("/media/downloads/", http.StripPrefix("/media/downloads/", http.FileServer(http.Dir(cfg.downloadsPath))))
+	mux.Handle("/media/library/", http.StripPrefix("/media/library/", http.FileServer(http.Dir(cfg.libraryPath))))
 
 	srv := &http.Server{
 		Addr:    ":" + cfg.port,
@@ -156,7 +162,9 @@ func initConfig(dbReset, insertTestData bool) (*apiConfig, error) {
 		db:                db,
 		frontendPath:      fPath,
 		downloadsPath:     dPath,
+		downloadsName:     "downloads",
 		libraryPath:       lPath,
+		libraryName:       "library",
 		port:              port,
 		googleBooksApiKey: gbApiKey,
 	}, nil
