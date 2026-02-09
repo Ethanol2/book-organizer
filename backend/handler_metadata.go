@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/Ethanol2/book-organizer/metadata"
+	"github.com/Ethanol2/book-organizer/internal/metadata"
 )
 
 func (cfg *apiConfig) handlerSearchOpenLibrary(params metadata.SearchParams, w http.ResponseWriter, r *http.Request) {

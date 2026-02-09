@@ -11,7 +11,7 @@ import (
 
 	"github.com/Ethanol2/book-organizer/internal/database"
 	"github.com/Ethanol2/book-organizer/internal/fileManagement"
-	"github.com/Ethanol2/book-organizer/metadata"
+	"github.com/Ethanol2/book-organizer/internal/metadata"
 	"github.com/google/uuid"
 	"github.com/joho/godotenv"
 	_ "github.com/mattn/go-sqlite3"
@@ -162,9 +162,9 @@ func initConfig(dbReset, insertTestData bool) (*apiConfig, error) {
 		db:                db,
 		frontendPath:      fPath,
 		downloadsPath:     dPath,
-		downloadsName:     "downloads",
+		downloadsName:     "/media/downloads",
 		libraryPath:       lPath,
-		libraryName:       "library",
+		libraryName:       "/media/library",
 		port:              port,
 		googleBooksApiKey: gbApiKey,
 	}, nil
