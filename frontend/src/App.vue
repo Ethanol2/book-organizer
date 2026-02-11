@@ -5,30 +5,49 @@ import HelloWorld from './components/HelloWorld.vue'
 
 <template>
   <div class="app">
-    <aside class="sidebar">
-      <img alt="book organizer logo" class="logo" src="@/assets/book-organizer-logo.png" />
+    <header class="header">
+      <h1>
+        <img alt="book organizer logo" class="logo" src="@/assets/book-organizer-logo.png" />
+        <RouterLink to="/">Book Organizer</RouterLink>
+      </h1>
+    </header>
 
-      <nav>
-        <RouterLink to="/">Library</RouterLink>
-        <RouterLink to="/downloads">Downloads</RouterLink>
-        <RouterLink to="/about">About</RouterLink>
-      </nav>
-    </aside>
+    <body class="body">
+      <aside class="sidebar">
 
-    <main class="content">
-      <RouterView />
-    </main>
+        <nav>
+          <RouterLink to="/">Library</RouterLink>
+          <RouterLink to="/downloads">Downloads</RouterLink>
+          <RouterLink to="/about">About</RouterLink>
+        </nav>
+      </aside>
+
+      <main class="content">
+        <RouterView />
+      </main>
+    </body>
   </div>
 </template>
 
 <style scoped>
 .app {
-  display: flex;
   height: 100vh;
+  width: 100%;
+}
+
+.header {
+  display: flex;
+  height: 100px;
+  border-bottom: 1px solid grey;
+  padding: 1rem;
+}
+
+.body {
+  display: flex;
 }
 
 .sidebar {
-  width: 150px;
+  width: 120px;
   border-right: 1px solid grey;
   padding: 1rem;
 }
@@ -41,8 +60,10 @@ import HelloWorld from './components/HelloWorld.vue'
 
 .logo {
   object-fit: contain;
-  height: auto;
-  width: 100%;
+  height: 100%;
+  width: auto;
+  vertical-align: middle;
+  padding: 0.2rem;
 }
 
 nav {
