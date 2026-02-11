@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import {ref, onMounted} from 'vue'
+import { ref, onMounted } from 'vue'
 import DownloadItem from './DownloadItem.vue';
 import type { Download } from '@/types/download';
 
@@ -24,12 +24,6 @@ onMounted(async () => {
 
 <template>
     <section>
-        <p>Downloads length: {{  downloads.length  }}</p>
-
-        <DownloadItem
-            v-for="download in downloads"
-            :key="download.id"
-            :download="download"
-        />
+        <DownloadItem v-for="download in downloads" :key="download.id" :download="download" />
     </section>
 </template>

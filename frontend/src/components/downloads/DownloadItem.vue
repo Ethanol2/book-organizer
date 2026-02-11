@@ -1,51 +1,44 @@
 <script setup lang="ts">
-import type { Download } from '@/types/download';
+import { getDownloadName, getTimeAdded, type Download } from '@/types/download';
 
 const props = defineProps<{
-    download: Download
+  download: Download
 }>()
 
 </script>
 
 <template>
   <div class="card">
-    <div>
-        <div class="cover">
-            <div v-if="download.files.cover !== null">
-                <img :src="download.files.cover">
-            </div>
-        </div>
-        <div class="details">
-            <h3>
-                {{ download.files.root }}
-            </h3>
-            <p>
-                Text File Count: {{ download.files.text_files == null ? 0 : download.files.text_files.length }} <br>
-                Audio File Count: {{ download.files.audio_files == null ? 0 : download.files.audio_files.length }} <br>
-                Added {{ download.created_at }}
-            </p>
-        </div>
+    <div class="card-content">
+      <div v-if="download.files.cover !== null" class="cover-wrapper">
+        <img :src="download.files.cover" class="cover">
+      </div>
+      <div class="details">
+        <h3>
+          {{ getDownloadName(download) }}
+        </h3>
+        <p>
+          Text File Count: {{ download.files.text_files == null ? 0 : download.files.text_files.length }} <br>
+          Audio File Count: {{ download.files.audio_files == null ? 0 : download.files.audio_files.length }} <br>
+          {{ getTimeAdded(download) }}
+        </p>
+      </div>
     </div>
   </div>
 </template>
 
 <style scoped>
 .card {
-  display: flex;
-  margin-top: 2rem;
-}
-
-.cover {
-  flex: 33%;
-  padding: 2rem;
-  position: relative;
-}
-
-img {
-  object-fit: cover;
-  aspect-ratio: 1;
-  overflow: hidden;
+  height: 140px;
   width: 100%;
+  border: 1px solid grey;
+  border-radius: 6px;
+  padding: 6px;
+  margin-bottom: 1rem;
+}
+
+.card-content {
+  display: flex;
   height: 100%;
 }
 
@@ -56,14 +49,17 @@ img {
   position: relative;
 }
 
-i {
+.cover-wrapper {
+  padding: 0.1rem;
+  height: 100%;
   display: flex;
-  place-items: center;
-  place-content: center;
-  width: 32px;
-  height: 32px;
+  align-items: center;
+}
 
-  color: var(--color-text);
+.cover {
+  height: 100%;
+  width: auto;
+  object-fit: contain;
 }
 
 h3 {
