@@ -43,6 +43,7 @@ func (client *Client) handleMigration() error {
 	CREATE TABLE IF NOT EXISTS books (
 		id TEXT PRIMARY KEY,
 		title TEXT NOT NULL,
+		subtitle TEXT,
 		publish_year INTEGER,
 		description TEXT,
 		tags TEXT,

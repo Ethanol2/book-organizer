@@ -135,9 +135,10 @@ func (results *OpenLibrarySearchResults) Parse(genres *[]string) SearchResults {
 		}
 
 		book := database.Book{
-			Title:   result.Title,
-			Year:    &result.FirstPublishYear,
-			Authors: authors,
+			Title:    result.Title,
+			Subtitle: &result.Subtitle,
+			Year:     &result.FirstPublishYear,
+			Authors:  authors,
 		}
 
 		if len(genresCats) > 0 {

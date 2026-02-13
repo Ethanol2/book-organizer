@@ -289,3 +289,16 @@ func (c Client) GetCategoryTypesAssociatedWithBook(tx *sql.Tx, bookId string, ca
 
 	return cats, nil
 }
+
+func CategoryToStrSlice(items []Category) []string {
+	strings := []string{}
+	for i := range items {
+		indexStr := ""
+		if items[i].Index != nil {
+			indexStr = fmt.Sprint(items[i])
+		}
+		strings = append(strings, fmt.Sprintf("%s %s", items[i].Name, indexStr))
+	}
+
+	return strings
+}

@@ -16,6 +16,7 @@ import (
 type Book struct {
 	Id          *uuid.UUID `json:"id,omitempty"`
 	Title       string     `json:"title"`
+	Subtitle    *string    `json:"subtitle"`
 	Description string     `json:"description"`
 	Year        *int       `json:"year"`
 	ISBN        string     `json:"isbn"`
@@ -36,6 +37,7 @@ type Book struct {
 
 type BookParams struct {
 	Title       *string   `json:"title"`
+	Subtitle    *string   `json:"subtitle"`
 	Description *string   `json:"description"`
 	Year        *int      `json:"year"`
 	ISBN        *string   `json:"isbn"`
@@ -73,12 +75,12 @@ func (c Client) AddBook(params BookParams) (Book, error) {
 
 	query := `
 	INSERT INTO books
-		(id, title, publish_year, description, tags, isbn, asin, publisher, directory, audio_files, text_files, cover, created_at, updated_at)
+		(id, title, subtitle, publish_year, description, tags, isbn, asin, publisher, directory, audio_files, text_files, cover, created_at, updated_at)
 	VALUES
-		(?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, NULL, NULL, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)	
+		(?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, NULL, NULL, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)	
 	`
 
-	_, err = tx.Exec(query, id, params.Title, params.Year, params.Description, string(tagsJson), params.ISBN, params.ASIN, params.Publisher)
+	_, err = tx.Exec(query, id, params.Title, params.Subtitle, params.Year, params.Description, string(tagsJson), params.ISBN, params.ASIN, params.Publisher)
 	if err != nil {
 		return Book{}, err
 	}
@@ -156,6 +158,7 @@ func (c Client) GetBook(id uuid.UUID) (Book, error) {
 	err := c.db.QueryRow("SELECT * FROM books WHERE id = ?", id).Scan(
 		&book.Id,
 		&book.Title,
+		&book.Subtitle,
 		&book.Year,
 		&book.Description,
 		&tagsStr,
@@ -240,6 +243,7 @@ func (c Client) GetBooks() ([]Book, error) {
 		err := rows.Scan(
 			&book.Id,
 			&book.Title,
+			&book.Subtitle,
 			&book.Year,
 			&book.Description,
 			&tagsStr,
@@ -376,6 +380,9 @@ func (c Client) UpdateBook(id uuid.UUID, update BookParams) (Book, error) {
 	if update.Title != nil {
 		add("title", update.Title)
 	}
+	if update.Subtitle != nil {
+		add("subtitle", update.Subtitle)
+	}
 	if update.Year != nil {
 		add("publish_year", update.Year)
 	}
@@ -493,6 +500,30 @@ func (c Client) UpdateBook(id uuid.UUID, update BookParams) (Book, error) {
 	return c.GetBook(id)
 }
 
+func (c Client) GetPrimaryAuthorAndSeries(id uuid.UUID) (string, string, error) {
+	authorDir := "Unknown"
+	authors, err := c.GetCategoryTypesAssociatedWithBook(nil, id.String(), Authors)
+	if err != nil {
+		return "", "", err
+	}
+	if len(authors) > 0 {
+		authorDir = authors[0].Name
+	}
+
+	seriesDir := ""
+	series, err := c.GetCategoryTypesAssociatedWithBook(nil, id.String(), Series)
+	if err != nil {
+		return "", "", err
+	}
+	if len(series) > 0 {
+		seriesDir = series[0].Name
+	}
+
+	return authorDir, seriesDir, nil
+}
+
+// #region Book Methods
+
 func (book *Book) getBookCategories(c Client, tx *sql.Tx) error {
 	var err error
 
@@ -517,26 +548,4 @@ func (book *Book) getBookCategories(c Client, tx *sql.Tx) error {
 	}
 
 	return nil
-}
-
-func (c Client) GetPrimaryAuthorAndSeries(id uuid.UUID) (string, string, error) {
-	authorDir := "Unknown"
-	authors, err := c.GetCategoryTypesAssociatedWithBook(nil, id.String(), Authors)
-	if err != nil {
-		return "", "", err
-	}
-	if len(authors) > 0 {
-		authorDir = authors[0].Name
-	}
-
-	seriesDir := ""
-	series, err := c.GetCategoryTypesAssociatedWithBook(nil, id.String(), Series)
-	if err != nil {
-		return "", "", err
-	}
-	if len(series) > 0 {
-		seriesDir = series[0].Name
-	}
-
-	return authorDir, seriesDir, nil
 }

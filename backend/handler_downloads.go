@@ -9,6 +9,7 @@ import (
 	"path"
 
 	"github.com/Ethanol2/book-organizer/internal/fileManagement"
+	"github.com/Ethanol2/book-organizer/internal/metadata"
 	"github.com/google/uuid"
 )
 
@@ -93,6 +94,11 @@ func (cfg *apiConfig) handlerAssociateDownloadToBook(downloadId uuid.UUID, w htt
 		}
 		respondWithError(w, http.StatusInternalServerError, "Failed to associate the book and files. Files have been returned to downloads", err)
 		return
+	}
+
+	err = fileManagement.CreateMetadataFile(metadata.MetadataFileFromBook(book), path.Join(newPath, "metadata.json"))
+	if err != nil {
+		log.Println("failed to create metadata file:", err)
 	}
 
 	if book.Files != nil {

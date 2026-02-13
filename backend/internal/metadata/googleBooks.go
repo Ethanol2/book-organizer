@@ -152,6 +152,7 @@ func (results *GoogleBooksSearchResults) Parse(offset int) SearchResults {
 
 		book := database.Book{
 			Title:       result.VolumeInfo.Title,
+			Subtitle:    &result.VolumeInfo.Subtitle,
 			Description: result.VolumeInfo.Description,
 			Year:        &year,
 			Publisher:   result.VolumeInfo.Publisher,
