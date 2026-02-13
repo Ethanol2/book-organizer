@@ -150,15 +150,16 @@ func (results *GoogleBooksSearchResults) Parse(offset int) SearchResults {
 			})
 		}
 
-		book := database.Book{
-			Title:       result.VolumeInfo.Title,
+		book := database.BookParams{
+			Title:       &result.VolumeInfo.Title,
 			Subtitle:    &result.VolumeInfo.Subtitle,
-			Description: result.VolumeInfo.Description,
+			Description: &result.VolumeInfo.Description,
 			Year:        &year,
-			Publisher:   result.VolumeInfo.Publisher,
-			ISBN:        isbn,
-			Authors:     authors,
-			Genres:      genres,
+			Publisher:   &result.VolumeInfo.Publisher,
+			ISBN:        &isbn,
+			Authors:     &authors,
+			Genres:      &genres,
+			Cover:       &result.VolumeInfo.ImageLinks.Thumbnail,
 		}
 
 		standardResults.Items = append(standardResults.Items, book)

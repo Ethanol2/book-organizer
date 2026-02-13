@@ -237,7 +237,7 @@ func getFiles(root, folder string) (database.BookFiles, error) {
 	}
 
 	return database.BookFiles{
-		Root:       folder,
+		Root:       &folder,
 		AudioFiles: &audio,
 		TextFiles:  &text,
 		Cover:      &cover,

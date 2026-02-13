@@ -24,6 +24,8 @@ type apiConfig struct {
 	downloadsName string
 	libraryPath   string
 	libraryName   string
+	metadataPath  string
+	metadataName  string
 	port          string
 
 	googleBooksApiKey string
@@ -86,6 +88,7 @@ func main() {
 	// Media
 	mux.Handle("/media/downloads/", http.StripPrefix("/media/downloads/", http.FileServer(http.Dir(cfg.downloadsPath))))
 	mux.Handle("/media/library/", http.StripPrefix("/media/library/", http.FileServer(http.Dir(cfg.libraryPath))))
+	mux.Handle("/media/metadata/", http.StripPrefix("/media/metadata/", http.FileServer(http.Dir(cfg.metadataPath))))
 
 	srv := &http.Server{
 		Addr:    ":" + cfg.port,
@@ -165,6 +168,8 @@ func initConfig(dbReset, insertTestData bool) (*apiConfig, error) {
 		downloadsName:     "/media/downloads",
 		libraryPath:       lPath,
 		libraryName:       "/media/library",
+		metadataPath:      "./data/metadata",
+		metadataName:      "/media/metadata",
 		port:              port,
 		googleBooksApiKey: gbApiKey,
 	}, nil

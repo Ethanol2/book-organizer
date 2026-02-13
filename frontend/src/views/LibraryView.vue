@@ -14,6 +14,7 @@ async function fetchBooks() {
         }
 
         books.value = await resp.json();
+
     } catch (error) {
         console.error("Error fetching books list:", error)
     }
@@ -27,8 +28,17 @@ onMounted(async () => {
 
 <template>
     <section>
-        <div>
+        <div class="library">
             <BookItem v-for="book in books" :key="book.id" :book="book"></BookItem>
         </div>
     </section>
 </template>
+
+<style scoped>
+.library {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    gap: 16px;
+    padding-bottom: 10rem;
+}
+</style>

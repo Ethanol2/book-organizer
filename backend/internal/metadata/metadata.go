@@ -20,10 +20,10 @@ type SearchParams struct {
 }
 
 type SearchResults struct {
-	TotalCount int             `json:"total_count"`
-	Count      int             `json:"count"`
-	Offset     int             `json:"offset"`
-	Items      []database.Book `json:"items"`
+	TotalCount int                   `json:"total_count"`
+	Count      int                   `json:"count"`
+	Offset     int                   `json:"offset"`
+	Items      []database.BookParams `json:"items"`
 }
 
 // Matches AudioBookshelf's metadata format

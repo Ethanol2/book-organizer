@@ -101,9 +101,7 @@ func (cfg *apiConfig) handlerAssociateDownloadToBook(downloadId uuid.UUID, w htt
 		log.Println("failed to create metadata file:", err)
 	}
 
-	if book.Files != nil {
-		book.Files.Prepend(cfg.libraryName)
-	}
+	book.Files.Prepend(cfg.libraryName)
 
 	respondWithJson(w, http.StatusOK, book)
 }
@@ -119,7 +117,7 @@ func (cfg *apiConfig) handlerGetDownloadCover(id uuid.UUID, w http.ResponseWrite
 		return
 	}
 
-	coverPath := path.Join(cfg.downloadsPath, download.Files.Root, *download.Files.Cover)
+	coverPath := path.Join(cfg.downloadsPath, *download.Files.Root, *download.Files.Cover)
 	log.Println("Serving download cover from", coverPath)
 
 	http.ServeFile(w, r, coverPath)

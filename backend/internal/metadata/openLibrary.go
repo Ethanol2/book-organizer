@@ -134,15 +134,18 @@ func (results *OpenLibrarySearchResults) Parse(genres *[]string) SearchResults {
 			})
 		}
 
-		book := database.Book{
-			Title:    result.Title,
+		cover := fmt.Sprintf("https://covers.openlibrary.org/b/id/%d-L.jpg", result.CoverI)
+
+		book := database.BookParams{
+			Title:    &result.Title,
 			Subtitle: &result.Subtitle,
 			Year:     &result.FirstPublishYear,
-			Authors:  authors,
+			Authors:  &authors,
+			Cover:    &cover,
 		}
 
 		if len(genresCats) > 0 {
-			book.Genres = genresCats
+			book.Genres = &genresCats
 		}
 
 		standardResults.Items = append(standardResults.Items, book)

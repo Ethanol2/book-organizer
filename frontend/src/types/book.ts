@@ -14,11 +14,11 @@ export type Book = {
     authors: Author[]
     genres: Genre[]
     narrators: Narrator[]
-    files?: BookFiles | null
+    files: BookFiles
 };
 
 export type BookFiles = {
-    root: string,
+    root?: string | null,
     cover?: string | null,
     audio_files?: string[] | null,
     text_files?: string[] | null

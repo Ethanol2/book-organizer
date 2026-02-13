@@ -5,9 +5,11 @@ import (
 	"errors"
 	"log"
 	"net/http"
+	"os"
 	"path"
 
 	"github.com/Ethanol2/book-organizer/internal/database"
+	"github.com/Ethanol2/book-organizer/internal/fileManagement"
 	"github.com/google/uuid"
 	"github.com/mattn/go-sqlite3"
 )
@@ -20,7 +22,9 @@ func (cfg *apiConfig) handlerGetBook(id uuid.UUID, w http.ResponseWriter, r *htt
 		return
 	}
 
-	if book.Files != nil {
+	if book.Files.Root == nil {
+		book.Files.Prepend(cfg.metadataName)
+	} else {
 		book.Files.Prepend(cfg.libraryName)
 	}
 
@@ -35,11 +39,15 @@ func (cfg *apiConfig) handlerGetBooks(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	for _, b := range books {
-		if b.Files != nil {
-			b.Files.Prepend(cfg.libraryName)
+	for i := range books {
+		if books[i].Files.Root == nil {
+			books[i].Files.Prepend(cfg.metadataName)
+		} else {
+			books[i].Files.Prepend(cfg.libraryName)
 		}
 	}
+
+	log.Println("Fetching books")
 
 	respondWithJson(w, http.StatusOK, books)
 }
@@ -51,6 +59,18 @@ func (cfg *apiConfig) handlerPostBook(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		respondWithError(w, http.StatusBadRequest, "Couldn't read body", err)
 		return
+	}
+
+	var coverFile *os.File
+	if bookParams.Cover != nil {
+		coverFile, err = fileManagement.DownloadTempFile(*bookParams.Cover)
+		if err != nil {
+			respondWithError(w, http.StatusBadRequest, "failed to fetch cover from url", err)
+			return
+		}
+		defer coverFile.Close()
+		ext := path.Ext(coverFile.Name())
+		bookParams.Cover = &ext
 	}
 
 	book, err := cfg.db.AddBook(bookParams)
@@ -65,8 +85,14 @@ func (cfg *apiConfig) handlerPostBook(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if book.Files != nil {
-		book.Files.Prepend(cfg.libraryName)
+	if coverFile != nil {
+		err = fileManagement.MoveFilesWithPaths(coverFile.Name(), path.Join(cfg.metadataPath, *book.Files.Cover))
+		if err != nil {
+			respondWithError(w, http.StatusInternalServerError, "failed to create cover file", err)
+			return
+		}
+		coverWebPath := path.Join(cfg.metadataName, *book.Files.Cover)
+		book.Files.Cover = &coverWebPath
 	}
 
 	respondWithJson(w, http.StatusOK, book)
@@ -74,23 +100,49 @@ func (cfg *apiConfig) handlerPostBook(w http.ResponseWriter, r *http.Request) {
 
 func (cfg *apiConfig) handlerUpdateBook(id uuid.UUID, w http.ResponseWriter, r *http.Request) {
 
-	var update database.BookParams
-	err := json.NewDecoder(r.Body).Decode(&update)
+	var bookParams database.BookParams
+	err := json.NewDecoder(r.Body).Decode(&bookParams)
 	if err != nil {
 		respondWithError(w, http.StatusBadRequest, "Failed to read body", err)
 		return
 	}
 
-	book, err := cfg.db.UpdateBook(id, update)
+	var coverFile *os.File
+	if bookParams.Cover != nil {
+		coverFile, err = fileManagement.DownloadTempFile(*bookParams.Cover)
+		if err != nil {
+			respondWithError(w, http.StatusBadRequest, "failed to fetch cover from url", err)
+			return
+		}
+		defer coverFile.Close()
+		ext := path.Ext(coverFile.Name())
+		bookParams.Cover = &ext
+	}
+
+	book, oldCover, err := cfg.db.UpdateBook(id, bookParams)
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, "Failed to update database", err)
 		return
 	}
 
-	if book.Files != nil {
-		book.Files.Prepend(cfg.libraryName)
+	if oldCover != "" {
+		err := os.Remove(path.Join(cfg.metadataPath, oldCover))
+		if err != nil {
+			log.Println("Failed to remove old cover:", err)
+		}
 	}
 
+	if coverFile != nil {
+		err = fileManagement.MoveFilesWithPaths(coverFile.Name(), path.Join(cfg.metadataPath, *book.Files.Cover))
+		if err != nil {
+			respondWithError(w, http.StatusInternalServerError, "failed to create cover file", err)
+			return
+		}
+		coverWebPath := path.Join(cfg.metadataName, *book.Files.Cover)
+		book.Files.Cover = &coverWebPath
+	}
+
+	book.Files.Prepend(cfg.libraryName)
 	respondWithJson(w, http.StatusOK, book)
 }
 
@@ -110,13 +162,18 @@ func (cfg *apiConfig) handlerGetBookCover(id uuid.UUID, w http.ResponseWriter, r
 		return
 	}
 
-	author, series, err := cfg.db.GetPrimaryAuthorAndSeries(id)
-	if err != nil {
-		respondWithError(w, http.StatusInternalServerError, "Database error", err)
-		return
-	}
+	coverPath := ""
+	if book.Files.Root == nil {
+		coverPath = path.Join(cfg.metadataPath, *book.Files.Cover)
+	} else {
+		author, series, err := cfg.db.GetPrimaryAuthorAndSeries(id)
+		if err != nil {
+			respondWithError(w, http.StatusInternalServerError, "Database error", err)
+			return
+		}
 
-	coverPath := path.Join(cfg.libraryPath, author, series, book.Files.Root, *book.Files.Cover)
+		coverPath = path.Join(cfg.libraryPath, author, series, *book.Files.Cover)
+	}
 	log.Println("Serving book cover from", coverPath)
 
 	http.ServeFile(w, r, coverPath)

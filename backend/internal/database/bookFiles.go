@@ -2,11 +2,12 @@ package database
 
 import (
 	"encoding/json"
+	"log"
 	"path"
 )
 
 type BookFiles struct {
-	Root       string    `json:"root"`
+	Root       *string   `json:"root"`
 	AudioFiles *[]string `json:"audio_files"`
 	TextFiles  *[]string `json:"text_files"`
 	Cover      *string   `json:"cover"`
@@ -60,7 +61,10 @@ func (files *BookFiles) Prepend(p string) {
 	if files.Cover != nil {
 		cover := path.Join(p, *files.Cover)
 		files.Cover = &cover
+		log.Println(cover)
 	}
-
-	files.Root = path.Join(p, files.Root)
+	if files.Root != nil {
+		root := path.Join(p, *files.Root)
+		files.Root = &root
+	}
 }

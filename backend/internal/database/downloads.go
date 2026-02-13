@@ -54,7 +54,7 @@ func (c Client) AddDownload(tx *sql.Tx, files BookFiles) (*Download, error) {
 		}
 	}
 
-	log.Println("Added \"", files.Root, "\" to downloads")
+	log.Println("Added \"", *files.Root, "\" to downloads")
 
 	return c.GetDownload(id)
 }
