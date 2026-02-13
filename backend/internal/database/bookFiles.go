@@ -2,7 +2,6 @@ package database
 
 import (
 	"encoding/json"
-	"log"
 	"path"
 )
 
@@ -61,7 +60,6 @@ func (files *BookFiles) Prepend(p string) {
 	if files.Cover != nil {
 		cover := path.Join(p, *files.Cover)
 		files.Cover = &cover
-		log.Println(cover)
 	}
 	if files.Root != nil {
 		root := path.Join(p, *files.Root)
