@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue'
-import DownloadItem from './DownloadItem.vue';
 import type { Download } from '@/types/download';
+import DownloadItem from '@/components/DownloadItem.vue';
 
 const downloads = ref<Download[]>([]);
 const lastRefresh = ref<string>("Never refreshed");

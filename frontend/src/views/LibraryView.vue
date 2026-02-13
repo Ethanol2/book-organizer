@@ -1,0 +1,34 @@
+<script setup lang="ts">
+import BookItem from '@/components/BookItem.vue';
+import type { Book } from '@/types/book';
+import { onMounted, ref } from 'vue';
+
+const books = ref<Book[]>([]);
+
+async function fetchBooks() {
+    books.value = [];
+    try {
+        const resp = await fetch("api/books");
+        if (!resp.ok) {
+            throw new Error(`HTTP error with status: ${resp.status}`);
+        }
+
+        books.value = await resp.json();
+    } catch (error) {
+        console.error("Error fetching books list:", error)
+    }
+}
+
+onMounted(async () => {
+    await fetchBooks();
+});
+
+</script>
+
+<template>
+    <section>
+        <div>
+            <BookItem v-for="book in books" :key="book.id" :book="book"></BookItem>
+        </div>
+    </section>
+</template>

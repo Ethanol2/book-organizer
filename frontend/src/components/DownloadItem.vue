@@ -10,8 +10,8 @@ const props = defineProps<{
 <template>
   <div class="card">
     <div class="card-content">
-      <div v-if="download.files.cover !== null" class="cover-wrapper">
-        <img :src="download.files.cover" class="cover">
+      <div class="cover-wrapper">
+        <img :src="download.files.cover === null ? '' : download.files.cover" alt="no cover found" class="cover">
       </div>
       <div class="details">
         <h3>
@@ -50,16 +50,19 @@ const props = defineProps<{
 }
 
 .cover-wrapper {
-  padding: 0.1rem;
   height: 100%;
   display: flex;
-  align-items: center;
+  text-align: center;
+  border: 1px solid grey;
 }
 
 .cover {
   height: 100%;
-  width: auto;
+  aspect-ratio: 1;
   object-fit: contain;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 h3 {
