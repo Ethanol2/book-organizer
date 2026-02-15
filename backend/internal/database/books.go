@@ -4,7 +4,6 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"log"
 	"path"
 	"slices"
@@ -76,20 +75,14 @@ func (c Client) AddBook(params BookParams) (Book, error) {
 		return Book{}, err
 	}
 
-	var cover *string
-	if params.Cover != nil {
-		cvr := fmt.Sprintf("/covers/%s%s", id, *params.Cover)
-		cover = &cvr
-	}
-
 	query := `
 	INSERT INTO books
 		(id, title, subtitle, publish_year, description, tags, isbn, asin, publisher, cover, directory, audio_files, text_files, created_at, updated_at)
 	VALUES
-		(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, NULL, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)	
+		(?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, NULL, NULL, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)	
 	`
 
-	_, err = c.tx.Exec(query, id, params.Title, params.Subtitle, params.Year, params.Description, string(tagsJson), params.ISBN, params.ASIN, params.Publisher, cover)
+	_, err = c.tx.Exec(query, id, params.Title, params.Subtitle, params.Year, params.Description, string(tagsJson), params.ISBN, params.ASIN, params.Publisher)
 	if err != nil {
 		return Book{}, err
 	}
@@ -147,7 +140,7 @@ func (c Client) AddBook(params BookParams) (Book, error) {
 		return Book{}, err
 	}
 
-	err = c.tx.Commit()
+	err = c.Commit()
 	if err != nil {
 		return Book{}, err
 	}
@@ -280,7 +273,7 @@ func (c Client) GetBooks() ([]Book, error) {
 		books = append(books, book)
 	}
 
-	err = c.tx.Commit()
+	err = c.Commit()
 	if err != nil {
 		return []Book{}, err
 	}
@@ -475,7 +468,7 @@ func (c Client) UpdateBook(id uuid.UUID, update BookParams) (Book, error) {
 		}
 	}
 
-	err = c.tx.Commit()
+	err = c.Commit()
 	if err != nil {
 		return Book{}, err
 	}
@@ -485,7 +478,7 @@ func (c Client) UpdateBook(id uuid.UUID, update BookParams) (Book, error) {
 	return c.GetBook(id)
 }
 
-func (c Client) UpdateBookCover(id uuid.UUID, metadataPath, libraryPath, ext string) (string, string, error) {
+func (c Client) UpdateBookCover(id uuid.UUID, ext string) (string, string, error) {
 
 	var dir *string
 	var cover *string
@@ -495,34 +488,14 @@ func (c Client) UpdateBookCover(id uuid.UUID, metadataPath, libraryPath, ext str
 		return "", "", err
 	}
 
-	newCover := ""
-	if cover == nil {
-		if dir == nil {
-			tmp := fmt.Sprintf("%d.%s", id, ext)
-			newCover = path.Join(metadataPath, tmp)
-			cover = &tmp
-		} else {
-			tmp := fmt.Sprintf(*dir+"/cover.%s", ext)
-			newCover = path.Join(libraryPath, tmp)
-			cover = &tmp
-		}
-
-		_, err = c.tx.Exec("UPDATE books SET cover = ? WHERE id = ?", cover, id)
-		if err != nil {
-			return "", "", err
-		}
-
-		return "", newCover, nil
+	if dir == nil {
+		return "", "", nil
 	}
 
-	if dir == nil {
-		newCover = *cover
-	} else {
-		newCover = path.Join(*dir, "cover."+ext)
-		_, err = c.tx.Exec("UPDATE books SET cover = ? WHERE id = ?", cover, id)
-		if err != nil {
-			return "", "", err
-		}
+	newCover := path.Join(*dir, "cover."+ext)
+	_, err = c.tx.Exec("UPDATE books SET cover = ? WHERE id = ?", newCover, id)
+	if err != nil {
+		return "", "", err
 	}
 
 	return *cover, newCover, nil

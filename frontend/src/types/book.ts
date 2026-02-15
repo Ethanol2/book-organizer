@@ -40,3 +40,15 @@ export function getBookCoverSrc(book: Book): string {
     }
     return ""
 }
+
+export function getAuthorsList(book: Book): string {
+    if (book.authors.length == 0) {
+        return ""
+    }
+
+    let list = ""
+    book.authors.forEach(author => {
+        list += ', ' + author.name
+    });
+    return list.slice(2, list.length)
+}

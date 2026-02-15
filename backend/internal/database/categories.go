@@ -63,7 +63,7 @@ func (c Client) AddCategory(categoryType CategoryType, name string) (Category, e
 	}
 
 	if indyTx {
-		err = c.tx.Commit()
+		err = c.Commit()
 		if err != nil {
 			return Category{}, err
 		}
@@ -128,7 +128,7 @@ func (c Client) GetCategory(categoryType CategoryType, id int) (Category, error)
 	}
 
 	if indyTx {
-		err = c.tx.Commit()
+		err = c.Commit()
 		if err != nil {
 			return Category{}, err
 		}
@@ -166,7 +166,7 @@ func (c Client) GetCategoryByValue(categoryType CategoryType, name string) (Cate
 	defer log.Println("Retrieved \"", cat.Name, "\" from", categoryType)
 
 	if indyTx {
-		err = c.tx.Commit()
+		err = c.Commit()
 		if err != nil {
 			return Category{}, err
 		}
@@ -281,7 +281,7 @@ func (c Client) GetCategoryTypesAssociatedWithBook(bookId string, categoryType C
 	}
 
 	if indyTx {
-		err = c.tx.Commit()
+		err = c.Commit()
 		if err != nil {
 			return []Category{}, err
 		}

@@ -7,7 +7,7 @@ export type Download = {
 }
 
 export function getDownloadName(download: Download): string {
-    if (download == null || download.files.root == "") {
+    if (download == null || download.files.root == null) {
         return "";
     }
     var items = download.files.root.split("/");

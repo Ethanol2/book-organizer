@@ -3,10 +3,11 @@ package fileManagement
 import (
 	"encoding/json"
 	"fmt"
+	"image"
+	"image/jpeg"
 	"io"
 	"net/http"
 	"os"
-	"path/filepath"
 
 	"github.com/Ethanol2/book-organizer/internal/metadata"
 )
@@ -22,12 +23,6 @@ func CreateMetadataFile(metadata metadata.MetadataFile, path string) error {
 }
 
 func DownloadTempFile(url string) (*os.File, error) {
-
-	ext := filepath.Ext(url)
-	if ext == "" {
-		ext = ".jpg"
-	}
-
 	resp, err := http.Get(url)
 	if err != nil {
 		return nil, err
@@ -38,17 +33,22 @@ func DownloadTempFile(url string) (*os.File, error) {
 		return nil, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
 	}
 
-	tmp, err := os.CreateTemp("", "bookOrg-*"+ext)
+	img, _, err := image.Decode(resp.Body)
 	if err != nil {
 		return nil, err
 	}
 
-	_, err = io.Copy(tmp, resp.Body)
+	tmp, err := os.CreateTemp("", "bookOrg-*.jpg")
 	if err != nil {
 		return nil, err
 	}
 
-	return tmp, err
+	err = jpeg.Encode(tmp, img, &jpeg.Options{Quality: 90})
+	if err != nil {
+		return nil, err
+	}
+
+	return tmp, nil
 }
 
 func CreateTempFileFromRequest(r *http.Request) (*os.File, error) {

@@ -11,9 +11,8 @@ import { RouterLink, RouterView } from 'vue-router'
       </h1>
     </header>
 
-    <body class="body">
+    <section class="body">
       <aside class="sidebar">
-
         <nav>
           <RouterLink to="/">Library</RouterLink>
           <RouterLink to="/downloads">Downloads</RouterLink>
@@ -24,7 +23,7 @@ import { RouterLink, RouterView } from 'vue-router'
       <main class="content">
         <RouterView />
       </main>
-    </body>
+    </section>
   </div>
 </template>
 
@@ -43,6 +42,9 @@ import { RouterLink, RouterView } from 'vue-router'
 
 .body {
   display: flex;
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
 }
 
 .sidebar {

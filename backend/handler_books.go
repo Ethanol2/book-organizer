@@ -23,8 +23,6 @@ func (cfg *apiConfig) handlerGetBook(id uuid.UUID, w http.ResponseWriter, r *htt
 	}
 
 	if book.Files.Root == nil {
-		book.Files.Prepend(cfg.metadataName)
-	} else {
 		book.Files.Prepend(cfg.libraryName)
 	}
 
@@ -40,11 +38,7 @@ func (cfg *apiConfig) handlerGetBooks(w http.ResponseWriter, r *http.Request) {
 	}
 
 	for i := range books {
-		if books[i].Files.Root == nil {
-			books[i].Files.Prepend(cfg.metadataName)
-		} else {
-			books[i].Files.Prepend(cfg.libraryName)
-		}
+		books[i].Files.Prepend(cfg.libraryName)
 	}
 
 	log.Println("Fetching books")
@@ -69,8 +63,6 @@ func (cfg *apiConfig) handlerPostBook(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		defer coverFile.Close()
-		ext := path.Ext(coverFile.Name())
-		bookParams.Cover = &ext
 	}
 
 	book, err := cfg.db.AddBook(bookParams)
@@ -86,13 +78,11 @@ func (cfg *apiConfig) handlerPostBook(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if coverFile != nil {
-		err = fileManagement.MoveFilesWithPaths(coverFile.Name(), path.Join(cfg.metadataPath, *book.Files.Cover))
+		err = fileManagement.MoveFilesWithPaths(coverFile.Name(), path.Join(cfg.metadataPath, book.Id.String()+path.Ext(coverFile.Name())))
 		if err != nil {
 			respondWithError(w, http.StatusInternalServerError, "failed to create cover file", err)
 			return
 		}
-		coverWebPath := path.Join(cfg.metadataName, *book.Files.Cover)
-		book.Files.Cover = &coverWebPath
 	}
 
 	respondWithJson(w, http.StatusOK, book)
@@ -124,22 +114,30 @@ func (cfg *apiConfig) handlerUpdateBookCover(id uuid.UUID, w http.ResponseWriter
 		respondWithError(w, http.StatusBadRequest, "Failed to download image", err)
 		return
 	}
+	defer tmp.Close()
 
 	cfg.db.Begin()
 	defer cfg.db.Rollback()
-	oldPath, newPath, err := cfg.db.UpdateBookCover(id, cfg.metadataPath, cfg.libraryPath, path.Ext(tmp.Name()))
+
+	oldPath, newPath, err := cfg.db.UpdateBookCover(id, path.Ext(tmp.Name()))
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, "Database error", err)
 		return
 	}
 
-	if oldPath != "" {
-		err = os.Remove(oldPath)
-		if err != nil {
-			log.Println("Failed to remove old cover")
-			respondWithError(w, http.StatusInternalServerError, "File error", err)
-			return
-		}
+	if oldPath == "" {
+		oldPath = path.Join(cfg.metadataPath, id.String()+path.Ext(tmp.Name()))
+	}
+
+	err = os.Remove(oldPath)
+	if err != nil {
+		log.Println("Failed to remove old cover")
+		respondWithError(w, http.StatusInternalServerError, "File error", err)
+		return
+	}
+
+	if newPath == "" {
+		newPath = path.Join(cfg.metadataPath, id.String()+path.Ext(tmp.Name()))
 	}
 
 	err = fileManagement.MoveFilesWithPaths(tmp.Name(), newPath)

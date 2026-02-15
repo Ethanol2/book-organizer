@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { getBookCoverSrc, type Book } from '@/types/book';
+import { getAuthorsList, getBookCoverSrc, type Book } from '@/types/book';
 
 const props = defineProps<{
     book: Book
@@ -10,10 +10,10 @@ const cover = getBookCoverSrc(props.book)
 </script>
 
 <template>
-    <div class="book">
+    <RouterLink :to="`/books/${book.title}`" class="book">
         <div class="cover-wrapper">
-            <img v-if="cover != ''" :src="cover" :alt="book.title + ', cover'" class="cover">
-            <p v-else class="no-cover">{{ book.title + ', cover' }}</p>
+            <img v-if="cover != ''" :src="cover" :alt="book.title" class="cover">
+            <img v-else :src="'/media/metadata/' + book.id + '.jpg'" :alt="book.title" class="no-cover">
         </div>
         <div class="info">
             <h3>
@@ -21,9 +21,10 @@ const cover = getBookCoverSrc(props.book)
             </h3>
             <small>
                 {{ book.subtitle }}
+                {{ getAuthorsList(book) }}
             </small>
         </div>
-    </div>
+    </RouterLink>
 </template>
 
 <style scoped>
@@ -34,6 +35,8 @@ const cover = getBookCoverSrc(props.book)
     height: 320px;
     text-align: center;
     padding: 0.2rem;
+    text-decoration: none;
+    color: inherit
 }
 
 .cover-wrapper {
@@ -57,8 +60,9 @@ const cover = getBookCoverSrc(props.book)
 .no-cover {
     display: flex;
     width: 160px;
-    height: 256px;
+    min-height: 160px;
     align-items: center;
+    justify-content: center;
     border: 1px solid grey;
     box-shadow: 0 0 5px black;
 }

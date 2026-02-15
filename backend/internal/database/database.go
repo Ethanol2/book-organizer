@@ -299,12 +299,22 @@ func (c *Client) Rollback() error {
 	if c.tx == nil {
 		return nil
 	}
-	return c.tx.Rollback()
+	err := c.tx.Rollback()
+	if err != nil {
+		return err
+	}
+	c.tx = nil
+	return nil
 }
 
 func (c *Client) Commit() error {
 	if c.tx == nil {
 		return nil
 	}
-	return c.tx.Commit()
+	err := c.tx.Commit()
+	if err != nil {
+		return err
+	}
+	c.tx = nil
+	return nil
 }

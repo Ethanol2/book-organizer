@@ -25,7 +25,6 @@ type apiConfig struct {
 	libraryPath   string
 	libraryName   string
 	metadataPath  string
-	metadataName  string
 	port          string
 
 	googleBooksApiKey string
@@ -170,7 +169,6 @@ func initConfig(dbReset, insertTestData bool) (*apiConfig, error) {
 		libraryPath:       lPath,
 		libraryName:       "/media/library",
 		metadataPath:      "./data/metadata",
-		metadataName:      "/media/metadata",
 		port:              port,
 		googleBooksApiKey: gbApiKey,
 	}, nil
