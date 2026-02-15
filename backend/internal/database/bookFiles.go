@@ -12,18 +12,18 @@ type BookFiles struct {
 	Cover      *string   `json:"cover"`
 }
 
-func (files BookFiles) ToJson() (string, string, string, error) {
+func (files BookFiles) FileListsToJson() (string, string, error) {
 
 	audioBytes, err := json.Marshal(files.AudioFiles)
 	if err != nil {
-		return "", "", "", err
+		return "", "", err
 	}
 	textBytes, err := json.Marshal(files.TextFiles)
 	if err != nil {
-		return "", "", "", err
+		return "", "", err
 	}
 
-	return string(audioBytes), string(textBytes), *files.Cover, nil
+	return string(audioBytes), string(textBytes), nil
 }
 
 func (files *BookFiles) ParseAudioJson(audioJson string) error {

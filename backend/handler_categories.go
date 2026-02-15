@@ -47,7 +47,7 @@ func (cfg *apiConfig) handlerPutCategory(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	category, err := cfg.db.AddCategory(nil, catType, newCat.Value)
+	category, err := cfg.db.AddCategory(catType, newCat.Value)
 	if err != nil {
 		log.Println(err)
 		respondWithError(w, http.StatusInternalServerError, fmt.Sprintf(`couldn't add the category " %s " to the %s database`, newCat.Value, catType), err)

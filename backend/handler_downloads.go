@@ -54,7 +54,8 @@ func (cfg *apiConfig) handlerAssociateDownloadToBook(downloadId uuid.UUID, w htt
 	}
 
 	var bookIdStruct struct {
-		BookId uuid.UUID `json:"book_id"`
+		BookId           uuid.UUID `json:"book_id"`
+		ReplaceBookCover bool      `json:"replace_book_cover"`
 	}
 	err = json.NewDecoder(r.Body).Decode(&bookIdStruct)
 	if err != nil {

@@ -107,43 +107,62 @@ func (cfg *apiConfig) handlerUpdateBook(id uuid.UUID, w http.ResponseWriter, r *
 		return
 	}
 
-	var coverFile *os.File
-	if bookParams.Cover != nil {
-		coverFile, err = fileManagement.DownloadTempFile(*bookParams.Cover)
-		if err != nil {
-			respondWithError(w, http.StatusBadRequest, "failed to fetch cover from url", err)
-			return
-		}
-		defer coverFile.Close()
-		ext := path.Ext(coverFile.Name())
-		bookParams.Cover = &ext
-	}
-
-	book, oldCover, err := cfg.db.UpdateBook(id, bookParams)
+	book, err := cfg.db.UpdateBook(id, bookParams)
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, "Failed to update database", err)
 		return
 	}
 
-	if oldCover != "" {
-		err := os.Remove(path.Join(cfg.metadataPath, oldCover))
-		if err != nil {
-			log.Println("Failed to remove old cover:", err)
-		}
-	}
-
-	if coverFile != nil {
-		err = fileManagement.MoveFilesWithPaths(coverFile.Name(), path.Join(cfg.metadataPath, *book.Files.Cover))
-		if err != nil {
-			respondWithError(w, http.StatusInternalServerError, "failed to create cover file", err)
-			return
-		}
-		coverWebPath := path.Join(cfg.metadataName, *book.Files.Cover)
-		book.Files.Cover = &coverWebPath
-	}
-
 	book.Files.Prepend(cfg.libraryName)
 	respondWithJson(w, http.StatusOK, book)
+}
+
+func (cfg *apiConfig) handlerUpdateBookCover(id uuid.UUID, w http.ResponseWriter, r *http.Request) {
+
+	tmp, err := fileManagement.CreateTempFileFromRequest(r)
+	if err != nil {
+		respondWithError(w, http.StatusBadRequest, "Failed to download image", err)
+		return
+	}
+
+	cfg.db.Begin()
+	defer cfg.db.Rollback()
+	oldPath, newPath, err := cfg.db.UpdateBookCover(id, cfg.metadataPath, cfg.libraryPath, path.Ext(tmp.Name()))
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Database error", err)
+		return
+	}
+
+	if oldPath != "" {
+		err = os.Remove(oldPath)
+		if err != nil {
+			log.Println("Failed to remove old cover")
+			respondWithError(w, http.StatusInternalServerError, "File error", err)
+			return
+		}
+	}
+
+	err = fileManagement.MoveFilesWithPaths(tmp.Name(), newPath)
+	if err != nil {
+		log.Println("Failed to move new cover to path")
+		respondWithError(w, http.StatusInternalServerError, "File error", err)
+		return
+	}
+
+	err = cfg.db.Commit()
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Database error", err)
+		return
+	}
+
+	book, err := cfg.db.GetBook(id)
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Database error", err)
+		return
+	}
+
+	respondWithJson(w, http.StatusOK, book)
+
 }
 
 func (cfg *apiConfig) handlerGetBookCover(id uuid.UUID, w http.ResponseWriter, r *http.Request) {

@@ -8,6 +8,7 @@ import (
 
 type Client struct {
 	db *sql.DB
+	tx *sql.Tx
 }
 
 func NewClient(dbPath string) (Client, error) {
@@ -15,7 +16,7 @@ func NewClient(dbPath string) (Client, error) {
 	if err != nil {
 		return Client{}, err
 	}
-	c := Client{db}
+	c := Client{db: db}
 	err = c.handleMigration()
 	if err != nil {
 		return Client{}, err
@@ -164,8 +165,8 @@ func (c Client) generateJoiningTable(type1, type1Table, type2, type2Table string
 
 func (c Client) InsertTestData() error {
 
-	tx, _ := c.db.Begin()
-	defer tx.Rollback()
+	c.Begin()
+	defer c.Rollback()
 
 	fmt.Print("\n======= Inserting Test Data =======\n\n")
 
@@ -188,7 +189,7 @@ func (c Client) InsertTestData() error {
 	createCategories := func(categoryType CategoryType, values []string) error {
 
 		for _, value := range values {
-			_, err := c.AddCategory(tx, categoryType, value)
+			_, err := c.AddCategory(categoryType, value)
 			if err != nil {
 				return err
 			}
@@ -216,7 +217,7 @@ func (c Client) InsertTestData() error {
 		return err
 	}
 
-	err = tx.Commit()
+	err = c.tx.Commit()
 	if err != nil {
 		return err
 	}
@@ -283,4 +284,27 @@ func (c Client) InsertTestData() error {
 	fmt.Print("\n======= Finished Inserting Test Data =======\n\n")
 
 	return nil
+}
+
+func (c *Client) Begin() error {
+	tx, err := c.db.Begin()
+	if err != nil {
+		return err
+	}
+	c.tx = tx
+	return nil
+}
+
+func (c *Client) Rollback() error {
+	if c.tx == nil {
+		return nil
+	}
+	return c.tx.Rollback()
+}
+
+func (c *Client) Commit() error {
+	if c.tx == nil {
+		return nil
+	}
+	return c.tx.Commit()
 }

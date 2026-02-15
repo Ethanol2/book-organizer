@@ -66,8 +66,8 @@ func (c Client) CheckBookExists(id uuid.UUID) (bool, error) {
 
 func (c Client) AddBook(params BookParams) (Book, error) {
 
-	tx, _ := c.db.Begin()
-	defer tx.Rollback()
+	c.Begin()
+	defer c.Rollback()
 
 	id := uuid.New()
 
@@ -89,27 +89,27 @@ func (c Client) AddBook(params BookParams) (Book, error) {
 		(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, NULL, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)	
 	`
 
-	_, err = tx.Exec(query, id, params.Title, params.Subtitle, params.Year, params.Description, string(tagsJson), params.ISBN, params.ASIN, params.Publisher, cover)
+	_, err = c.tx.Exec(query, id, params.Title, params.Subtitle, params.Year, params.Description, string(tagsJson), params.ISBN, params.ASIN, params.Publisher, cover)
 	if err != nil {
 		return Book{}, err
 	}
 
 	log.Println("Added \"", params.Title, "\" to books")
 
-	sortCats := func(tx *sql.Tx, catType CategoryType, cats []Category) error {
+	sortCats := func(catType CategoryType, cats []Category) error {
 		log.Println("Associating", catType)
 
 		for i, cat := range cats {
 
 			if cat.Id == nil {
-				result, err := c.GetCategoryByValue(tx, catType, cat.Name)
+				result, err := c.GetCategoryByValue(catType, cat.Name)
 
 				if err != nil {
 					return err
 				}
 
 				if result == (Category{}) {
-					result, err = c.AddCategory(tx, catType, cat.Name)
+					result, err = c.AddCategory(catType, cat.Name)
 					if err != nil {
 						return err
 					}
@@ -118,7 +118,7 @@ func (c Client) AddBook(params BookParams) (Book, error) {
 				cat = result
 			}
 
-			err := c.associateBookAndCategoryType(tx, id.String(), cat, i)
+			err := c.associateBookAndCategoryType(id.String(), cat, i)
 			if err != nil {
 				return err
 			}
@@ -126,28 +126,28 @@ func (c Client) AddBook(params BookParams) (Book, error) {
 		return nil
 	}
 
-	err = sortCats(tx, Series, *params.Series)
+	err = sortCats(Series, *params.Series)
 	if err != nil {
 		return Book{}, err
 	}
 
-	err = sortCats(tx, Genres, *params.Genres)
+	err = sortCats(Genres, *params.Genres)
 	if err != nil {
 		return Book{}, err
 	}
 
-	err = sortCats(tx, Narrators, *params.Narrators)
+	err = sortCats(Narrators, *params.Narrators)
 	if err != nil {
 		return Book{}, err
 	}
 
-	err = sortCats(tx, Authors, *params.Authors)
+	err = sortCats(Authors, *params.Authors)
 
 	if err != nil {
 		return Book{}, err
 	}
 
-	err = tx.Commit()
+	err = c.tx.Commit()
 	if err != nil {
 		return Book{}, err
 	}
@@ -207,7 +207,7 @@ func (c Client) GetBook(id uuid.UUID) (Book, error) {
 		}
 	}
 
-	err = book.getBookCategories(c, nil)
+	err = book.getBookCategories(c)
 	if err != nil {
 		return Book{}, err
 	}
@@ -219,12 +219,12 @@ func (c Client) GetBook(id uuid.UUID) (Book, error) {
 
 func (c Client) GetBooks() ([]Book, error) {
 
-	tx, _ := c.db.Begin()
-	defer tx.Rollback()
+	c.Begin()
+	defer c.Rollback()
 
 	books := []Book{}
 
-	rows, err := tx.Query("SELECT * FROM books")
+	rows, err := c.tx.Query("SELECT * FROM books")
 	if err != nil {
 		return []Book{}, err
 	}
@@ -271,7 +271,7 @@ func (c Client) GetBooks() ([]Book, error) {
 			}
 		}
 
-		err = book.getBookCategories(c, tx)
+		err = book.getBookCategories(c)
 		if err != nil {
 			log.Println(err)
 			continue
@@ -280,7 +280,7 @@ func (c Client) GetBooks() ([]Book, error) {
 		books = append(books, book)
 	}
 
-	err = tx.Commit()
+	err = c.tx.Commit()
 	if err != nil {
 		return []Book{}, err
 	}
@@ -323,7 +323,7 @@ func (c Client) AssociateBookAndDownload(bookId, downloadId uuid.UUID, author, s
 	}
 
 	files.Prepend(path.Join(author, series))
-	audio, text, cover, err := files.ToJson()
+	audio, text, err := files.FileListsToJson()
 	if err != nil {
 		return Book{}, err
 	}
@@ -336,7 +336,7 @@ func (c Client) AssociateBookAndDownload(bookId, downloadId uuid.UUID, author, s
 		audio_files = ?,
 		text_files = ?,
 		cover = ?
-	WHERE id = ?`, dbFiles.Root, audio, text, cover, bookId)
+	WHERE id = ?`, dbFiles.Root, audio, text, files.Cover, bookId)
 	if err != nil {
 		return Book{}, err
 	}
@@ -349,10 +349,13 @@ func (c Client) AssociateBookAndDownload(bookId, downloadId uuid.UUID, author, s
 	return c.GetBook(bookId)
 }
 
-func (c Client) UpdateBook(id uuid.UUID, update BookParams) (Book, string, error) {
+func (c Client) UpdateBook(id uuid.UUID, update BookParams) (Book, error) {
 
-	tx, _ := c.db.Begin()
-	defer tx.Rollback()
+	err := c.Begin()
+	if err != nil {
+		return Book{}, err
+	}
+	defer c.Rollback()
 
 	setParts := []string{"updated_at = CURRENT_TIMESTAMP"}
 	args := []interface{}{}
@@ -365,9 +368,6 @@ func (c Client) UpdateBook(id uuid.UUID, update BookParams) (Book, string, error
 	if update.Title != nil {
 		add("title", update.Title)
 	}
-	if update.Subtitle != nil {
-		add("subtitle", update.Subtitle)
-	}
 	if update.Year != nil {
 		add("publish_year", update.Year)
 	}
@@ -377,7 +377,7 @@ func (c Client) UpdateBook(id uuid.UUID, update BookParams) (Book, string, error
 	if update.Tags != nil {
 		tagsJson, err := json.Marshal(update.Tags)
 		if err != nil {
-			return Book{}, "", err
+			return Book{}, err
 		}
 		add("tags", tagsJson)
 	}
@@ -390,24 +390,13 @@ func (c Client) UpdateBook(id uuid.UUID, update BookParams) (Book, string, error
 	if update.Publisher != nil {
 		add("publisher", update.Publisher)
 	}
-	var oldCover string
-	if update.Cover != nil {
-		add("cover", fmt.Sprintf("/covers/%s%s", id, *update.Cover))
-		var cvr *string
-		err := tx.QueryRow("SELECT cover FROM books WHERE id = ?", id).Scan(&cvr)
-		if err != nil {
-			log.Println("Couldn't get old cover from database")
-			return Book{}, "", err
-		}
-		oldCover = *cvr
-	}
 
 	if len(setParts) > 0 {
 		query := "UPDATE books SET " + strings.Join(setParts, ", ") + "WHERE id = ?"
 		args = append(args, id)
-		_, err := tx.Exec(query, args...)
+		_, err := c.tx.Exec(query, args...)
 		if err != nil {
-			return Book{}, "", err
+			return Book{}, err
 		}
 	}
 
@@ -427,14 +416,14 @@ func (c Client) UpdateBook(id uuid.UUID, update BookParams) (Book, string, error
 		}
 
 		for _, cat := range removed {
-			_, err := tx.Exec(deleteQuery, id, cat.Id)
+			_, err := c.tx.Exec(deleteQuery, id, cat.Id)
 			if err != nil {
 				return err
 			}
 		}
 
 		for i, cat := range new {
-			err := c.associateBookAndCategoryType(tx, idStr, cat, i)
+			err := c.associateBookAndCategoryType(idStr, cat, i)
 			if err != nil {
 				return err
 			}
@@ -443,64 +432,105 @@ func (c Client) UpdateBook(id uuid.UUID, update BookParams) (Book, string, error
 	}
 
 	if update.Authors != nil {
-		old, err := c.GetCategoryTypesAssociatedWithBook(tx, id.String(), Authors)
+		old, err := c.GetCategoryTypesAssociatedWithBook(id.String(), Authors)
 		if err != nil {
-			return Book{}, "", err
+			return Book{}, err
 		}
 		err = handleCategories("DELETE FROM books_authors WHERE book_id = ? AND author_id = ?", *update.Authors, old, Authors)
 		if err != nil {
-			return Book{}, "", err
+			return Book{}, err
 		}
 	}
 
 	if update.Genres != nil {
-		old, err := c.GetCategoryTypesAssociatedWithBook(tx, id.String(), Genres)
+		old, err := c.GetCategoryTypesAssociatedWithBook(id.String(), Genres)
 		if err != nil {
-			return Book{}, "", err
+			return Book{}, err
 		}
 		err = handleCategories("DELETE FROM books_genres WHERE book_id = ? AND genre_id = ?", *update.Genres, old, Genres)
 		if err != nil {
-			return Book{}, "", err
+			return Book{}, err
 		}
 	}
 
 	if update.Series != nil {
-		old, err := c.GetCategoryTypesAssociatedWithBook(tx, id.String(), Series)
+		old, err := c.GetCategoryTypesAssociatedWithBook(id.String(), Series)
 		if err != nil {
-			return Book{}, "", err
+			return Book{}, err
 		}
 		err = handleCategories("DELETE FROM books_series WHERE book_id = ? AND series_id = ?", *update.Series, old, Series)
 		if err != nil {
-			return Book{}, "", err
+			return Book{}, err
 		}
 	}
 
 	if update.Narrators != nil {
-		old, err := c.GetCategoryTypesAssociatedWithBook(tx, id.String(), Narrators)
+		old, err := c.GetCategoryTypesAssociatedWithBook(id.String(), Narrators)
 		if err != nil {
-			return Book{}, "", err
+			return Book{}, err
 		}
 		err = handleCategories("DELETE FROM books_narrators WHERE book_id = ? AND narrator_id = ?", *update.Narrators, old, Narrators)
 		if err != nil {
-			return Book{}, "", err
+			return Book{}, err
 		}
 	}
 
-	err := tx.Commit()
+	err = c.tx.Commit()
 	if err != nil {
-		return Book{}, "", err
+		return Book{}, err
 	}
 
 	log.Println("Updated book \"", *update.Title, "\" (", id, ")")
 
-	book, err := c.GetBook(id)
+	return c.GetBook(id)
+}
 
-	return book, oldCover, err
+func (c Client) UpdateBookCover(id uuid.UUID, metadataPath, libraryPath, ext string) (string, string, error) {
+
+	var dir *string
+	var cover *string
+
+	err := c.tx.QueryRow("SELECT directory, cover FROM books WHERE id = ?", id).Scan(&dir, &cover)
+	if err != nil {
+		return "", "", err
+	}
+
+	newCover := ""
+	if cover == nil {
+		if dir == nil {
+			tmp := fmt.Sprintf("%d.%s", id, ext)
+			newCover = path.Join(metadataPath, tmp)
+			cover = &tmp
+		} else {
+			tmp := fmt.Sprintf(*dir+"/cover.%s", ext)
+			newCover = path.Join(libraryPath, tmp)
+			cover = &tmp
+		}
+
+		_, err = c.tx.Exec("UPDATE books SET cover = ? WHERE id = ?", cover, id)
+		if err != nil {
+			return "", "", err
+		}
+
+		return "", newCover, nil
+	}
+
+	if dir == nil {
+		newCover = *cover
+	} else {
+		newCover = path.Join(*dir, "cover."+ext)
+		_, err = c.tx.Exec("UPDATE books SET cover = ? WHERE id = ?", cover, id)
+		if err != nil {
+			return "", "", err
+		}
+	}
+
+	return *cover, newCover, nil
 }
 
 func (c Client) GetPrimaryAuthorAndSeries(id uuid.UUID) (string, string, error) {
 	authorDir := "Unknown"
-	authors, err := c.GetCategoryTypesAssociatedWithBook(nil, id.String(), Authors)
+	authors, err := c.GetCategoryTypesAssociatedWithBook(id.String(), Authors)
 	if err != nil {
 		return "", "", err
 	}
@@ -509,7 +539,7 @@ func (c Client) GetPrimaryAuthorAndSeries(id uuid.UUID) (string, string, error) 
 	}
 
 	seriesDir := ""
-	series, err := c.GetCategoryTypesAssociatedWithBook(nil, id.String(), Series)
+	series, err := c.GetCategoryTypesAssociatedWithBook(id.String(), Series)
 	if err != nil {
 		return "", "", err
 	}
@@ -522,25 +552,26 @@ func (c Client) GetPrimaryAuthorAndSeries(id uuid.UUID) (string, string, error) 
 
 // #region Book Methods
 
-func (book *Book) getBookCategories(c Client, tx *sql.Tx) error {
+func (book *Book) getBookCategories(c Client) error {
+
 	var err error
 
-	book.Authors, err = c.GetCategoryTypesAssociatedWithBook(tx, book.Id.String(), Authors)
+	book.Authors, err = c.GetCategoryTypesAssociatedWithBook(book.Id.String(), Authors)
 	if err != nil {
 		return err
 	}
 
-	book.Genres, err = c.GetCategoryTypesAssociatedWithBook(tx, book.Id.String(), Genres)
+	book.Genres, err = c.GetCategoryTypesAssociatedWithBook(book.Id.String(), Genres)
 	if err != nil {
 		return err
 	}
 
-	book.Series, err = c.GetCategoryTypesAssociatedWithBook(tx, book.Id.String(), Series)
+	book.Series, err = c.GetCategoryTypesAssociatedWithBook(book.Id.String(), Series)
 	if err != nil {
 		return err
 	}
 
-	book.Narrators, err = c.GetCategoryTypesAssociatedWithBook(tx, book.Id.String(), Narrators)
+	book.Narrators, err = c.GetCategoryTypesAssociatedWithBook(book.Id.String(), Narrators)
 	if err != nil {
 		return err
 	}

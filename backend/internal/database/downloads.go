@@ -31,7 +31,7 @@ func (c Client) AddDownload(tx *sql.Tx, files BookFiles) (*Download, error) {
 
 	id := uuid.New()
 
-	audio, text, cover, err := files.ToJson()
+	audio, text, err := files.FileListsToJson()
 	if err != nil {
 		return nil, err
 	}
@@ -42,7 +42,7 @@ func (c Client) AddDownload(tx *sql.Tx, files BookFiles) (*Download, error) {
 	VALUES
 		(?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
 	`
-	_, err = tx.Exec(query, id, files.Root, audio, text, cover)
+	_, err = tx.Exec(query, id, files.Root, audio, text, files.Cover)
 	if err != nil {
 		return nil, err
 	}
@@ -89,7 +89,7 @@ func (c Client) UpdateDownloadFiles(tx *sql.Tx, id uuid.UUID, files BookFiles) e
 		defer tx.Rollback()
 	}
 
-	audio, text, cover, err := files.ToJson()
+	audio, text, err := files.FileListsToJson()
 	if err != nil {
 		return err
 	}
@@ -102,7 +102,7 @@ func (c Client) UpdateDownloadFiles(tx *sql.Tx, id uuid.UUID, files BookFiles) e
 			cover = ?
 		WHERE id = ?
 	`
-	_, err = tx.Exec(query, audio, text, cover, id)
+	_, err = tx.Exec(query, audio, text, files.Cover, id)
 	if err != nil {
 		return err
 	}

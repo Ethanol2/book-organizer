@@ -80,6 +80,7 @@ func main() {
 	mux.HandleFunc("GET /api/books/{id}", uuidMiddleware(cfg.handlerGetBook))
 	mux.HandleFunc("GET /api/books/{id}/cover", uuidMiddleware(cfg.handlerGetBookCover))
 	mux.HandleFunc("PATCH /api/books/{id}", uuidMiddleware(cfg.handlerUpdateBook))
+	mux.HandleFunc("PATCH /api/books/{id}/cover", uuidMiddleware(cfg.handlerUpdateBookCover))
 
 	// Metadata
 	mux.HandleFunc("GET /api/metadata/openlibrary", metadataSearchMiddleware(cfg.handlerSearchOpenLibrary))
