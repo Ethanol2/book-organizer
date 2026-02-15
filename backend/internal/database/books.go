@@ -289,28 +289,22 @@ func (c Client) AssociateBookAndDownload(bookId, downloadId uuid.UUID, author, s
 	}
 	defer tx.Rollback()
 
-	var dbFiles struct {
-		Root  *string
-		Audio *string
-		Text  *string
-		Cover *string
-	}
+	var files BookFiles
+	var Audio *string
+	var Text *string
+
 	err = tx.QueryRow(`
 	SELECT dir_name, audio_files, text_files, cover FROM downloads WHERE id = ?
-	`, downloadId).Scan(&dbFiles.Root, &dbFiles.Audio, &dbFiles.Text, &dbFiles.Cover)
+	`, downloadId).Scan(&files.Root, &Audio, &Text, &files.Cover)
 	if err != nil {
 		return Book{}, err
 	}
 
-	files := BookFiles{
-		Root:  dbFiles.Root,
-		Cover: dbFiles.Cover,
-	}
-	err = files.ParseAudioJson(*dbFiles.Audio)
+	err = files.ParseAudioJson(*Audio)
 	if err != nil {
 		return Book{}, err
 	}
-	err = files.ParseTextJson(*dbFiles.Text)
+	err = files.ParseTextJson(*Text)
 	if err != nil {
 		return Book{}, err
 	}
@@ -329,7 +323,7 @@ func (c Client) AssociateBookAndDownload(bookId, downloadId uuid.UUID, author, s
 		audio_files = ?,
 		text_files = ?,
 		cover = ?
-	WHERE id = ?`, dbFiles.Root, audio, text, files.Cover, bookId)
+	WHERE id = ?`, files.Root, audio, text, files.Cover, bookId)
 	if err != nil {
 		return Book{}, err
 	}
