@@ -35,6 +35,14 @@ type Book struct {
 	Files BookFiles `json:"files,omitempty"`
 }
 
+type BookOverview struct {
+	Id       uuid.UUID  `json:"id"`
+	Title    string     `json:"title"`
+	Subtitle *string    `json:"subtitle"`
+	Authors  []Category `json:"authors"`
+	Cover    *string    `json:"cover"`
+}
+
 type BookParams struct {
 	Title       *string   `json:"title"`
 	Subtitle    *string   `json:"subtitle"`
@@ -205,7 +213,7 @@ func (c Client) GetBook(id uuid.UUID) (Book, error) {
 		return Book{}, err
 	}
 
-	defer log.Println("Retrieved \"", book.Title, "\" from books")
+	//defer log.Println("Retrieved \"", book.Title, "\" from books")
 
 	return book, nil
 }
@@ -276,6 +284,38 @@ func (c Client) GetBooks() ([]Book, error) {
 	err = c.Commit()
 	if err != nil {
 		return []Book{}, err
+	}
+
+	return books, nil
+}
+
+func (c Client) GetBooksSummary() ([]BookOverview, error) {
+
+	err := c.Begin()
+	if err != nil {
+		return []BookOverview{}, err
+	}
+	defer c.Rollback()
+
+	rows, err := c.tx.Query("SELECT id, title, subtitle, cover FROM books")
+	if err != nil {
+		return []BookOverview{}, err
+	}
+
+	var books []BookOverview
+	for rows.Next() {
+		var book BookOverview
+		err = rows.Scan(&book.Id, &book.Title, &book.Subtitle, &book.Cover)
+		if err != nil {
+			return []BookOverview{}, err
+		}
+
+		book.Authors, err = c.GetCategoryTypesAssociatedWithBook(book.Id.String(), Authors)
+		if err != nil {
+			return []BookOverview{}, err
+		}
+
+		books = append(books, book)
 	}
 
 	return books, nil

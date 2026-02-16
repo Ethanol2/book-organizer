@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -18,32 +19,65 @@ func (cfg *apiConfig) handlerGetBook(id uuid.UUID, w http.ResponseWriter, r *htt
 
 	book, err := cfg.db.GetBook(id)
 	if err != nil {
-		respondWithError(w, http.StatusInternalServerError, "Couldn't get book", err)
+		respondWithError(w, http.StatusInternalServerError, "Database error", err)
 		return
 	}
 
-	if book.Files.Root == nil {
-		book.Files.Prepend(cfg.libraryName)
-	}
+	book.Files.Prepend(cfg.libraryName)
+
+	log.Println("Fetching \"", book.Title, "\" book details")
 
 	respondWithJson(w, http.StatusOK, book)
 }
 
 func (cfg *apiConfig) handlerGetBooks(w http.ResponseWriter, r *http.Request) {
 
-	books, err := cfg.db.GetBooks()
-	if err != nil {
-		respondWithError(w, http.StatusInternalServerError, "Couldn't get books", err)
-		return
+	getFullResults := r.URL.Query().Get("view")
+
+	switch getFullResults {
+
+	case "full":
+		books, err := cfg.db.GetBooks()
+		if err != nil {
+			respondWithError(w, http.StatusInternalServerError, "Database error", err)
+			return
+		}
+
+		for i := range books {
+			books[i].Files.Prepend(cfg.libraryName)
+		}
+
+		log.Println("Fetching book details")
+
+		respondWithJson(w, http.StatusOK, books)
+
+	case "":
+	case "summary":
+		books, err := cfg.db.GetBooksSummary()
+		if err != nil {
+			respondWithError(w, http.StatusInternalServerError, "Database error", err)
+			return
+		}
+
+		for i := range books {
+			if books[i].Cover != nil {
+				cover := *books[i].Cover
+				cover = path.Join(cfg.libraryName, cover)
+				books[i].Cover = &cover
+			}
+		}
+
+		log.Println("Fetching book summaries")
+
+		respondWithJson(w, http.StatusOK, books)
+
+	default:
+		respondWithError(
+			w,
+			http.StatusBadRequest,
+			"View options are 'full' for full details or 'summary' for just title, subtitle, cover and authors",
+			fmt.Errorf("Invalid view value when fetching books: %s", getFullResults))
 	}
-
-	for i := range books {
-		books[i].Files.Prepend(cfg.libraryName)
-	}
-
-	log.Println("Fetching books")
-
-	respondWithJson(w, http.StatusOK, books)
 }
 
 func (cfg *apiConfig) handlerPostBook(w http.ResponseWriter, r *http.Request) {

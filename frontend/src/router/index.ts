@@ -26,7 +26,7 @@ const router = createRouter({
       component: DownloadsView
     },
     {
-      path: '/books/:title',
+      path: '/books/:id',
       name: 'book-details',
       component: BookDetailsView
     }

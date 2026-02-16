@@ -1,16 +1,16 @@
 <script setup lang="ts">
-import { getAuthorsList, getBookCoverSrc, type Book } from '@/types/book';
+import { getAuthorsList, getBookCoverSrc, type Book, type BookSummary } from '@/types/book';
 
 const props = defineProps<{
-    book: Book
+    book: BookSummary
 }>();
 
-const cover = getBookCoverSrc(props.book)
+const cover = props.book.cover == null ? "" : props.book.cover
 
 </script>
 
 <template>
-    <RouterLink :to="`/books/${book.title}`" class="book">
+    <RouterLink :to="`/books/${book.id}`" class="book">
         <div class="cover-wrapper">
             <img v-if="cover != ''" :src="cover" :alt="book.title" class="cover">
             <img v-else :src="'/media/metadata/' + book.id + '.jpg'" :alt="book.title" class="no-cover">
@@ -21,7 +21,7 @@ const cover = getBookCoverSrc(props.book)
             </h3>
             <small>
                 {{ book.subtitle }}
-                {{ getAuthorsList(book) }}
+                {{ getAuthorsList(book.authors) }}
             </small>
         </div>
     </RouterLink>

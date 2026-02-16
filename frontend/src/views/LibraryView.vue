@@ -1,14 +1,14 @@
 <script setup lang="ts">
 import BookItem from '@/components/BookItem.vue';
-import type { Book } from '@/types/book';
+import type { Book, BookSummary } from '@/types/book';
 import { onMounted, ref } from 'vue';
 
-const books = ref<Book[]>([]);
+const books = ref<BookSummary[]>([]);
 
 async function fetchBooks() {
     books.value = [];
     try {
-        const resp = await fetch("api/books");
+        const resp = await fetch('api/books?view=summary');
         if (!resp.ok) {
             throw new Error(`HTTP error with status: ${resp.status}`);
         }

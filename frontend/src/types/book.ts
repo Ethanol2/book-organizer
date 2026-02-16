@@ -3,7 +3,7 @@ export type Book = {
     title: string
     subtitle: string
     description: string
-    year: string
+    year: number
     isbn: string
     asin: string
     tags: string[]
@@ -16,6 +16,14 @@ export type Book = {
     narrators: Narrator[]
     files: BookFiles
 };
+
+export type BookSummary = {
+    id: string
+    title: string
+    subtitle: string
+    cover?: string | null
+    authors: Author[]
+}
 
 export type BookFiles = {
     root?: string | null,
@@ -41,13 +49,13 @@ export function getBookCoverSrc(book: Book): string {
     return ""
 }
 
-export function getAuthorsList(book: Book): string {
-    if (book.authors.length == 0) {
+export function getAuthorsList(authors: Author[]): string {
+    if (authors.length == 0) {
         return ""
     }
 
     let list = ""
-    book.authors.forEach(author => {
+    authors.forEach(author => {
         list += ', ' + author.name
     });
     return list.slice(2, list.length)
