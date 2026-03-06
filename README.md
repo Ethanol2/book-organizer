@@ -2,28 +2,42 @@
 
 An app written in Go and designed to run in Docker that helps organize a book library.
 
+**Currently on hold**
+This project benefits me, so I definitely want to continue work and finish the project. Due to life circumstances and minor burnout, I'm shelving the project for now. Might come back to this in a week, might be 6 months.
+
+The backend portion is pretty complete. I'm sure as the frontend continues development I'll have to make changes.
+
+The frontend development is where I'm technically most weak. What is currently developed is a combination of my learning and assists from ChatGPT.
+
 ## Description
 
 This app will scan a downloads folder for new book directories, let users associate each download with a book entry, and then move the files into a structured library folder. It’s heavily inspired by the *arr* apps (RIP Readarr).
  
-## Planned Features
+## Features
+
+## Technologies
+
+- **Language**: Go
+- **Frontend**: Vue *in development*
+- **Database**: SQLite
+- **Runtime**: Docker *planned*
 
 ### New File Scanning
 
-The app will periodically scan a configurable downloads folder for new book directories. When a new directory is found, it will add a record to a `pending` table in SQLite, including:
+The app periodically scans a configurable downloads folder for new book directories.
 
 - The folder name
 - Detected file types (audio files, ebook files, cover art, etc.)
 
-From the UI, users will be able to view and manage this pending list.
+From the UI, are able to view and will be able to manage this pending list.
 
 ### Book Library
 
-Books will be stored in a `books` table in SQLite. Once a pending directory is associated with a book, the app will move its files into the library folder using a fixed structure, for example:
+Books are stored in a `books` table in SQLite. Once a pending download is associated with a book, the app will move its files into the library folder using a fixed structure, for example:
 
 `Author/Series/Book Title/`
 
-The app will integrate with at least one metadata source to help populate book details (title, author, series, ISBN, etc.). Likely candidates are Audible, Open Library, or Google Books.
+Currently the backend can make queries to Google Books and OpenLibrary.
 
 ### Frontend and Backend
 
@@ -34,16 +48,12 @@ The app will integrate with at least one metadata source to help populate book d
   - Create and edit book entries
   - Trigger imports/moves
 
+## Planned Features
+
 ### qBittorrent Integration (Nice-to-have)
 
 After the core library flow is working, the app will integrate with qBittorrent to track labeled downloads. For completed torrents with a specific label (e.g. `books`), the app will automatically add them to the pending list. The frontend will also surface whether qBittorrent is reachable.
 
-## Technologies
-
-- **Language**: Go
-- **Frontend**: Vue
-- **Database**: SQLite
-- **Runtime**: Docker
 
 ## API Reference ✅
 
@@ -54,12 +64,16 @@ Below are the current HTTP endpoints and the JSON structures they expect and ret
 ### Downloads 📥
 
 - **GET /api/downloads**
-  - **Description:** List pending downloads
+  - **Description:** List pending downloads (items in the downloads folder that have not yet been associated with a book)
   - **Response:** 200 OK — array of `Download` objects
 
 - **GET /api/downloads/{id}**
-  - **Description:** Get a single download by UUID
+  - **Description:** Get a single pending download by UUID
   - **Response:** 200 OK — single `Download` object
+
+- **GET /api/downloads/{id}/cover**
+  - **Description:** Serve the cover image file associated with a download (if present)
+  - **Response:** 200 OK — binary image (jpeg/png/webp/gif)
 
 - **POST /api/downloads/{id}/associate**
   - **Description:** Associate a pending download with an existing book and move files into the library
@@ -106,6 +120,10 @@ Below are the current HTTP endpoints and the JSON structures they expect and ret
   - **Description:** Get a single book by UUID
   - **Response:** 200 OK — single `Book` object
 
+- **GET /api/books/{id}/cover**
+  - **Description:** Serve the cover image file associated with a book (if present)
+  - **Response:** 200 OK — binary image (jpeg/png/webp/gif)
+
 - **POST /api/books**
   - **Description:** Create a new book
   - **Request JSON (BookParams)** — all fields are optional, include only what you want to set:
@@ -130,6 +148,106 @@ Below are the current HTTP endpoints and the JSON structures they expect and ret
   - **Description:** Update fields on an existing book (same schema as `BookParams`; send only fields to change)
   - **Request JSON:** same as `POST /api/books`
   - **Response:** 200 OK — updated `Book` object
+
+- **PATCH /api/books/{id}/cover**
+  - **Description:** Upload a new cover image for a book
+  - **Request:** Raw binary image in the request body with `Content-Type: image/jpeg|png|webp|gif`
+  - **Response:** 200 OK — updated `Book` object
+
+---
+
+### Metadata 🔎
+
+- **GET /api/metadata/openlibrary**
+  - **Description:** Search OpenLibrary for metadata matching the provided query parameters
+  - **Request JSON:** `SearchParams` (all fields are optional)
+  - **Response:** 200 OK — `SearchResults`
+
+- **GET /api/metadata/googlebooks**
+  - **Description:** Search Google Books for metadata (requires `GOOGLE_BOOKS_API_KEY` in env)
+  - **Request JSON:** `SearchParams` (all fields are optional)
+  - **Response:** 200 OK — `SearchResults`
+
+---
+
+### Media static file access 📂
+
+These are served directly from the configured folders:
+
+- **GET /media/downloads/{path...}** — files in the downloads directory
+- **GET /media/library/{path...}** — files in the library directory
+- **GET /media/metadata/{path...}** — stored metadata/cover assets
+
+---
+
+## Example Usage (curl) 🧪
+
+### Downloads
+
+- List pending downloads:
+  ```bash
+  curl -s http://localhost:8080/api/downloads | jq .
+  ```
+
+- Get a download by ID:
+  ```bash
+  curl -s http://localhost:8080/api/downloads/<DOWNLOAD_ID> | jq .
+  ```
+
+- Associate a download with an existing book:
+  ```bash
+  curl -X POST http://localhost:8080/api/downloads/<DOWNLOAD_ID>/associate \
+    -H "Content-Type: application/json" \
+    -d '{"book_id":"<BOOK_ID>"}' | jq .
+  ```
+
+### Books
+
+- Create a book:
+  ```bash
+  curl -X POST http://localhost:8080/api/books \
+    -H "Content-Type: application/json" \
+    -d '{"title":"My Book","authors":[{"name":"Me"}]}' | jq .
+  ```
+
+- Update a book:
+  ```bash
+  curl -X PATCH http://localhost:8080/api/books/<BOOK_ID> \
+    -H "Content-Type: application/json" \
+    -d '{"description":"Updated summary"}' | jq .
+  ```
+
+- Upload a cover image:
+  ```bash
+  curl -X PATCH http://localhost:8080/api/books/<BOOK_ID>/cover \
+    -H "Content-Type: image/jpeg" \
+    --data-binary @cover.jpg | jq .
+  ```
+
+### Categories
+
+- Add a category value:
+  ```bash
+  curl -X POST http://localhost:8080/api/categories/series \
+    -H "Content-Type: application/json" \
+    -d '{"value":"My Series"}' | jq .
+  ```
+
+### Metadata
+
+- Search OpenLibrary (JSON body):
+  ```bash
+  curl -X GET http://localhost:8080/api/metadata/openlibrary \
+    -H "Content-Type: application/json" \
+    -d '{"title":"The Martian"}' | jq .
+  ```
+
+- Search Google Books (requires GOOGLE_BOOKS_API_KEY):
+  ```bash
+  curl -X GET http://localhost:8080/api/metadata/googlebooks \
+    -H "Content-Type: application/json" \
+    -d '{"title":"The Martian"}' | jq .
+  ```
 
 ---
 
