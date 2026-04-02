@@ -24,15 +24,28 @@ At the moment I haven't moved to get the project onto docker.
 
 Clone or download the repo to your local machine. I'm not sure if it works using github codespaces, but let me know if you try it and it does.
 
-- Setup your `.env` file. Use the `.env (example)` as a base.
-    - `DB_PATH`: The app will create the file automatically at the set location
-    - `FRONTEND_PATH`: Leave default. Not currently used
-    - `DOWNLOADS_PATH`: The app will search this directory for new downloads.
-    - `LIBRARY_PATH`: Directory where books are moved once they're associated with a download.
-    - `PORT`: Leave defaulf if unsure. The frontend is setup to use this port during development. 
-    - `GOOGLE_BOOKS_API_KEY`: Fill if you want google books metadata fetching. This involves figuring out google's api keys with your own google account.
+- Backend
+  - Setup your `.env` file. Use the `.env (example)` as a base.
+      - `DB_PATH`: The app will create the file automatically at the set location
+      - `FRONTEND_PATH`: Leave default. Not currently used
+      - `DOWNLOADS_PATH`: The app will search this directory for new downloads.
+      - `LIBRARY_PATH`: Directory where books are moved once they're associated with a download.
+      - `PORT`: Leave defaulf if unsure. The frontend is setup to use this port during development. 
+      - `GOOGLE_BOOKS_API_KEY`: Fill if you want google books metadata fetching. This involves figuring out google's api keys with your own google account.
 
-  The directories must exist
+    The directories must exist
+
+- Frontend
+  - Install npm
+  
+  - Install Node.js
+    https://nodejs.org/en/download
+
+  - Install frontend dependencies
+    ```bash
+    cd frontend
+    npm install
+    ```
 
 ## Usage ⚙️
 
