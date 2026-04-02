@@ -213,14 +213,21 @@ Below are the current HTTP endpoints and the JSON structures they expect and ret
 
 ### Metadata 🔎
 
-- **GET /api/metadata/openlibrary**
+- **GET /api/metadata/**
   - **Description:** Search OpenLibrary for metadata matching the provided query parameters
-  - **Request JSON:** `SearchParams` (all fields are optional)
-  - **Response:** 200 OK — `SearchResults`
-
-- **GET /api/metadata/googlebooks**
-  - **Description:** Search Google Books for metadata (requires `GOOGLE_BOOKS_API_KEY` in env)
-  - **Request JSON:** `SearchParams` (all fields are optional)
+  - **Metadata Source:**
+    Current sources are Open Library or Google Books (requires api key)
+    ```
+    ?source=google+books
+    ```
+  - **Search Params:** (all fields are optional)
+    - title
+    - author
+    - year
+    - publisher
+    - isbn
+    - genre(s) `?genre=scifi&genre=fantasy`
+    - languages(s) `?language=eng&language=fr`
   - **Response:** 200 OK — `SearchResults`
 
 ---
