@@ -129,9 +129,9 @@ func initConfig(dbReset, insertTestData bool) (*apiConfig, error) {
 		return nil, fmt.Errorf("couldn't open database: %v", err)
 	}
 
-	fPath := os.Getenv("FRONTENT_PATH")
+	fPath := os.Getenv("FRONTEND_PATH")
 	if fPath == "" {
-		return nil, fmt.Errorf("FRONTENT_PATH must be set")
+		return nil, fmt.Errorf("FRONTEND_PATH must be set")
 	}
 
 	dPath := os.Getenv("DOWNLOADS_PATH")

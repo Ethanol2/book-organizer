@@ -1,0 +1,6 @@
+DB_PATH="./appData.db"
+FRONTEND_PATH="./static"
+DOWNLOADS_PATH="./data/downloads"
+LIBRARY_PATH="./data/library"
+PORT="8080"
+GOOGLE_BOOKS_API_KEY=""
