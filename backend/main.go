@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
@@ -82,8 +81,7 @@ func main() {
 	mux.HandleFunc("PATCH /api/books/{id}/cover", uuidMiddleware(cfg.handlerUpdateBookCover))
 
 	// Metadata
-	mux.HandleFunc("GET /api/metadata/openlibrary", metadataSearchMiddleware(cfg.handlerSearchOpenLibrary))
-	mux.HandleFunc("GET /api/metadata/googlebooks", metadataSearchMiddleware(cfg.handlerSearchGoogleBooks))
+	mux.HandleFunc("GET /api/metadata/", cfg.metadataSearchMiddleware())
 
 	// Media
 	mux.Handle("/media/downloads/", http.StripPrefix("/media/downloads/", http.FileServer(http.Dir(cfg.downloadsPath))))
@@ -190,14 +188,58 @@ func uuidMiddleware(handler func(uuid.UUID, http.ResponseWriter, *http.Request))
 
 }
 
-func metadataSearchMiddleware(handler func(metadata.SearchParams, http.ResponseWriter, *http.Request)) func(http.ResponseWriter, *http.Request) {
+func (cfg apiConfig) metadataSearchMiddleware() func(http.ResponseWriter, *http.Request) {
 
 	return func(w http.ResponseWriter, r *http.Request) {
-		var searchParams metadata.SearchParams
-		err := json.NewDecoder(r.Body).Decode(&searchParams)
-		if err != nil {
-			respondWithError(w, http.StatusBadRequest, "couldn't read body", err)
+		var handler func(metadata.SearchParams, http.ResponseWriter, *http.Request)
+
+		// GET /books/search?source=google&title=harry+potter
+
+		switch r.URL.Query().Get("source") {
+
+		case "":
+			respondWithError(w, http.StatusBadRequest, "Missing source", fmt.Errorf("request missing source in url"))
 			return
+
+		case "open library":
+			handler = cfg.handlerSearchOpenLibrary
+
+		case "google books":
+			if cfg.googleBooksApiKey == "" {
+				respondWithError(w, http.StatusInternalServerError, "Missing Google Books api key", fmt.Errorf("Missing Google Books api key"))
+				return
+			}
+			handler = cfg.handlerSearchGoogleBooks
+
+		default:
+			src := r.URL.Query().Get("source")
+			respondWithError(w, http.StatusBadRequest, "Unknown source: "+src, fmt.Errorf("Unknown source: "+src))
+			return
+		}
+
+		var searchParams metadata.SearchParams
+
+		if title := r.URL.Query().Get("title"); title != "" {
+			searchParams.Title = &title
+		}
+		if author := r.URL.Query().Get("author"); author != "" {
+			searchParams.Author = &author
+		}
+		if year := r.URL.Query().Get("year"); year != "" {
+			searchParams.Year = &year
+		}
+		if pub := r.URL.Query().Get("publisher"); pub != "" {
+			searchParams.Publisher = &pub
+		}
+		if isbn := r.URL.Query().Get("isbn"); isbn != "" {
+			searchParams.ISBN = &isbn
+		}
+
+		if genres := r.URL.Query()["genre"]; len(genres) > 0 {
+			searchParams.Genres = &genres
+		}
+		if langs := r.URL.Query()["language"]; len(langs) > 0 {
+			searchParams.Languages = &langs
 		}
 
 		handler(searchParams, w, r)

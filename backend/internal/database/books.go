@@ -95,7 +95,7 @@ func (c Client) AddBook(params BookParams) (Book, error) {
 		return Book{}, err
 	}
 
-	log.Println("Added \"", params.Title, "\" to books")
+	log.Println("Added \"", *params.Title, "\" to books")
 
 	sortCats := func(catType CategoryType, cats []Category) error {
 		log.Println("Associating", catType)

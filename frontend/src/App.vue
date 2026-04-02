@@ -14,6 +14,7 @@ import { RouterLink, RouterView } from 'vue-router'
     <section class="body">
       <aside class="sidebar">
         <nav>
+          <RouterLink to="/add-book">Add Book</RouterLink>
           <RouterLink to="/">Library</RouterLink>
           <RouterLink to="/downloads">Downloads</RouterLink>
           <RouterLink to="/about">About</RouterLink>

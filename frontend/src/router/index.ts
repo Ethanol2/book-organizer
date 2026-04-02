@@ -3,6 +3,7 @@ import HomeView from '../views/HomeView.vue'
 import DownloadsView from '../views/DownloadsView.vue'
 import LibraryView from '@/views/LibraryView.vue'
 import BookDetailsView from '@/views/BookDetailsView.vue'
+import AddBookView from '@/views/AddBookView.vue'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -19,6 +20,11 @@ const router = createRouter({
       // this generates a separate chunk (About.[hash].js) for this route
       // which is lazy-loaded when the route is visited.
       component: () => import('../views/AboutView.vue'),
+    },
+    {
+      path: '/add-book',
+      name: 'add-book',
+      component: AddBookView
     },
     {
       path: '/downloads',
