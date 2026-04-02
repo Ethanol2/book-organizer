@@ -10,18 +10,59 @@ The backend portion is pretty complete. I'm sure as the frontend continues devel
 
 The frontend development is where I'm technically most weak. What is currently developed is a combination of my learning and assists from ChatGPT. I'm hopeful that I can power through the learning curve and create something useable.
 
-## Description
+## Description and Motivation
 
 This app will scan a downloads folder for new book directories, let users associate each download with a book entry, and then move the files into a structured library folder. It’s heavily inspired by the *arr* apps (RIP Readarr).
- 
-## Features
 
+I wanted to make this app because I have a big audiobook library and I wanted a tool to manage it. I know alternatives exist, plus a whole host of projects inspired by Readarr like this one, so this is also a learning opportunity for me.
+
+---
+
+## Quickstart
+
+At the moment I haven't moved to get the project onto docker.
+
+Clone or download the repo to your local machine. I'm not sure if it works using github codespaces, but let me know if you try it and it does.
+
+- Setup your `.env` file. Use the `.env (example)` as a base.
+    - `DB_PATH`: The app will create the file automatically at the set location
+    - `FRONTEND_PATH`: Leave default. Not currently used
+    - `DOWNLOADS_PATH`: The app will search this directory for new downloads.
+    - `LIBRARY_PATH`: Directory where books are moved once they're associated with a download.
+    - `PORT`: Leave defaulf if unsure. The frontend is setup to use this port during development. 
+    - `GOOGLE_BOOKS_API_KEY`: Fill if you want google books metadata fetching. This involves figuring out google's api keys with your own google account.
+
+  The directories must exist
+
+## Usage ⚙️
+
+- **Start the app locally:**
+  - Backend
+    ```bash
+    go run main.go
+    ```
+    - Flags available at startup:
+      - `-r` — reset (remove) the DB file before starting
+      - `-t` — insert test data (implies reset)
+  - Frontend
+    ```bash
+    cd frontend
+    npm run dev
+    ```
+---
+
+## Contributing
+
+If you'd like to contribute, please fork the repository and open a pull request to the `main` branch.
+ 
 ## Technologies
 
 - **Language**: Go
-- **Frontend**: Vue *in development*
+- **Frontend**: Vue *(in development)*
 - **Database**: SQLite
-- **Runtime**: Docker *planned*
+- **Runtime**: Docker *(planned)*
+
+## Features
 
 ### New File Scanning
 
@@ -298,28 +339,3 @@ These are served directly from the configured folders:
     "name": "<string>"
   }
   ```
-
----
-
-## Usage ⚙️
-
-At the moment I haven't moved to get the project onto docker.
-
-- **Before running the app**
-  - Setup your `.env` file. Use the `.env (example)` as a base.
-    - `DB_PATH`: The app will create the file automatically at the set location
-    - `FRONTEND_PATH`: Leave default. Not currently used
-    - `DOWNLOADS_PATH`: The app will search this directory for new downloads.
-    - `LIBRARY_PATH`: Directory where books are moved once they're associated with a download.
-    - `PORT`: Leave defaulf if unsure. The frontend is setup to use this port during development. 
-    - `GOOGLE_BOOKS_API_KEY`: Fill if you want google books metadata fetching. This involves figuring out google's api keys with your own google account.
-
-  The directories must exist
-
-- **Start the app locally:**
-  ```bash
-  go run main.go
-  ```
-  - Flags available at startup:
-    - `-r` — reset (remove) the DB file before starting
-    - `-t` — insert test data (implies reset)
