@@ -79,8 +79,9 @@ func SearchGoogleBooks(params SearchParams, key string) (SearchResults, error) {
 	q := u.Query()
 	q.Add("q", strings.Join(searchItems, " "))
 
-	pageOffset := (*params.Page - 1) * 10
+	pageOffset := 0
 	if params.Page != nil {
+		pageOffset = (*params.Page - 1) * 10
 		q.Add("startIndex", fmt.Sprint(pageOffset))
 	}
 	if params.Sort != nil {
@@ -109,10 +110,10 @@ func SearchGoogleBooks(params SearchParams, key string) (SearchResults, error) {
 		return SearchResults{}, err
 	}
 
-	return results.Parse(pageOffset), nil
+	return results.ParseSearch(pageOffset), nil
 }
 
-func (results *GoogleBooksSearchResults) Parse(offset int) SearchResults {
+func (results *GoogleBooksSearchResults) ParseSearch(offset int) SearchResults {
 
 	standardResults := SearchResults{
 		TotalCount: results.TotalItems,
@@ -120,12 +121,19 @@ func (results *GoogleBooksSearchResults) Parse(offset int) SearchResults {
 		Offset:     offset,
 	}
 
+	var err error
 	for _, result := range results.Items {
 
-		year, err := strconv.Atoi(result.VolumeInfo.PublishedDate)
-		if err != nil {
-			log.Println(err)
-			continue
+		var year int
+		if dateStr := result.VolumeInfo.PublishedDate; dateStr != "" {
+			if split := strings.Split(dateStr, "-"); len(split) > 1 {
+				dateStr = split[0]
+			}
+
+			year, err = strconv.Atoi(dateStr)
+			if err != nil {
+				log.Println(err)
+			}
 		}
 
 		isbn := ""
