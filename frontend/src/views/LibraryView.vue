@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import BookItem from '@/components/BookItem.vue';
+import BookItem from '@/components/LibraryItem.vue';
 import type { Book, BookSummary } from '@/types/book';
 import { onMounted, ref } from 'vue';
 

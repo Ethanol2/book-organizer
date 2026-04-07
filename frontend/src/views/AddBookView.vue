@@ -226,7 +226,6 @@ async function addBook(bookData: {
 <template>
   <section class="add-book">
     <h2>Add Book</h2>
-    <p class="hint">Search metadata from Open Library or Google Books and review results.</p>
 
     <div class="search-row">
       <select v-model="source" aria-label="Metadata source">

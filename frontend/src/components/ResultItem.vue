@@ -49,11 +49,9 @@ const formattedAuthors = (item: MetadataItem) => {
     <div class="result-details">
       <h3>{{ item.title || 'Untitled' }}</h3>
       <p class="subtitle" v-if="item.subtitle">{{ item.subtitle }}</p>
-      <p class="meta">
-        <strong>Author:</strong> {{ formattedAuthors(item) }}
-        <span v-if="item.year">• {{ item.year }}</span>
-        <span v-if="item.isbn">• ISBN {{ item.isbn }}</span>
-      </p>
+      <p class="meta" v-if="item.authors"><strong>Author:</strong> {{ formattedAuthors(item) }}</p>
+      <p class="publisher" v-if="item.year"><strong>Year:</strong> {{ item.year }}</p>
+      <p class="publisher" v-if="item.isbn"><strong>ISBN:</strong> {{ item.isbn }}</p>
       <p class="publisher" v-if="item.publisher"><strong>Publisher:</strong> {{ item.publisher }}</p>
       <p class="description" v-if="item.description">{{ item.description }}</p>
     </div>

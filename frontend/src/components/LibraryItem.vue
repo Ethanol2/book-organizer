@@ -19,10 +19,16 @@ const cover = props.book.cover == null ? "" : props.book.cover
             <h3>
                 {{ book.title }}
             </h3>
+            <p>
             <small>
                 {{ book.subtitle }}
+            </small>
+        </p>
+            <p>
+            <small>
                 {{ getAuthorsList(book.authors) }}
             </small>
+        </p>
         </div>
     </RouterLink>
 </template>
@@ -32,7 +38,7 @@ const cover = props.book.cover == null ? "" : props.book.cover
     display: flex;
     flex-direction: column;
     width: 180px;
-    height: 320px;
+    height: 400px;
     text-align: center;
     padding: 0.2rem;
     text-decoration: none;
@@ -61,6 +67,7 @@ const cover = props.book.cover == null ? "" : props.book.cover
     display: flex;
     width: 160px;
     min-height: 160px;
+    max-height: 256px;
     align-items: center;
     justify-content: center;
     border: 1px solid grey;
