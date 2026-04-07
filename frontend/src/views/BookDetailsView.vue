@@ -12,14 +12,33 @@ const coverSrc = computed(() => {
   if (!book.value) {
     return '';
   }
-  return book.value.files?.cover ?? `/media/metadata/${book.value.id}.jpg`;
+  return book.value.files?.cover || `/media/metadata/${book.value.id}.jpg`;
 });
 
-const formattedAuthors = computed(() => book.value?.authors.map(a => a.name).join(', ') ?? 'Unknown');
-const formattedGenres = computed(() => book.value?.genres.map(g => g.name).join(', ') ?? 'Unknown');
-const formattedSeries = computed(() => book.value?.series.map(s => `${s.name} #${s.index}`).join(', ') ?? 'None');
-const formattedNarrators = computed(() => book.value?.narrators.map(n => n.name).join(', ') ?? 'None');
-const formattedTags = computed(() => book.value?.tags.length ? book.value.tags.join(', ') : 'None');
+const formattedAuthors = computed(() => {
+  const authors = book.value?.authors ?? [];
+  return authors.length ? authors.map(a => a.name).join(', ') : 'Unknown';
+});
+
+const formattedGenres = computed(() => {
+  const genres = book.value?.genres ?? [];
+  return genres.length ? genres.map(g => g.name).join(', ') : 'Unknown';
+});
+
+const formattedSeries = computed(() => {
+  const series = book.value?.series ?? [];
+  return series.length ? series.map(s => `${s.name} #${s.index}`).join(', ') : 'None';
+});
+
+const formattedNarrators = computed(() => {
+  const narrators = book.value?.narrators ?? [];
+  return narrators.length ? narrators.map(n => n.name).join(', ') : 'None';
+});
+
+const formattedTags = computed(() => {
+  const tags = book.value?.tags ?? [];
+  return tags.length ? tags.join(', ') : 'None';
+});
 
 const audioFiles = computed(() => book.value?.files?.audio_files ?? []);
 const textFiles = computed(() => book.value?.files?.text_files ?? []);

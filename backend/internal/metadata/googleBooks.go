@@ -182,7 +182,6 @@ func (result *GoogleBooksItem) Parse() (database.BookParams, error) {
 		Year:        &year,
 		Publisher:   &result.VolumeInfo.Publisher,
 		ISBN:        &isbn,
-		MetadataKey: &result.ID,
 		Authors:     &authors,
 		Genres:      &genres,
 		Cover:       &result.VolumeInfo.ImageLinks.Thumbnail,
