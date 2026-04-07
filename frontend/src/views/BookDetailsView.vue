@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { Book } from '@/types/book';
 import { computed, onMounted, ref } from 'vue';
-import { useRoute } from 'vue-router';
+import { RouterLink, useRoute } from 'vue-router';
 
 const route = useRoute();
 const book = ref<Book | null>(null);
@@ -76,137 +76,112 @@ onMounted(async () => {
 
 <template>
   <div class="book-details">
+    <div class="page-header">
+      <RouterLink to="/" class="back-button">← Back to library</RouterLink>
+      <h1>Book Details</h1>
+    </div>
+
     <div v-if="loading" class="status-message">Loading book details…</div>
     <div v-else-if="error" class="status-message status-error">{{ error }}</div>
     <div v-else-if="book" class="details-shell">
       <section class="details-hero">
         <div class="hero-cover">
-          <img :src="coverSrc" :alt="book.title" />
+          <img :src="coverSrc" :alt="''" />
         </div>
+
         <div class="hero-info">
-          <div class="hero-label">Book Details</div>
-          <h1>{{ book.title }}</h1>
-          <p v-if="book.subtitle" class="hero-subtitle">{{ book.subtitle }}</p>
-
-          <div class="hero-stats">
-            <div>
-              <span class="stat-label">Year</span>
-              <strong>{{ book.year || 'Unknown' }}</strong>
-            </div>
-            <div>
-              <span class="stat-label">Publisher</span>
-              <strong>{{ book.publisher || 'Unknown' }}</strong>
-            </div>
-            <div>
-              <span class="stat-label">ISBN</span>
-              <strong>{{ book.isbn || 'N/A' }}</strong>
-            </div>
-            <div>
-              <span class="stat-label">ASIN</span>
-              <strong>{{ book.asin || 'N/A' }}</strong>
-            </div>
+          <div class="hero-title-group">
+            <h2>{{ book.title }}</h2>
+            <p v-if="book.subtitle" class="hero-subtitle">{{ book.subtitle }}</p>
           </div>
 
-          <div class="hero-tags" v-if="book.tags?.length">
-            <span class="chip" v-for="tag in book.tags" :key="tag">{{ tag }}</span>
-          </div>
+          <dl class="hero-info-grid">
+            <div>
+              <dt>Year</dt>
+              <dd>{{ book.year || 'Unknown' }}</dd>
+            </div>
+            <div>
+              <dt>Publisher</dt>
+              <dd>{{ book.publisher || 'Unknown' }}</dd>
+            </div>
+            <div>
+              <dt>ISBN</dt>
+              <dd>{{ book.isbn || 'N/A' }}</dd>
+            </div>
+            <div>
+              <dt>ASIN</dt>
+              <dd>{{ book.asin || 'N/A' }}</dd>
+            </div>
+            <div>
+              <dt>Authors</dt>
+              <dd>{{ formattedAuthors }}</dd>
+            </div>
+            <div>
+              <dt>Genres</dt>
+              <dd>{{ formattedGenres }}</dd>
+            </div>
+            <div>
+              <dt>Series</dt>
+              <dd>{{ formattedSeries }}</dd>
+            </div>
+            <div>
+              <dt>Narrators</dt>
+              <dd>{{ formattedNarrators }}</dd>
+            </div>
+            <div>
+              <dt>Tags</dt>
+              <dd>{{ formattedTags }}</dd>
+            </div>
+            <div>
+              <dt>Created</dt>
+              <dd>{{ formatDate(book.created_at) }}</dd>
+            </div>
+            <div>
+              <dt>Updated</dt>
+              <dd>{{ formatDate(book.updated_at) }}</dd>
+            </div>
+          </dl>
         </div>
       </section>
 
       <div class="details-grid">
-        <aside class="details-main">
-          <section class="section-card summary-card">
-            <div class="section-heading">
-              <h2>Summary</h2>
-            </div>
-            <p v-if="book.description" class="description">{{ book.description }}</p>
-            <p v-else class="description muted">No description available for this book.</p>
-          </section>
+        <section class="section-card summary-card">
+          <div class="section-heading">
+            <h2>Summary</h2>
+          </div>
+          <p v-if="book.description" class="description">{{ book.description }}</p>
+          <p v-else class="description muted">No description available for this book.</p>
+        </section>
 
-          <section class="section-card relationships-card">
-            <div class="section-heading">
-              <h2>Relationships</h2>
+        <section class="section-card files-card">
+          <div class="section-heading">
+            <h2>Files</h2>
+          </div>
+          <div class="file-overview">
+            <div class="file-metric">
+              <span class="metric-label">Audio files</span>
+              <strong>{{ audioFiles.length }}</strong>
             </div>
-            <dl class="info-grid">
-              <div>
-                <dt>Authors</dt>
-                <dd>{{ formattedAuthors }}</dd>
-              </div>
-              <div>
-                <dt>Genres</dt>
-                <dd>{{ formattedGenres }}</dd>
-              </div>
-              <div>
-                <dt>Series</dt>
-                <dd>{{ formattedSeries }}</dd>
-              </div>
-              <div>
-                <dt>Narrators</dt>
-                <dd>{{ formattedNarrators }}</dd>
-              </div>
-              <div>
-                <dt>Tags</dt>
-                <dd>{{ formattedTags }}</dd>
-              </div>
-            </dl>
-          </section>
-        </aside>
+            <div class="file-metric">
+              <span class="metric-label">Text files</span>
+              <strong>{{ textFiles.length }}</strong>
+            </div>
+          </div>
 
-        <aside class="details-side">
-          <section class="section-card metadata-card">
-            <div class="section-heading">
-              <h2>Metadata</h2>
-            </div>
-            <dl class="info-grid">
-              <div>
-                <dt>Created</dt>
-                <dd>{{ formatDate(book.created_at) }}</dd>
-              </div>
-              <div>
-                <dt>Updated</dt>
-                <dd>{{ formatDate(book.updated_at) }}</dd>
-              </div>
-              <div>
-                <dt>Cover path</dt>
-                <dd>{{ coverSrc }}</dd>
-              </div>
-              <div>
-                <dt>Root folder</dt>
-                <dd>{{ book.files?.root || 'Unknown' }}</dd>
-              </div>
-            </dl>
-          </section>
+          <div class="file-list-group" v-if="audioFiles.length">
+            <h3>Audio file names</h3>
+            <ul class="file-list">
+              <li v-for="path in audioFiles" :key="path">{{ path }}</li>
+            </ul>
+          </div>
 
-          <section class="section-card files-card">
-            <div class="section-heading">
-              <h2>Files</h2>
-            </div>
-            <div class="file-overview">
-              <div class="file-metric">
-                <span class="metric-label">Audio files</span>
-                <strong>{{ audioFiles.length }}</strong>
-              </div>
-              <div class="file-metric">
-                <span class="metric-label">Text files</span>
-                <strong>{{ textFiles.length }}</strong>
-              </div>
-            </div>
-
-            <div class="file-list-group" v-if="audioFiles.length">
-              <h3>Audio file names</h3>
-              <ul class="file-list">
-                <li v-for="path in audioFiles" :key="path">{{ path }}</li>
-              </ul>
-            </div>
-
-            <div class="file-list-group" v-if="textFiles.length">
-              <h3>Text file names</h3>
-              <ul class="file-list">
-                <li v-for="path in textFiles" :key="path">{{ path }}</li>
-              </ul>
-            </div>
-          </section>
-        </aside>
+          <div class="file-list-group" v-if="textFiles.length">
+            <h3>Text file names</h3>
+            <ul class="file-list">
+              <li v-for="path in textFiles" :key="path">{{ path }}</li>
+            </ul>
+          </div>
+        </section>
       </div>
     </div>
     <div v-else class="status-message">Book not found.</div>
@@ -217,12 +192,13 @@ onMounted(async () => {
 .book-details {
   width: 100%;
   padding: 1.5rem;
+  padding-bottom: 10rem;
   overflow-y: auto;
 }
 
 .status-message {
   padding: 2rem 1.5rem;
-  border-radius: 14px;
+  border-radius: 6px;
   background: var(--color-background-soft);
   color: var(--color-text);
   font-weight: 600;
@@ -238,12 +214,41 @@ onMounted(async () => {
   gap: 1.5rem;
 }
 
+.page-header {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.page-header h1 {
+  margin: 0;
+  font-size: clamp(1.8rem, 2.2vw, 2.6rem);
+}
+
+.back-button {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.75rem 1rem;
+  border-radius: 999px;
+  border: 1px solid var(--color-border);
+  background: var(--color-background-soft);
+  color: var(--color-text);
+  font-weight: 700;
+  transition: transform 0.2s ease, background-color 0.2s ease;
+}
+
+.back-button:hover {
+  transform: translateX(-1px);
+  background: rgba(54, 140, 211, 0.1);
+}
+
 .details-hero {
   display: grid;
-  grid-template-columns: minmax(240px, 280px) 1fr;
+  grid-template-columns: minmax(260px, 320px) 1fr;
   gap: 1.5rem;
   padding: 1.5rem;
-  border-radius: 20px;
+  border-radius: 6px;
   background: radial-gradient(circle at top left, rgba(31, 96, 103, 0.12), transparent 40%),
     var(--color-background-soft);
   border: 1px solid var(--color-border);
@@ -253,7 +258,7 @@ onMounted(async () => {
   width: 100%;
   aspect-ratio: 5 / 7;
   overflow: hidden;
-  border-radius: 18px;
+  border-radius: 6px;
   background: var(--color-background);
   box-shadow: 0 18px 40px rgba(0, 0, 0, 0.08);
 }
@@ -261,35 +266,26 @@ onMounted(async () => {
 .hero-cover img {
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  object-fit: contain;
   display: block;
 }
 
 .hero-info {
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
+  display: grid;
   gap: 1.25rem;
 }
 
-.hero-label {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.5rem 0.9rem;
-  border-radius: 999px;
-  background: rgba(120, 138, 163, 0.12);
-  color: var(--color-text);
-  font-size: 0.85rem;
-  font-weight: 700;
-  letter-spacing: 0.03em;
-  text-transform: uppercase;
-}
-
-.hero-info h1 {
+.hero-title-group h2 {
   margin: 0;
   font-size: clamp(2rem, 2.5vw, 3rem);
   line-height: 1.05;
+}
+
+.hero-subtitle {
+  margin: 0.5rem 0 0;
+  font-size: 1rem;
+  color: rgba(60, 60, 60, 0.8);
+  max-width: 72ch;
 }
 
 .hero-subtitle {
@@ -318,6 +314,50 @@ onMounted(async () => {
   margin-bottom: 0.35rem;
 }
 
+.hero-info-grid {
+  display: grid;
+  gap: 0.65rem;
+  grid-template-columns: 1fr;
+}
+
+.hero-info-grid > div {
+  display: grid;
+  grid-template-columns: minmax(100px, 140px) minmax(0, 1fr);
+  gap: 0.8rem;
+}
+
+.hero-info-grid dt {
+  font-size: 0.85rem;
+  color: rgba(60, 60, 60, 0.7);
+  font-weight: 600;
+}
+
+.hero-info-grid dd {
+  margin: 0;
+  font-size: 0.9rem;
+  color: rgba(20, 20, 20, 0.95);
+}
+
+@media (min-width: 1200px) {
+  .hero-info-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .hero-info-grid > div {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+  }
+
+  .hero-info-grid dt {
+    font-size: 0.8rem;
+  }
+
+  .hero-info-grid dd {
+    font-size: 0.88rem;
+  }
+}
+
 .hero-tags {
   display: flex;
   flex-wrap: wrap;
@@ -335,19 +375,13 @@ onMounted(async () => {
 
 .details-grid {
   display: grid;
-  grid-template-columns: minmax(0, 2fr) minmax(280px, 1fr);
-  gap: 1.5rem;
-}
-
-.details-main,
-.details-side {
-  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 1.5rem;
 }
 
 .section-card {
   padding: 1.35rem 1.5rem;
-  border-radius: 20px;
+  border-radius: 6px;
   background: var(--color-background-soft);
   border: 1px solid var(--color-border);
 }
@@ -402,7 +436,7 @@ onMounted(async () => {
   justify-content: space-between;
   gap: 1rem;
   padding: 0.95rem 1rem;
-  border-radius: 14px;
+  border-radius: 6px;
   background: rgba(54, 140, 211, 0.08);
 }
 
@@ -429,7 +463,7 @@ onMounted(async () => {
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
   font-size: 0.88rem;
   padding: 0.65rem 0.9rem;
-  border-radius: 12px;
+  border-radius: 6px;
   background: var(--color-background);
   border: 1px solid var(--color-border);
   color: rgba(30, 30, 30, 0.9);
