@@ -4,11 +4,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
-	"net/http"
 	"net/url"
 	"strconv"
 	"strings"
 
+	"github.com/Ethanol2/book-organizer/internal/cache"
 	"github.com/Ethanol2/book-organizer/internal/database"
 )
 
@@ -47,7 +47,7 @@ type GoogleBooksSearchResults struct {
 	} `json:"items"`
 }
 
-func SearchGoogleBooks(params SearchParams, key string) (SearchResults, error) {
+func SearchGoogleBooks(params SearchParams, key string, cache *cache.Cache) (SearchResults, error) {
 
 	u := url.URL{
 		Scheme: "https",
@@ -94,18 +94,13 @@ func SearchGoogleBooks(params SearchParams, key string) (SearchResults, error) {
 
 	log.Println("Querying GoogleBooks:", u.String())
 
-	resp, err := http.Get(u.String())
+	body, err := cache.HttpGet(u.String())
 	if err != nil {
 		return SearchResults{}, err
 	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return SearchResults{}, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
-	}
 
 	var results GoogleBooksSearchResults
-	err = json.NewDecoder(resp.Body).Decode(&results)
+	err = json.Unmarshal(body, &results)
 	if err != nil {
 		return SearchResults{}, err
 	}

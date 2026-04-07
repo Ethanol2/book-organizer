@@ -8,6 +8,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/Ethanol2/book-organizer/internal/cache"
 	"github.com/Ethanol2/book-organizer/internal/database"
 	"github.com/Ethanol2/book-organizer/internal/fileManagement"
 	"github.com/google/uuid"
@@ -16,7 +17,9 @@ import (
 )
 
 type apiConfig struct {
-	db            database.Client
+	db      database.Client
+	mdCache cache.Cache
+
 	frontendPath  string
 	downloadsPath string
 	downloadsName string
@@ -160,6 +163,7 @@ func initConfig(dbReset, insertTestData bool) (*apiConfig, error) {
 
 	return &apiConfig{
 		db:                db,
+		mdCache:           cache.NewCache(time.Minute * 5),
 		frontendPath:      fPath,
 		downloadsPath:     dPath,
 		downloadsName:     "/media/downloads",

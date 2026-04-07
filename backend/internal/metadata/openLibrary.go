@@ -4,10 +4,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
-	"net/http"
 	"net/url"
 	"strings"
 
+	"github.com/Ethanol2/book-organizer/internal/cache"
 	"github.com/Ethanol2/book-organizer/internal/database"
 )
 
@@ -39,7 +39,7 @@ type OpenLibrarySearchResults struct {
 	} `json:"docs"`
 }
 
-func SearchOpenLibrary(params SearchParams) (SearchResults, error) {
+func SearchOpenLibrary(params SearchParams, cache *cache.Cache) (SearchResults, error) {
 
 	u := url.URL{
 		Scheme: "https",
@@ -89,18 +89,13 @@ func SearchOpenLibrary(params SearchParams) (SearchResults, error) {
 
 	log.Println("Querying OpenLibrary:", u.String())
 
-	resp, err := http.Get(u.String())
+	body, err := cache.HttpGet(u.String())
 	if err != nil {
 		return SearchResults{}, err
 	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return SearchResults{}, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
-	}
 
 	var results OpenLibrarySearchResults
-	err = json.NewDecoder(resp.Body).Decode(&results)
+	err = json.Unmarshal(body, &results)
 	if err != nil {
 		return SearchResults{}, err
 	}

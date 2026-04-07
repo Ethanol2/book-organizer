@@ -46,7 +46,7 @@ func (cfg *apiConfig) handlerMetadataSearch(w http.ResponseWriter, r *http.Reque
 		return
 
 	case "open library":
-		results, err = metadata.SearchOpenLibrary(searchParams)
+		results, err = metadata.SearchOpenLibrary(searchParams, &cfg.mdCache)
 		if err != nil {
 			respondWithError(w, http.StatusInternalServerError, "something went wrong while querying openlibrary", err)
 			return
@@ -58,7 +58,7 @@ func (cfg *apiConfig) handlerMetadataSearch(w http.ResponseWriter, r *http.Reque
 			return
 		}
 
-		results, err = metadata.SearchGoogleBooks(searchParams, cfg.googleBooksApiKey)
+		results, err = metadata.SearchGoogleBooks(searchParams, cfg.googleBooksApiKey, &cfg.mdCache)
 		if err != nil {
 			respondWithError(w, http.StatusInternalServerError, "something went wrong while querying google books", err)
 			return
