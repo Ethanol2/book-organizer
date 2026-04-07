@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"net/http"
+	"strconv"
 
 	"github.com/Ethanol2/book-organizer/internal/metadata"
 )
@@ -27,6 +28,18 @@ func (cfg *apiConfig) handlerMetadataSearch(w http.ResponseWriter, r *http.Reque
 	}
 	if isbn := r.URL.Query().Get("isbn"); isbn != "" {
 		searchParams.ISBN = &isbn
+	}
+	if page := r.URL.Query().Get("page"); page != "" {
+		num, err := strconv.Atoi(page)
+		if err == nil {
+			searchParams.Page = &num
+		}
+	}
+	if limit := r.URL.Query().Get("limit"); limit != "" {
+		num, err := strconv.Atoi(limit)
+		if err == nil {
+			searchParams.Limit = &num
+		}
 	}
 
 	if genres := r.URL.Query()["genre"]; len(genres) > 0 {

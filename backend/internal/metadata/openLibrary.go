@@ -81,6 +81,9 @@ func SearchOpenLibrary(params SearchParams, cache *cache.Cache) (SearchResults, 
 	if params.Page != nil {
 		q.Add("page", fmt.Sprint(*params.Page))
 	}
+	if params.Limit != nil {
+		q.Add("limit", fmt.Sprint(*params.Limit))
+	}
 	if params.Sort != nil {
 		q.Add("sort", *params.Sort)
 	}

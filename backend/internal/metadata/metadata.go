@@ -15,8 +15,9 @@ type SearchParams struct {
 	Languages *[]string `json:"languages"`
 	ISBN      *string   `json:"isbn"`
 
-	Page *int    `json:"page"`
-	Sort *string `json:"sort"`
+	Page  *int    `json:"page"`
+	Limit *int    `json:"limit"`
+	Sort  *string `json:"sort"`
 }
 
 type SearchResults struct {

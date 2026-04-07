@@ -81,9 +81,17 @@ func SearchGoogleBooks(params SearchParams, key string, cache *cache.Cache) (Sea
 
 	pageOffset := 0
 	if params.Page != nil {
-		pageOffset = (*params.Page - 1) * 10
+
+		limit := 10
+		if params.Limit != nil {
+			limit = *params.Limit
+		}
+
+		pageOffset = (*params.Page - 1) * limit
+		log.Println(pageOffset)
 		q.Add("startIndex", fmt.Sprint(pageOffset))
 	}
+
 	if params.Sort != nil {
 		q.Add("orderBy", *params.Sort)
 	}

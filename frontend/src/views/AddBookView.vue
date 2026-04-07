@@ -1,7 +1,10 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import AddBookModal from '../components/AddBookModal.vue'
+import ResultItem from '../components/ResultItem.vue'
 
+// Type definitions for metadata search functionality
 type MetadataSource = 'open library' | 'google books'
 
 type Category = { id?: string; name?: string }
@@ -25,9 +28,11 @@ type SearchResults = {
   items: MetadataItem[]
 }
 
+// Router utilities for URL parameter management
 const route = useRoute()
 const router = useRouter()
 
+// Search filter state
 const source = ref<MetadataSource>('open library')
 const title = ref('')
 const author = ref('')
@@ -36,18 +41,23 @@ const publisher = ref('')
 const isbn = ref('')
 const genres = ref('')
 const languages = ref('')
+
+// Pagination and result state
 const page = ref(1)
 const limit = 10
 const results = ref<MetadataItem[]>([])
 const totalCount = ref(0)
 const offset = ref(0)
 const count = ref(0)
+
+// UI state
 const loading = ref(false)
 const error = ref('')
 const showAdvanced = ref(false)
 const showModal = ref(false)
 const selectedItem = ref<MetadataItem | null>(null)
 
+// Modal form state for adding books
 const modalTitle = ref('')
 const modalSubtitle = ref('')
 const modalDescription = ref('')
@@ -58,14 +68,16 @@ const modalAuthors = ref('')
 const modalGenres = ref('')
 const modalCover = ref('')
 
+// Computed properties and utility functions
 const sourceLabel = (s: MetadataSource) => (s === 'open library' ? 'Open Library' : 'Google Books')
-
 const selectedSourceName = computed(() => sourceLabel(source.value))
 
+// Pagination computed properties
 const hasMultiplePages = computed(() => totalCount.value > limit)
 const isFirstPage = computed(() => page.value === 1)
 const isLastPage = computed(() => (page.value - 1) * limit + count.value >= totalCount.value)
 
+// Build URL query parameters from current search filters
 function buildQueryParams() {
   const params = new URLSearchParams()
   params.append('source', source.value)
@@ -85,6 +97,11 @@ function buildQueryParams() {
   return params
 }
 
+// Fetch search results from metadata API
+async function searchBooksAndResetPage() {
+  page.value = 1
+  await searchBooks()
+}
 async function searchBooks() {
   error.value = ''
   results.value = []
@@ -132,6 +149,9 @@ async function searchBooks() {
   }
 }
 
+// Pagination handlers
+
+// Pagination handlers
 function prevPage() {
   if (page.value > 1) {
     page.value--
@@ -147,6 +167,7 @@ function nextPage() {
 // Initialize page from URL
 page.value = parseInt(route.query.page as string) || 1
 
+// Modal management functions
 function openModal(item: MetadataItem) {
   selectedItem.value = item
   modalTitle.value = item.title || ''
@@ -166,21 +187,18 @@ function closeModal() {
   selectedItem.value = null
 }
 
-async function addBook() {
-  if (!selectedItem.value) return
-
-  const bookData = {
-    title: modalTitle.value || null,
-    subtitle: modalSubtitle.value || null,
-    description: modalDescription.value || null,
-    year: modalYear.value ? parseInt(modalYear.value) : null,
-    isbn: modalIsbn.value || null,
-    publisher: modalPublisher.value || null,
-    authors: modalAuthors.value ? modalAuthors.value.split(',').map(name => ({ name: name.trim() })) : null,
-    genres: modalGenres.value ? modalGenres.value.split(',').map(name => ({ name: name.trim() })) : null,
-    cover: modalCover.value || null,
-  }
-
+// Post book data to backend API
+async function addBook(bookData: {
+  title: string | null
+  subtitle: string | null
+  description: string | null
+  year: number | null
+  isbn: string | null
+  publisher: string | null
+  authors: Array<{ name: string }> | null
+  genres: Array<{ name: string }> | null
+  cover: string | null
+}) {
   try {
     const resp = await fetch('/api/books', {
       method: 'POST',
@@ -203,12 +221,6 @@ async function addBook() {
   }
 }
 
-const formattedAuthors = (item: MetadataItem) => {
-  if (!item.authors || item.authors.length === 0) {
-    return 'Unknown author'
-  }
-  return item.authors.map(a => a.name || 'unknown').join(', ')
-}
 </script>
 
 <template>
@@ -225,10 +237,10 @@ const formattedAuthors = (item: MetadataItem) => {
         v-model="title"
         type="text"
         placeholder="Enter title"
-        @keyup.enter="searchBooks"
+        @keyup.enter="searchBooksAndResetPage"
         aria-label="Book title"
       />
-      <button type="button" @click="searchBooks" :disabled="loading">Search</button>
+      <button type="button" @click="searchBooksAndResetPage" :disabled="loading">Search</button>
     </div>
 
     <div class="advanced-toggle">
@@ -291,23 +303,12 @@ const formattedAuthors = (item: MetadataItem) => {
     <div v-if="error" class="error">{{ error }}</div>
 
     <ul class="results" v-if="results.length > 0">
-      <li class="result-item" v-for="(item, index) in results" :key="index" @click="openModal(item)">
-        <div class="result-cover">
-          <img v-if="item.cover" :src="item.cover" :alt="item.title || 'cover'" />
-          <div v-else class="cover-placeholder"></div>
-        </div>
-        <div class="result-details">
-          <h3>{{ item.title || 'Untitled' }}</h3>
-          <p class="subtitle" v-if="item.subtitle">{{ item.subtitle }}</p>
-          <p class="meta">
-            <strong>Author:</strong> {{ formattedAuthors(item) }}
-            <span v-if="item.year">• {{ item.year }}</span>
-            <span v-if="item.isbn">• ISBN {{ item.isbn }}</span>
-          </p>
-          <p class="publisher" v-if="item.publisher"><strong>Publisher:</strong> {{ item.publisher }}</p>
-          <p class="description" v-if="item.description">{{ item.description }}</p>
-        </div>
-      </li>
+      <ResultItem
+        v-for="(item, index) in results"
+        :key="index"
+        :item="item"
+        @click="openModal(item)"
+      />
     </ul>
 
     <div v-if="hasMultiplePages" class="pagination">
@@ -321,42 +322,50 @@ const formattedAuthors = (item: MetadataItem) => {
     </div>
   </section>
 
-  <div v-if="showModal" class="modal-overlay" @click="closeModal">
-    <div class="modal" @click.stop>
-      <h3>Add Book</h3>
-      <form @submit.prevent="addBook">
-        <label>Title: <input v-model="modalTitle" required /></label>
-        <label>Subtitle: <input v-model="modalSubtitle" /></label>
-        <label>Description: <textarea v-model="modalDescription"></textarea></label>
-        <label>Year: <input v-model="modalYear" type="number" /></label>
-        <label>ISBN: <input v-model="modalIsbn" /></label>
-        <label>Publisher: <input v-model="modalPublisher" /></label>
-        <label>Authors (comma-separated): <input v-model="modalAuthors" /></label>
-        <label>Genres (comma-separated): <input v-model="modalGenres" /></label>
-        <label>Cover URL: <input v-model="modalCover" /></label>
-        <div class="modal-buttons">
-          <button type="button" @click="closeModal">Cancel</button>
-          <button type="submit">Add Book</button>
-        </div>
-      </form>
-    </div>
-  </div>
+  <!-- Modal component for adding books -->
+  <AddBookModal
+    :show="showModal"
+    :title="modalTitle"
+    :subtitle="modalSubtitle"
+    :description="modalDescription"
+    :year="modalYear"
+    :isbn="modalIsbn"
+    :publisher="modalPublisher"
+    :authors="modalAuthors"
+    :genres="modalGenres"
+    :cover="modalCover"
+    @close="closeModal"
+    @update:title="modalTitle = $event"
+    @update:subtitle="modalSubtitle = $event"
+    @update:description="modalDescription = $event"
+    @update:year="modalYear = $event"
+    @update:isbn="modalIsbn = $event"
+    @update:publisher="modalPublisher = $event"
+    @update:authors="modalAuthors = $event"
+    @update:genres="modalGenres = $event"
+    @update:cover="modalCover = $event"
+    @add-book="addBook"
+  />
 </template>
 
 <style scoped>
+/* Main container - entire view scrolls vertically */
 .add-book {
-  max-width: 900px;
-  height: 100vh;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
+  display: block;
+  overflow-y: auto;
+  padding: 1rem;
+  padding-bottom: 10rem;
+  box-sizing: border-box;
 }
+
+/* Search controls section */
 .search-row {
   display: grid;
   grid-template-columns: 180px 1fr auto;
   gap: 0.7rem;
   margin-bottom: 0.8rem;
 }
+
 .search-row select,
 .search-row input,
 .search-row button {
@@ -365,12 +374,16 @@ const formattedAuthors = (item: MetadataItem) => {
   border-radius: 6px;
   font-size: 0.95rem;
 }
+
 .search-row button {
   min-width: 120px;
 }
+
+/* Advanced search toggle button */
 .advanced-toggle {
   margin-bottom: 0.8rem;
 }
+
 .advanced-toggle button {
   padding: 0.5rem 1rem;
   border: 1px solid #ccc;
@@ -378,16 +391,22 @@ const formattedAuthors = (item: MetadataItem) => {
   background: #f9f9f9;
   cursor: pointer;
 }
+
 .advanced-toggle button:hover {
   background: #e9e9e9;
 }
+
+/* Advanced search fields - two columns */
 .advanced-search .search-row {
   grid-template-columns: 1fr 1fr;
   margin-bottom: 0.5rem;
 }
+
 .advanced-search .search-row:last-child {
   margin-bottom: 0.8rem;
 }
+
+/* Search metadata display */
 .search-meta {
   margin-bottom: 0.8rem;
   font-size: 0.9rem;
@@ -395,6 +414,8 @@ const formattedAuthors = (item: MetadataItem) => {
   display: flex;
   gap: 1rem;
 }
+
+/* Error message styling */
 .error {
   color: #a00;
   background: #ffe5e5;
@@ -403,15 +424,17 @@ const formattedAuthors = (item: MetadataItem) => {
   padding: 0.7rem;
   margin-bottom: 1rem;
 }
+
+/* Results list - scrollable, fills remaining space */
 .results {
   list-style: none;
   padding: 0;
   margin: 0;
   display: grid;
   gap: 0.8rem;
-  flex: 1;
-  overflow-y: auto;
 }
+
+/* Pagination controls */
 .pagination {
   display: flex;
   justify-content: center;
@@ -419,6 +442,7 @@ const formattedAuthors = (item: MetadataItem) => {
   gap: 1rem;
   margin-top: 1rem;
 }
+
 .pagination button {
   padding: 0.5rem 1rem;
   border: 1px solid #ccc;
@@ -426,115 +450,54 @@ const formattedAuthors = (item: MetadataItem) => {
   background: #f9f9f9;
   cursor: pointer;
 }
+
 .pagination button:disabled {
   background: #e0e0e0;
   cursor: not-allowed;
 }
+
 .pagination button:hover:not(:disabled) {
   background: #e9e9e9;
 }
+
 .pagination span {
   font-size: 0.9rem;
   color: #555;
 }
-.result-item {
-  border: 1px solid #ccc;
-  border-radius: 8px;
-  padding: 0.8rem;
-  display: grid;
-  grid-template-columns: 160px 1fr;
-  gap: 0.8rem;
-  cursor: pointer;
-}
-.result-item:hover {
-  background: #f9f9f9;
-}
-.cover-placeholder {
-  width: 100%;
-  height: 250px;
-  background: #eee;
-  border: 1px solid #ccc;
-  border-radius: 4px;
-}
-.result-cover img {
-  width: 100%;
-  max-height: 250px;
-  object-fit: contain;
-}
-.result-details h3 {
-  margin: 0;
-}
-.result-details .subtitle {
-  margin: 0.2rem 0;
-  color: #333;
-}
-.result-details .meta,
-.result-details .publisher {
-  margin: 0.2rem 0;
-  font-size: 0.9rem;
-  color: #555;
-}
-.description {
-  margin-top: 0.45rem;
-  line-height: 1.35;
-  color: #444;
-}
+
+/* Empty state message */
 .empty-state {
   margin-top: 0.8rem;
   color: #666;
 }
-.modal-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100vw;
-  height: 100vh;
-  background: rgba(0, 0, 0, 0.5);
-  display: flex;
-  align-items: center;
-  justify-content: center;
+
+/* Responsive design for landscape orientation */
+@media (orientation: landscape) and (max-height: 500px) {
+  .add-book {
+    padding: 0.5rem;
+  }
+
+  .search-row {
+    margin-bottom: 0.4rem;
+  }
+
+  .advanced-toggle {
+    margin-bottom: 0.4rem;
+  }
+
+  .results {
+    gap: 0.4rem;
+  }
 }
-.modal {
-  background: white;
-  padding: 2rem;
-  border-radius: 8px;
-  max-width: 600px;
-  width: 90%;
-  max-height: 80vh;
-  overflow-y: auto;
-}
-.modal h3 {
-  margin-top: 0;
-}
-.modal label {
-  display: block;
-  margin-bottom: 0.5rem;
-}
-.modal input,
-.modal textarea {
-  width: 100%;
-  padding: 0.5rem;
-  border: 1px solid #ccc;
-  border-radius: 4px;
-  margin-bottom: 1rem;
-}
-.modal textarea {
-  height: 100px;
-}
-.modal-buttons {
-  display: flex;
-  gap: 1rem;
-  justify-content: flex-end;
-}
-.modal-buttons button {
-  padding: 0.5rem 1rem;
-  border: 1px solid #ccc;
-  border-radius: 4px;
-  background: #f9f9f9;
-  cursor: pointer;
-}
-.modal-buttons button[type="submit"] {
-  background: #4CAF50;
-  color: white;
+
+/* Responsive design for smaller screens */
+@media (max-width: 600px) {
+  .search-row {
+    grid-template-columns: 1fr;
+  }
+
+  .advanced-search .search-row {
+    grid-template-columns: 1fr;
+  }
 }
 </style>
