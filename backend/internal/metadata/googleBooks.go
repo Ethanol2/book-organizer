@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"net/url"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -115,10 +116,34 @@ func SearchGoogleBooks(params SearchParams, key string, cache *cache.Cache) (Sea
 		return SearchResults{}, err
 	}
 
-	return results.ParseSearch(pageOffset), nil
+	return results.parseSearch(pageOffset), nil
 }
 
-func (results *GoogleBooksSearchResults) ParseSearch(offset int) SearchResults {
+func GetFromGoogleBooks(id, key string, cache *cache.Cache) (database.BookParams, error) {
+	u := url.URL{
+		Scheme: "https",
+		Host:   "www.googleapis.com",
+		Path:   fmt.Sprintf("books/v1/volumes/%s", id),
+	}
+	u.Query().Add("key", key)
+
+	log.Println("Querying GoogleBooks", u.String())
+
+	body, err := cache.HttpGet(u.String())
+	if err != nil {
+		return database.BookParams{}, err
+	}
+
+	var item GoogleBooksItem
+	err = json.Unmarshal(body, &item)
+	if err != nil {
+		return database.BookParams{}, err
+	}
+
+	return item.parse()
+}
+
+func (results *GoogleBooksSearchResults) parseSearch(offset int) SearchResults {
 
 	standardResults := SearchResults{
 		TotalCount: results.TotalItems,
@@ -127,7 +152,7 @@ func (results *GoogleBooksSearchResults) ParseSearch(offset int) SearchResults {
 	}
 
 	for _, result := range results.Items {
-		book, err := result.Parse()
+		book, err := result.parse()
 		if err != nil {
 			log.Println(err)
 			continue
@@ -138,7 +163,7 @@ func (results *GoogleBooksSearchResults) ParseSearch(offset int) SearchResults {
 	return standardResults
 }
 
-func (result *GoogleBooksItem) Parse() (database.BookParams, error) {
+func (result *GoogleBooksItem) parse() (database.BookParams, error) {
 	var year int
 	var err error
 
@@ -169,21 +194,34 @@ func (result *GoogleBooksItem) Parse() (database.BookParams, error) {
 	}
 
 	genres := []database.Category{}
+	genresStr := []string{}
 	for _, genre := range result.VolumeInfo.Categories {
+		split := strings.Split(genre, "/")
+		for _, s := range split {
+			genresStr = append(genresStr, strings.TrimSpace(s))
+		}
+	}
+	slices.Sort(genresStr)
+	genresStr = slices.Compact(genresStr)
+	for _, genre := range genresStr {
 		genres = append(genres, database.Category{
 			Name: genre,
 		})
 	}
 
+	key := fmt.Sprintf("/api/metadata/%s?source=%s", result.ID, "google%20books")
+	desc := stripTags(result.VolumeInfo.Description)
+
 	return database.BookParams{
 		Title:       &result.VolumeInfo.Title,
 		Subtitle:    &result.VolumeInfo.Subtitle,
-		Description: &result.VolumeInfo.Description,
+		Description: &desc,
 		Year:        &year,
 		Publisher:   &result.VolumeInfo.Publisher,
 		ISBN:        &isbn,
 		Authors:     &authors,
 		Genres:      &genres,
 		Cover:       &result.VolumeInfo.ImageLinks.Thumbnail,
+		Key:         &key,
 	}, nil
 }

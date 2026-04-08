@@ -59,7 +59,9 @@ type BookParams struct {
 	Genres    *[]Category `json:"genres"`
 	Narrators *[]Category `json:"narrators"`
 
+	// URIs
 	Cover *string `json:"cover"`
+	Key   *string `json:"key"`
 }
 
 func (c Client) CheckBookExists(id uuid.UUID) (bool, error) {

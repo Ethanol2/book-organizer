@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"strconv"
 
+	"github.com/Ethanol2/book-organizer/internal/database"
 	"github.com/Ethanol2/book-organizer/internal/metadata"
 )
 
@@ -86,6 +87,45 @@ func (cfg *apiConfig) handlerMetadataSearch(w http.ResponseWriter, r *http.Reque
 	respondWithJson(w, http.StatusOK, results)
 }
 
-func (cfg *apiConfig) handlerGetBookDetails(w http.ResponseWriter, r *http.Request) {
+func (cfg *apiConfig) handlerGetMetadataBookDetails(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	if id == "" {
+		respondWithError(w, http.StatusBadRequest, "Request missing id", fmt.Errorf("request missing id"))
+		return
+	}
 
+	var result database.BookParams
+	var err error
+	switch r.URL.Query().Get("source") {
+
+	case "":
+		respondWithError(w, http.StatusBadRequest, "Missing source", fmt.Errorf("request missing source in url"))
+		return
+
+	case "open library":
+		result, err = metadata.GetFromOpenLibrary(id, &cfg.mdCache)
+		if err != nil {
+			respondWithError(w, http.StatusInternalServerError, "something went wrong while querying openlibrary", err)
+			return
+		}
+
+	case "google books":
+		if cfg.googleBooksApiKey == "" {
+			respondWithError(w, http.StatusInternalServerError, "missing google books api key in backend setup", fmt.Errorf("missing google books api key in backend setup"))
+			return
+		}
+
+		result, err = metadata.GetFromGoogleBooks(id, cfg.googleBooksApiKey, &cfg.mdCache)
+		if err != nil {
+			respondWithError(w, http.StatusInternalServerError, "something went wrong while querying google books", err)
+			return
+		}
+
+	default:
+		src := r.URL.Query().Get("source")
+		respondWithError(w, http.StatusBadRequest, "Unknown source: "+src, fmt.Errorf("unknown source"))
+		return
+	}
+
+	respondWithJson(w, http.StatusOK, result)
 }

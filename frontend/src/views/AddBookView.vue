@@ -1,31 +1,19 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { useNotificationsStore } from '@/stores/notifications'
+import type { BookParams } from '@/types/book'
 import AddBookModal from '../components/AddBookModal.vue'
 import ResultItem from '../components/ResultItem.vue'
 
 // Type definitions for metadata search functionality
 type MetadataSource = 'open library' | 'google books'
 
-type Category = { id?: string; name?: string }
-
-type MetadataItem = {
-  title?: string | null
-  subtitle?: string | null
-  description?: string | null
-  year?: number | null
-  isbn?: string | null
-  publisher?: string | null
-  authors?: Category[] | null
-  genres?: Category[] | null
-  cover?: string | null
-}
-
 type SearchResults = {
   total_count: number
   count: number
   offset: number
-  items: MetadataItem[]
+  items: BookParams[]
 }
 
 // Router utilities for URL parameter management
@@ -45,7 +33,7 @@ const languages = ref('')
 // Pagination and result state
 const page = ref(1)
 const limit = 10
-const results = ref<MetadataItem[]>([])
+const results = ref<BookParams[]>([])
 const totalCount = ref(0)
 const offset = ref(0)
 const count = ref(0)
@@ -55,18 +43,9 @@ const loading = ref(false)
 const error = ref('')
 const showAdvanced = ref(false)
 const showModal = ref(false)
-const selectedItem = ref<MetadataItem | null>(null)
+const selectedItem = ref<BookParams | null>(null)
 
-// Modal form state for adding books
-const modalTitle = ref('')
-const modalSubtitle = ref('')
-const modalDescription = ref('')
-const modalYear = ref('')
-const modalIsbn = ref('')
-const modalPublisher = ref('')
-const modalAuthors = ref('')
-const modalGenres = ref('')
-const modalCover = ref('')
+const notifications = useNotificationsStore()
 
 // Computed properties and utility functions
 const sourceLabel = (s: MetadataSource) => (s === 'open library' ? 'Open Library' : 'Google Books')
@@ -149,6 +128,47 @@ async function searchBooks() {
   }
 }
 
+async function getBookDetails(item: BookParams | null): Promise<BookParams | null> {
+    if (!item) return null
+    if (!item.key) {
+      notifications.notifyError('Selected item does not have a valid key for fetching details.')
+      return null
+    }
+
+    try {
+      const resp = await fetch(item.key, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      })
+  
+      if (!resp.ok) {
+        const body = await resp.text()
+        throw new Error(`${resp.status} ${resp.statusText}: ${body}`)
+      }
+  
+      var details: BookParams = (await resp.json()) as BookParams
+
+      details.title = details.title ?? item.title
+      details.subtitle = details.subtitle ?? item.subtitle
+      details.authors = details.authors ?? item.authors
+      details.genres = details.genres ?? item.genres
+      details.series = details.series ?? item.series
+      details.year = details.year ?? item.year
+      details.publisher = details.publisher ?? item.publisher
+      details.isbn = details.isbn ?? item.isbn
+      details.cover = details.cover ?? item.cover
+
+      return details
+      
+    } catch (err) {
+      console.error('Get book details error', err)
+      notifications.notifyError('Failed to get book details: ' + (err instanceof Error ? err.message : String(err)))
+      return null
+    }
+}
+
 // Pagination handlers
 
 // Pagination handlers
@@ -168,17 +188,9 @@ function nextPage() {
 page.value = parseInt(route.query.page as string) || 1
 
 // Modal management functions
-function openModal(item: MetadataItem) {
-  selectedItem.value = item
-  modalTitle.value = item.title || ''
-  modalSubtitle.value = item.subtitle || ''
-  modalDescription.value = item.description || ''
-  modalYear.value = item.year?.toString() || ''
-  modalIsbn.value = item.isbn || ''
-  modalPublisher.value = item.publisher || ''
-  modalAuthors.value = item.authors?.map(a => a.name).join(', ') || ''
-  modalGenres.value = item.genres?.map(g => g.name).join(', ') || ''
-  modalCover.value = item.cover || ''
+async function openModal(item: BookParams) {
+  const details = await getBookDetails(item)
+  selectedItem.value = details ?? item
   showModal.value = true
 }
 
@@ -213,11 +225,11 @@ async function addBook(bookData: {
       throw new Error(`${resp.status} ${resp.statusText}: ${body}`)
     }
 
-    alert('Book added successfully!')
+    notifications.notifySuccess('Book added successfully!')
     closeModal()
   } catch (err) {
     console.error('Add book error', err)
-    alert('Failed to add book: ' + (err instanceof Error ? err.message : String(err)))
+    notifications.notifyError('Failed to add book: ' + (err instanceof Error ? err.message : String(err)))
   }
 }
 
@@ -255,12 +267,14 @@ async function addBook(bookData: {
           type="text"
           placeholder="Author"
           aria-label="Author"
+        @keyup.enter="searchBooksAndResetPage"
         />
         <input
           v-model="year"
           type="text"
           placeholder="Year"
           aria-label="Year"
+        @keyup.enter="searchBooksAndResetPage"
         />
       </div>
       <div class="search-row">
@@ -269,12 +283,14 @@ async function addBook(bookData: {
           type="text"
           placeholder="Publisher"
           aria-label="Publisher"
+        @keyup.enter="searchBooksAndResetPage"
         />
         <input
           v-model="isbn"
           type="text"
           placeholder="ISBN"
           aria-label="ISBN"
+        @keyup.enter="searchBooksAndResetPage"
         />
       </div>
       <div class="search-row">
@@ -283,12 +299,14 @@ async function addBook(bookData: {
           type="text"
           placeholder="Genres (comma-separated)"
           aria-label="Genres"
+        @keyup.enter="searchBooksAndResetPage"
         />
         <input
           v-model="languages"
           type="text"
           placeholder="Languages (comma-separated)"
           aria-label="Languages"
+        @keyup.enter="searchBooksAndResetPage"
         />
       </div>
     </div>
@@ -324,25 +342,8 @@ async function addBook(bookData: {
   <!-- Modal component for adding books -->
   <AddBookModal
     :show="showModal"
-    :title="modalTitle"
-    :subtitle="modalSubtitle"
-    :description="modalDescription"
-    :year="modalYear"
-    :isbn="modalIsbn"
-    :publisher="modalPublisher"
-    :authors="modalAuthors"
-    :genres="modalGenres"
-    :cover="modalCover"
+    :params="selectedItem"
     @close="closeModal"
-    @update:title="modalTitle = $event"
-    @update:subtitle="modalSubtitle = $event"
-    @update:description="modalDescription = $event"
-    @update:year="modalYear = $event"
-    @update:isbn="modalIsbn = $event"
-    @update:publisher="modalPublisher = $event"
-    @update:authors="modalAuthors = $event"
-    @update:genres="modalGenres = $event"
-    @update:cover="modalCover = $event"
     @add-book="addBook"
   />
 </template>

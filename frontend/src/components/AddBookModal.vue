@@ -1,30 +1,22 @@
 <script setup lang="ts">
+import { ref, watch } from 'vue'
+import type { BookParams } from '@/types/book'
+import { getCategoriesString, getCategoriesArray, getSeriesArray, getSeriesString } from '@/types/book'
 // Modal component for adding/editing books with form fields and submission
+
+const authorsInput = ref('')
+const narratorsInput = ref('')
+const seriesInput = ref('')
+const genresInput = ref('')
 
 interface ModalProps {
   show: boolean
-  title: string
-  subtitle: string
-  description: string
-  year: string
-  isbn: string
-  publisher: string
-  authors: string
-  genres: string
-  cover: string
+  params: BookParams | null
 }
 
 const props = withDefaults(defineProps<ModalProps>(), {
   show: false,
-  title: '',
-  subtitle: '',
-  description: '',
-  year: '',
-  isbn: '',
-  publisher: '',
-  authors: '',
-  genres: '',
-  cover: '',
+    params: null
 })
 
 // Emits for closing modal and submitting book data
@@ -37,6 +29,8 @@ const emit = defineEmits<{
   'update:isbn': [value: string]
   'update:publisher': [value: string]
   'update:authors': [value: string]
+    'update:narrators': [value: string]
+    'update:series': [value: string]
   'update:genres': [value: string]
   'update:cover': [value: string]
   'add-book': [bookData: {
@@ -54,16 +48,25 @@ const emit = defineEmits<{
 
 // Handle form submission
 function handleSubmit() {
+  if (props.params) {
+    props.params.authors = getCategoriesArray(authorsInput.value)
+    props.params.narrators = getCategoriesArray(narratorsInput.value)
+    props.params.series = getSeriesArray(seriesInput.value)
+    props.params.genres = getCategoriesArray(genresInput.value)
+  }
+
   const bookData = {
-    title: props.title || null,
-    subtitle: props.subtitle || null,
-    description: props.description || null,
-    year: props.year ? parseInt(props.year) : null,
-    isbn: props.isbn || null,
-    publisher: props.publisher || null,
-    authors: props.authors ? props.authors.split(',').map(name => ({ name: name.trim() })) : null,
-    genres: props.genres ? props.genres.split(',').map(name => ({ name: name.trim() })) : null,
-    cover: props.cover || null,
+    title: props.params?.title || null,
+    subtitle: props.params?.subtitle || null,
+    description: props.params?.description || null,
+    year: props.params?.year || null,
+    isbn: props.params?.isbn || null,
+    publisher: props.params?.publisher || null,
+    authors: props.params?.authors || null,
+    narrators: props.params?.narrators || null,
+    series: props.params?.series || null,
+    genres: props.params?.genres || null,
+    cover: props.params?.cover || null,
   }
   emit('add-book', bookData)
 }
@@ -77,6 +80,21 @@ function handleOverlayClick() {
 function handleModalClick(e: Event) {
   e.stopPropagation()
 }
+
+watch(
+  () => props.show,
+  (visible) => {
+    if (!visible || !props.params) {
+      return
+    }
+
+    authorsInput.value = getCategoriesString(props.params.authors ?? [])
+    narratorsInput.value = getCategoriesString(props.params.narrators ?? [])
+    seriesInput.value = getSeriesString(props.params.series ?? [])
+    genresInput.value = getCategoriesString(props.params.genres ?? [])
+  },
+  { immediate: true }
+)
 </script>
 
 <template>
@@ -87,15 +105,17 @@ function handleModalClick(e: Event) {
       <h3>Add Book</h3>
       <form @submit.prevent="handleSubmit">
         <!-- Book metadata form fields -->
-        <label>Title: <input :value="title" @input="emit('update:title', ($event.target as HTMLInputElement).value)" type="text" required /></label>
-        <label>Subtitle: <input :value="subtitle" @input="emit('update:subtitle', ($event.target as HTMLInputElement).value)" type="text" /></label>
-        <label>Description: <textarea :value="description" @input="emit('update:description', ($event.target as HTMLTextAreaElement).value)"></textarea></label>
-        <label>Year: <input :value="year" @input="emit('update:year', ($event.target as HTMLInputElement).value)" type="number" /></label>
-        <label>ISBN: <input :value="isbn" @input="emit('update:isbn', ($event.target as HTMLInputElement).value)" type="text" /></label>
-        <label>Publisher: <input :value="publisher" @input="emit('update:publisher', ($event.target as HTMLInputElement).value)" type="text" /></label>
-        <label>Authors (comma-separated): <input :value="authors" @input="emit('update:authors', ($event.target as HTMLInputElement).value)" type="text" /></label>
-        <label>Genres (comma-separated): <input :value="genres" @input="emit('update:genres', ($event.target as HTMLInputElement).value)" type="text" /></label>
-        <label>Cover URL: <input :value="cover" @input="emit('update:cover', ($event.target as HTMLInputElement).value)" type="text" /></label>
+        <label>Title: <input :value="params?.title" @input="emit('update:title', ($event.target as HTMLInputElement).value)" type="text" required /></label>
+        <label>Subtitle: <input :value="params?.subtitle" @input="emit('update:subtitle', ($event.target as HTMLInputElement).value)" type="text" /></label>
+        <label>Series (comma-separated, use #1 for first in series): <input v-model="seriesInput" type="text" /></label>
+        <label>Description: <textarea :value="params?.description" @input="emit('update:description', ($event.target as HTMLTextAreaElement).value)"></textarea></label>
+        <label>Year: <input :value="params?.year" @input="emit('update:year', ($event.target as HTMLInputElement).value)" type="number" /></label>
+        <label>ISBN: <input :value="params?.isbn" @input="emit('update:isbn', ($event.target as HTMLInputElement).value)" type="text" /></label>
+        <label>Publisher: <input :value="params?.publisher" @input="emit('update:publisher', ($event.target as HTMLInputElement).value)" type="text" /></label>
+        <label>Authors (comma-separated): <input v-model="authorsInput" type="text" /></label>
+        <label>Narrators (comma-separated): <input v-model="narratorsInput" type="text" /></label>
+        <label>Genres (comma-separated): <input v-model="genresInput" type="text" /></label>
+        <label>Cover URL: <input :value="params?.cover" @input="emit('update:cover', ($event.target as HTMLInputElement).value)" type="text" /></label>
 
         <!-- Action buttons -->
         <div class="modal-buttons">

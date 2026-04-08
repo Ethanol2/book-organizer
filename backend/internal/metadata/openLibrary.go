@@ -36,6 +36,8 @@ type OpenLibrarySearchResults struct {
 		PublicScanB        bool     `json:"public_scan_b"`
 		Title              string   `json:"title"`
 		Subtitle           string   `json:"subtitle,omitempty"`
+		SeriesName         []string `json:"series_name,omitempty"`
+		SeriesPosition     []string `json:"series_position,omitempty"`
 	} `json:"docs"`
 }
 
@@ -103,10 +105,46 @@ func SearchOpenLibrary(params SearchParams, cache *cache.Cache) (SearchResults, 
 		return SearchResults{}, err
 	}
 
-	return results.Parse(params.Genres), nil
+	return results.parse(params.Genres), nil
 }
 
-func (results *OpenLibrarySearchResults) Parse(genres *[]string) SearchResults {
+func GetFromOpenLibrary(id string, cache *cache.Cache) (database.BookParams, error) {
+	u := url.URL{
+		Scheme: "https",
+		Host:   "openlibrary.org",
+		Path:   fmt.Sprintf("works/%s.json", id),
+	}
+
+	log.Println("Querying OpenLibrary:", u.String())
+
+	body, err := cache.HttpGet(u.String())
+	if err != nil {
+		return database.BookParams{}, err
+	}
+
+	var olItem struct {
+		Description string `json:"description"`
+		Title       string `json:"title"`
+		Subtitle    string `json:"subtitle"`
+	}
+	{
+	}
+
+	err = json.Unmarshal(body, &olItem)
+	if err != nil {
+		return database.BookParams{}, err
+	}
+
+	desc := stripTags(olItem.Description)
+
+	return database.BookParams{
+		Description: &desc,
+		Title:       &olItem.Title,
+		Subtitle:    &olItem.Subtitle,
+	}, nil
+}
+
+func (results *OpenLibrarySearchResults) parse(genres *[]string) SearchResults {
 
 	standardResults := SearchResults{
 		TotalCount: results.NumFound,
@@ -132,14 +170,31 @@ func (results *OpenLibrarySearchResults) Parse(genres *[]string) SearchResults {
 			})
 		}
 
+		seriesList := []database.Category{}
+		for i := range result.SeriesName {
+			series := database.Category{
+				Name:  result.SeriesName[i],
+				Index: &result.SeriesPosition[i],
+			}
+			seriesList = append(seriesList, series)
+		}
+
+		if result.LendingIdentifierS != "" {
+			result.LendingIdentifierS = strings.Trim(result.LendingIdentifierS, "isbn_")
+		}
+
 		cover := fmt.Sprintf("https://covers.openlibrary.org/b/id/%d-L.jpg", result.CoverI)
+		key := fmt.Sprintf("/api/metadata/%s?source=%s", strings.Trim(result.Key, "/works/"), "open%20library")
 
 		book := database.BookParams{
 			Title:    &result.Title,
 			Subtitle: &result.Subtitle,
 			Year:     &result.FirstPublishYear,
+			ISBN:     &result.LendingIdentifierS,
 			Authors:  &authors,
+			Series:   &seriesList,
 			Cover:    &cover,
+			Key:      &key,
 		}
 
 		if len(genresCats) > 0 {

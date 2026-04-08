@@ -1,25 +1,9 @@
 <script setup lang="ts">
+import type { BookParams } from '@/types/book';
 // Result item component - displays a single search result as a clickable card
 
-interface Category {
-  id?: string
-  name?: string
-}
-
-interface MetadataItem {
-  title?: string | null
-  subtitle?: string | null
-  description?: string | null
-  year?: number | null
-  isbn?: string | null
-  publisher?: string | null
-  authors?: Category[] | null
-  genres?: Category[] | null
-  cover?: string | null
-}
-
 const props = defineProps<{
-  item: MetadataItem
+  item: BookParams
 }>()
 
 // Emit click event to parent for modal opening
@@ -28,7 +12,7 @@ const emit = defineEmits<{
 }>()
 
 // Format author list for display
-const formattedAuthors = (item: MetadataItem) => {
+const formattedAuthors = (item: BookParams) => {
   if (!item.authors || item.authors.length === 0) {
     return 'Unknown author'
   }
@@ -49,6 +33,7 @@ const formattedAuthors = (item: MetadataItem) => {
     <div class="result-details">
       <h3>{{ item.title || 'Untitled' }}</h3>
       <p class="subtitle" v-if="item.subtitle">{{ item.subtitle }}</p>
+      <p class="meta" v-if="item.series"><strong>Series:</strong> {{ item.series.map(s => s.name).join(', ') }}</p>
       <p class="meta" v-if="item.authors"><strong>Author:</strong> {{ formattedAuthors(item) }}</p>
       <p class="publisher" v-if="item.year"><strong>Year:</strong> {{ item.year }}</p>
       <p class="publisher" v-if="item.isbn"><strong>ISBN:</strong> {{ item.isbn }}</p>

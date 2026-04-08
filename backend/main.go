@@ -84,6 +84,7 @@ func main() {
 
 	// Metadata
 	mux.HandleFunc("GET /api/metadata/", cfg.handlerMetadataSearch)
+	mux.HandleFunc("GET /api/metadata/{id}", cfg.handlerGetMetadataBookDetails)
 
 	// Media
 	mux.Handle("/media/downloads/", http.StripPrefix("/media/downloads/", http.FileServer(http.Dir(cfg.downloadsPath))))

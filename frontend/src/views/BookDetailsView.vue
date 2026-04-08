@@ -98,39 +98,39 @@ onMounted(async () => {
           <dl class="hero-info-grid">
             <div>
               <dt>Year</dt>
-              <dd>{{ book.year || 'Unknown' }}</dd>
+              <dd>{{ book.year || '' }}</dd>
             </div>
             <div>
               <dt>Publisher</dt>
-              <dd>{{ book.publisher || 'Unknown' }}</dd>
+              <dd>{{ book.publisher || '' }}</dd>
             </div>
             <div>
               <dt>ISBN</dt>
-              <dd>{{ book.isbn || 'N/A' }}</dd>
+              <dd>{{ book.isbn || '' }}</dd>
             </div>
             <div>
               <dt>ASIN</dt>
-              <dd>{{ book.asin || 'N/A' }}</dd>
+              <dd>{{ book.asin || '' }}</dd>
             </div>
             <div>
               <dt>Authors</dt>
-              <dd>{{ formattedAuthors }}</dd>
+              <dd>{{ formattedAuthors || '' }}</dd>
             </div>
             <div>
               <dt>Genres</dt>
-              <dd>{{ formattedGenres }}</dd>
+              <dd>{{ formattedGenres || '' }}</dd>
             </div>
             <div>
               <dt>Series</dt>
-              <dd>{{ formattedSeries }}</dd>
+              <dd>{{ formattedSeries || '' }}</dd>
             </div>
             <div>
               <dt>Narrators</dt>
-              <dd>{{ formattedNarrators }}</dd>
+              <dd>{{ formattedNarrators || '' }}</dd>
             </div>
             <div>
               <dt>Tags</dt>
-              <dd>{{ formattedTags }}</dd>
+              <dd>{{ formattedTags || '' }}</dd>
             </div>
             <div>
               <dt>Created</dt>
