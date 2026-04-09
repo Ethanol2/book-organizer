@@ -18,7 +18,7 @@ I wanted to make this app because I have a big audiobook library and I wanted a 
 
 ---
 
-## Quickstart
+## Quick start
 
 At the moment I haven't moved to get the project onto docker.
 
