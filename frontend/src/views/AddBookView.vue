@@ -76,6 +76,21 @@ function buildQueryParams() {
   return params
 }
 
+function resetSearch() {
+  title.value = ''
+  author.value = ''
+  year.value = ''
+  publisher.value = ''
+  isbn.value = ''
+  genres.value = ''
+  languages.value = ''
+  page.value = 1
+  results.value = []
+  totalCount.value = 0
+  offset.value = 0
+  count.value = 0
+}
+
 // Fetch search results from metadata API
 async function searchBooksAndResetPage() {
   page.value = 1
@@ -161,7 +176,7 @@ async function getBookDetails(item: BookParams | null): Promise<BookParams | nul
       details.cover = details.cover ?? item.cover
 
       return details
-      
+
     } catch (err) {
       console.error('Get book details error', err)
       notifications.notifyError('Failed to get book details: ' + (err instanceof Error ? err.message : String(err)))
@@ -200,17 +215,7 @@ function closeModal() {
 }
 
 // Post book data to backend API
-async function addBook(bookData: {
-  title: string | null
-  subtitle: string | null
-  description: string | null
-  year: number | null
-  isbn: string | null
-  publisher: string | null
-  authors: Array<{ name: string }> | null
-  genres: Array<{ name: string }> | null
-  cover: string | null
-}) {
+async function addBook(bookData: BookParams) {
   try {
     const resp = await fetch('/api/books', {
       method: 'POST',
@@ -258,6 +263,7 @@ async function addBook(bookData: {
       <button type="button" @click="showAdvanced = !showAdvanced">
         {{ showAdvanced ? 'Hide' : 'Show' }} Advanced Search
       </button>
+      <button type="button" @click="resetSearch">Reset</button>
     </div>
 
     <div v-if="showAdvanced" class="advanced-search">

@@ -1,9 +1,16 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import type { BookParams } from '@/types/book'
 import { getCategoriesString, getCategoriesArray, getSeriesArray, getSeriesString } from '@/types/book'
-// Modal component for adding/editing books with form fields and submission
 
+// Modal component for adding/editing books with form fields and submission
+const titleInput = ref('')
+const subtitleInput = ref('')
+const descriptionInput = ref('')
+const yearInput = ref('')
+const isbnInput = ref('')
+const publisherInput = ref('')
+const coverInput = ref('')
 const authorsInput = ref('')
 const narratorsInput = ref('')
 const seriesInput = ref('')
@@ -16,82 +23,72 @@ interface ModalProps {
 
 const props = withDefaults(defineProps<ModalProps>(), {
   show: false,
-    params: null
+  params: null,
 })
 
-// Emits for closing modal and submitting book data
 const emit = defineEmits<{
   close: []
-  'update:title': [value: string]
-  'update:subtitle': [value: string]
-  'update:description': [value: string]
-  'update:year': [value: string]
-  'update:isbn': [value: string]
-  'update:publisher': [value: string]
-  'update:authors': [value: string]
-    'update:narrators': [value: string]
-    'update:series': [value: string]
-  'update:genres': [value: string]
-  'update:cover': [value: string]
-  'add-book': [bookData: {
-    title: string | null
-    subtitle: string | null
-    description: string | null
-    year: number | null
-    isbn: string | null
-    publisher: string | null
-    authors: Array<{ name: string }> | null
-    genres: Array<{ name: string }> | null
-    cover: string | null
-  }]
+  'add-book': [BookParams]
 }>()
 
-// Handle form submission
-function handleSubmit() {
-  if (props.params) {
-    props.params.authors = getCategoriesArray(authorsInput.value)
-    props.params.narrators = getCategoriesArray(narratorsInput.value)
-    props.params.series = getSeriesArray(seriesInput.value)
-    props.params.genres = getCategoriesArray(genresInput.value)
-  }
+function resetFormFields() {
+  const params = props.params
 
-  const bookData = {
-    title: props.params?.title || null,
-    subtitle: props.params?.subtitle || null,
-    description: props.params?.description || null,
-    year: props.params?.year || null,
-    isbn: props.params?.isbn || null,
-    publisher: props.params?.publisher || null,
-    authors: props.params?.authors || null,
-    narrators: props.params?.narrators || null,
-    series: props.params?.series || null,
-    genres: props.params?.genres || null,
-    cover: props.params?.cover || null,
-  }
-  emit('add-book', bookData)
+  titleInput.value = params?.title ?? ''
+  subtitleInput.value = params?.subtitle ?? ''
+  descriptionInput.value = params?.description ?? ''
+  yearInput.value = params?.year != null ? String(params.year) : ''
+  isbnInput.value = params?.isbn ?? ''
+  publisherInput.value = params?.publisher ?? ''
+  coverInput.value = params?.cover ?? ''
+  authorsInput.value = getCategoriesString(params?.authors ?? [])
+  narratorsInput.value = getCategoriesString(params?.narrators ?? [])
+  seriesInput.value = getSeriesString(params?.series ?? [])
+  genresInput.value = getCategoriesString(params?.genres ?? [])
 }
 
-// Close modal when clicking overlay
+function handleSubmit() {
+  const baseParams = props.params ? { ...props.params } : {}
+  const yearValue = yearInput.value.trim()
+  const params: BookParams = {
+    ...baseParams,
+    title: titleInput.value.trim() || null,
+    subtitle: subtitleInput.value.trim() || null,
+    description: descriptionInput.value.trim() || null,
+    publisher: publisherInput.value.trim() || null,
+    isbn: isbnInput.value.trim() || null,
+    cover: coverInput.value.trim() || null,
+    year: yearValue ? Number(yearValue) : null,
+    authors: getCategoriesArray(authorsInput.value),
+    narrators: getCategoriesArray(narratorsInput.value),
+    series: getSeriesArray(seriesInput.value),
+    genres: getCategoriesArray(genresInput.value),
+  }
+
+  if (params.year !== null && Number.isNaN(params.year)) {
+    params.year = null
+  }
+
+  emit('add-book', params)
+}
+
 function handleOverlayClick() {
   emit('close')
 }
 
-// Prevent closing when clicking inside modal
 function handleModalClick(e: Event) {
   e.stopPropagation()
 }
 
-watch(
-  () => props.show,
-  (visible) => {
-    if (!visible || !props.params) {
-      return
-    }
+const modalTitle = computed(() => (props.params ? 'Edit Book' : 'Add Book'))
+const submitLabel = computed(() => (props.params ? 'Save Changes' : 'Add Book'))
 
-    authorsInput.value = getCategoriesString(props.params.authors ?? [])
-    narratorsInput.value = getCategoriesString(props.params.narrators ?? [])
-    seriesInput.value = getSeriesString(props.params.series ?? [])
-    genresInput.value = getCategoriesString(props.params.genres ?? [])
+watch(
+  [() => props.params, () => props.show],
+  ([params, visible]) => {
+    if (visible) {
+      resetFormFields()
+    }
   },
   { immediate: true }
 )
@@ -102,25 +99,25 @@ watch(
   <div v-if="show" class="modal-overlay" @click="handleOverlayClick">
     <!-- Modal dialog - prevents closing from interior clicks -->
     <div class="modal" @click="handleModalClick">
-      <h3>Add Book</h3>
+      <h3>{{ modalTitle }}</h3>
       <form @submit.prevent="handleSubmit">
         <!-- Book metadata form fields -->
-        <label>Title: <input :value="params?.title" @input="emit('update:title', ($event.target as HTMLInputElement).value)" type="text" required /></label>
-        <label>Subtitle: <input :value="params?.subtitle" @input="emit('update:subtitle', ($event.target as HTMLInputElement).value)" type="text" /></label>
+        <label>Title: <input v-model="titleInput" type="text" required /></label>
+        <label>Subtitle: <input v-model="subtitleInput" type="text" /></label>
         <label>Series (comma-separated, use #1 for first in series): <input v-model="seriesInput" type="text" /></label>
-        <label>Description: <textarea :value="params?.description" @input="emit('update:description', ($event.target as HTMLTextAreaElement).value)"></textarea></label>
-        <label>Year: <input :value="params?.year" @input="emit('update:year', ($event.target as HTMLInputElement).value)" type="number" /></label>
-        <label>ISBN: <input :value="params?.isbn" @input="emit('update:isbn', ($event.target as HTMLInputElement).value)" type="text" /></label>
-        <label>Publisher: <input :value="params?.publisher" @input="emit('update:publisher', ($event.target as HTMLInputElement).value)" type="text" /></label>
+        <label>Description: <textarea v-model="descriptionInput"></textarea></label>
+        <label>Year: <input v-model="yearInput" type="number" /></label>
+        <label>ISBN: <input v-model="isbnInput" type="text" /></label>
+        <label>Publisher: <input v-model="publisherInput" type="text" /></label>
         <label>Authors (comma-separated): <input v-model="authorsInput" type="text" /></label>
         <label>Narrators (comma-separated): <input v-model="narratorsInput" type="text" /></label>
         <label>Genres (comma-separated): <input v-model="genresInput" type="text" /></label>
-        <label>Cover URL: <input :value="params?.cover" @input="emit('update:cover', ($event.target as HTMLInputElement).value)" type="text" /></label>
+        <label>Cover URL: <input v-model="coverInput" type="text" /></label>
 
         <!-- Action buttons -->
         <div class="modal-buttons">
           <button type="button" @click="handleOverlayClick">Cancel</button>
-          <button type="submit">Add Book</button>
+          <button type="submit">{{ submitLabel }}</button>
         </div>
       </form>
     </div>

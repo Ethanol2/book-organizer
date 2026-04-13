@@ -108,6 +108,14 @@ func SearchOpenLibrary(params SearchParams, cache *cache.Cache) (SearchResults, 
 	return results.parse(params.Genres), nil
 }
 
+type Description string
+type OLItem struct {
+	Description Description `json:"description"`
+	Title       string      `json:"title"`
+	Subtitle    string      `json:"subtitle"`
+	Subjects    []string    `json:"subjects"`
+}
+
 func GetFromOpenLibrary(id string, cache *cache.Cache) (database.BookParams, error) {
 	u := url.URL{
 		Scheme: "https",
@@ -122,25 +130,55 @@ func GetFromOpenLibrary(id string, cache *cache.Cache) (database.BookParams, err
 		return database.BookParams{}, err
 	}
 
-	var olItem struct {
-		Description string `json:"description"`
-		Title       string `json:"title"`
-		Subtitle    string `json:"subtitle"`
-	}
-	{
-	}
+	var olItem OLItem
 
 	err = json.Unmarshal(body, &olItem)
 	if err != nil {
 		return database.BookParams{}, err
 	}
 
-	desc := stripTags(olItem.Description)
+	desc := stripTags(string(olItem.Description))
+
+	genres := []database.Category{}
+	series := []database.Category{}
+
+	for _, genre := range olItem.Subjects {
+
+		if len(genre) == 0 {
+			continue
+		}
+
+		split := strings.Split(genre, ":")
+
+		if len(split) == 1 {
+
+			genres = append(genres, database.Category{
+				Type: database.Genres,
+				Name: strings.ReplaceAll(genre, ", ", "-"),
+			})
+
+		} else {
+			switch split[0] {
+			case "series":
+			case "franchise":
+				series = append(series, database.Category{
+					Type: database.Series,
+					Name: split[1],
+				})
+			case "genre":
+				genres = append(genres, database.Category{
+					Type: database.Genres,
+					Name: strings.ReplaceAll(split[1], ", ", "-"),
+				})
+			}
+		}
+	}
 
 	return database.BookParams{
 		Description: &desc,
 		Title:       &olItem.Title,
 		Subtitle:    &olItem.Subtitle,
+		Genres:      &genres,
 	}, nil
 }
 
@@ -205,4 +243,26 @@ func (results *OpenLibrarySearchResults) parse(genres *[]string) SearchResults {
 	}
 
 	return standardResults
+}
+
+func (d *Description) UnmarshalJSON(b []byte) error {
+	// Try unmarshaling as a simple string first
+	var s string
+	if err := json.Unmarshal(b, &s); err == nil {
+		*d = Description(s)
+		return nil
+	}
+
+	// If that fails, try unmarshaling as the object struct
+	var obj struct {
+		Value string `json:"value"`
+	}
+	if err := json.Unmarshal(b, &obj); err == nil {
+		*d = Description(obj.Value)
+		return nil
+	}
+
+	// Fallback for empty or null
+	*d = ""
+	return nil
 }

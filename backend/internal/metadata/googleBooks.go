@@ -35,19 +35,25 @@ type GoogleBooksItem struct {
 			Type       string `json:"type"`
 			Identifier string `json:"identifier"`
 		} `json:"industryIdentifiers"`
-		PageCount      int      `json:"pageCount"`
-		PrintType      string   `json:"printType"`
-		Categories     []string `json:"categories"`
-		MaturityRating string   `json:"maturityRating"`
-		ImageLinks     struct {
-			SmallThumbnail string `json:"smallThumbnail"`
-			Thumbnail      string `json:"thumbnail"`
-		} `json:"imageLinks"`
-		Language            string `json:"language"`
-		PreviewLink         string `json:"previewLink"`
-		InfoLink            string `json:"infoLink"`
-		CanonicalVolumeLink string `json:"canonicalVolumeLink"`
+		PageCount           int              `json:"pageCount"`
+		PrintType           string           `json:"printType"`
+		Categories          []string         `json:"categories"`
+		MaturityRating      string           `json:"maturityRating"`
+		ImageLinks          GoogleImageLinks `json:"imageLinks"`
+		Language            string           `json:"language"`
+		PreviewLink         string           `json:"previewLink"`
+		InfoLink            string           `json:"infoLink"`
+		CanonicalVolumeLink string           `json:"canonicalVolumeLink"`
 	} `json:"volumeInfo"`
+}
+
+type GoogleImageLinks struct {
+	SmallThumbnail *string `json:"smallThumbnail"`
+	Thumbnail      *string `json:"thumbnail"`
+	Small          *string `json:"small"`
+	Medium         *string `json:"medium"`
+	Large          *string `json:"large"`
+	ExtraLarge     *string `json:"extraLarge"`
 }
 
 func SearchGoogleBooks(params SearchParams, key string, cache *cache.Cache) (SearchResults, error) {
@@ -125,7 +131,9 @@ func GetFromGoogleBooks(id, key string, cache *cache.Cache) (database.BookParams
 		Host:   "www.googleapis.com",
 		Path:   fmt.Sprintf("books/v1/volumes/%s", id),
 	}
-	u.Query().Add("key", key)
+	q := u.Query()
+	q.Add("key", key)
+	u.RawQuery = q.Encode()
 
 	log.Println("Querying GoogleBooks", u.String())
 
@@ -221,7 +229,25 @@ func (result *GoogleBooksItem) parse() (database.BookParams, error) {
 		ISBN:        &isbn,
 		Authors:     &authors,
 		Genres:      &genres,
-		Cover:       &result.VolumeInfo.ImageLinks.Thumbnail,
+		Cover:       result.VolumeInfo.ImageLinks.GetBiggestImage(),
 		Key:         &key,
 	}, nil
+}
+
+func (covers *GoogleImageLinks) GetBiggestImage() *string {
+	if covers.ExtraLarge != nil {
+		return covers.ExtraLarge
+	} else if covers.Large != nil {
+		return covers.Large
+	} else if covers.Medium != nil {
+		return covers.Medium
+	} else if covers.Small != nil {
+		return covers.Small
+	} else if covers.Thumbnail != nil {
+		return covers.Thumbnail
+	} else if covers.SmallThumbnail != nil {
+		return covers.SmallThumbnail
+	}
+
+	return nil
 }

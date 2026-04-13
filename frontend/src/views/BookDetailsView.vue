@@ -1,12 +1,75 @@
 <script setup lang="ts">
-import type { Book } from '@/types/book';
+import type { Book, BookParams } from '@/types/book';
 import { computed, onMounted, ref } from 'vue';
 import { RouterLink, useRoute } from 'vue-router';
+import AddBookModal from '@/components/AddBookModal.vue';
+import { useNotificationsStore } from '@/stores/notifications';
 
 const route = useRoute();
 const book = ref<Book | null>(null);
 const loading = ref(true);
 const error = ref<string | null>(null);
+const showEditModal = ref(false);
+const editParams = ref<BookParams | null>(null);
+const notifications = useNotificationsStore();
+
+function buildEditParams(book: Book): BookParams {
+  return {
+    title: book.title,
+    subtitle: book.subtitle,
+    description: book.description,
+    year: book.year,
+    isbn: book.isbn,
+    publisher: book.publisher,
+    series: book.series,
+    authors: book.authors,
+    genres: book.genres,
+    narrators: book.narrators,
+    cover: book.files?.cover ?? null,
+  };
+}
+
+function openEditModal() {
+  if (!book.value) {
+    return;
+  }
+
+  editParams.value = buildEditParams(book.value);
+  showEditModal.value = true;
+}
+
+function closeEditModal() {
+  showEditModal.value = false;
+  editParams.value = null;
+}
+
+async function submitEdit(bookData: BookParams) {
+  if (!book.value) {
+    return;
+  }
+
+  try {
+    const resp = await fetch(`/api/books/${book.value.id}`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(bookData),
+    });
+
+    if (!resp.ok) {
+      const body = await resp.text();
+      throw new Error(`${resp.status} ${resp.statusText}: ${body}`);
+    }
+
+    book.value = await resp.json();
+    closeEditModal();
+    notifications.notifySuccess('Book updated successfully!');
+  } catch (err) {
+    console.error('Update book error:', err);
+    notifications.notifyError('Failed to update book: ' + (err instanceof Error ? err.message : String(err)));
+  }
+}
 
 const coverSrc = computed(() => {
   if (!book.value) {
@@ -77,8 +140,11 @@ onMounted(async () => {
 <template>
   <div class="book-details">
     <div class="page-header">
-      <RouterLink to="/" class="back-button">← Back to library</RouterLink>
-      <h1>Book Details</h1>
+      <div class="page-header-left">
+        <RouterLink to="/" class="back-button">← Back to library</RouterLink>
+        <h1>Book Details</h1>
+      </div>
+      <button class="edit-button" type="button" @click="openEditModal">Edit Book</button>
     </div>
 
     <div v-if="loading" class="status-message">Loading book details…</div>
@@ -185,6 +251,13 @@ onMounted(async () => {
       </div>
     </div>
     <div v-else class="status-message">Book not found.</div>
+
+    <AddBookModal
+      :show="showEditModal"
+      :params="editParams"
+      @close="closeEditModal"
+      @add-book="submitEdit"
+    />
   </div>
 </template>
 
@@ -217,8 +290,15 @@ onMounted(async () => {
 .page-header {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 1rem;
   margin-bottom: 1.5rem;
+}
+
+.page-header-left {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
 }
 
 .page-header h1 {
@@ -240,6 +320,22 @@ onMounted(async () => {
 
 .back-button:hover {
   transform: translateX(-1px);
+  background: rgba(54, 140, 211, 0.1);
+}
+
+.edit-button {
+  padding: 0.75rem 1rem;
+  border-radius: 999px;
+  border: 1px solid var(--color-border);
+  background: var(--color-background-soft);
+  color: var(--color-text);
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 0.2s ease, background-color 0.2s ease;
+}
+
+.edit-button:hover {
+  transform: translateY(-1px);
   background: rgba(54, 140, 211, 0.1);
 }
 
