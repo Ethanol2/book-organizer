@@ -2,23 +2,24 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
 	"os"
 	"time"
 
+	"github.com/Ethanol2/book-organizer/internal/cache"
 	"github.com/Ethanol2/book-organizer/internal/database"
 	"github.com/Ethanol2/book-organizer/internal/fileManagement"
-	"github.com/Ethanol2/book-organizer/internal/metadata"
 	"github.com/google/uuid"
 	"github.com/joho/godotenv"
 	_ "github.com/mattn/go-sqlite3"
 )
 
 type apiConfig struct {
-	db            database.Client
+	db      database.Client
+	mdCache cache.Cache
+
 	frontendPath  string
 	downloadsPath string
 	downloadsName string
@@ -82,8 +83,8 @@ func main() {
 	mux.HandleFunc("PATCH /api/books/{id}/cover", uuidMiddleware(cfg.handlerUpdateBookCover))
 
 	// Metadata
-	mux.HandleFunc("GET /api/metadata/openlibrary", metadataSearchMiddleware(cfg.handlerSearchOpenLibrary))
-	mux.HandleFunc("GET /api/metadata/googlebooks", metadataSearchMiddleware(cfg.handlerSearchGoogleBooks))
+	mux.HandleFunc("GET /api/metadata/", cfg.handlerMetadataSearch)
+	mux.HandleFunc("GET /api/metadata/{id}", cfg.handlerGetMetadataBookDetails)
 
 	// Media
 	mux.Handle("/media/downloads/", http.StripPrefix("/media/downloads/", http.FileServer(http.Dir(cfg.downloadsPath))))
@@ -163,6 +164,7 @@ func initConfig(dbReset, insertTestData bool) (*apiConfig, error) {
 
 	return &apiConfig{
 		db:                db,
+		mdCache:           cache.NewCache(time.Minute * 5),
 		frontendPath:      fPath,
 		downloadsPath:     dPath,
 		downloadsName:     "/media/downloads",
@@ -188,18 +190,4 @@ func uuidMiddleware(handler func(uuid.UUID, http.ResponseWriter, *http.Request))
 		handler(id, w, r)
 	}
 
-}
-
-func metadataSearchMiddleware(handler func(metadata.SearchParams, http.ResponseWriter, *http.Request)) func(http.ResponseWriter, *http.Request) {
-
-	return func(w http.ResponseWriter, r *http.Request) {
-		var searchParams metadata.SearchParams
-		err := json.NewDecoder(r.Body).Decode(&searchParams)
-		if err != nil {
-			respondWithError(w, http.StatusBadRequest, "couldn't read body", err)
-			return
-		}
-
-		handler(searchParams, w, r)
-	}
 }

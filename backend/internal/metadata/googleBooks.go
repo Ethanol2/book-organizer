@@ -4,50 +4,59 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
-	"net/http"
 	"net/url"
+	"slices"
 	"strconv"
 	"strings"
 
+	"github.com/Ethanol2/book-organizer/internal/cache"
 	"github.com/Ethanol2/book-organizer/internal/database"
 )
 
 type GoogleBooksSearchResults struct {
-	Kind       string `json:"kind"`
-	TotalItems int    `json:"totalItems"`
-	Items      []struct {
-		Kind       string `json:"kind"`
-		ID         string `json:"id"`
-		Etag       string `json:"etag"`
-		SelfLink   string `json:"selfLink"`
-		VolumeInfo struct {
-			Title               string   `json:"title"`
-			Subtitle            string   `json:"subtitle"`
-			Authors             []string `json:"authors"`
-			Publisher           string   `json:"publisher"`
-			PublishedDate       string   `json:"publishedDate"`
-			Description         string   `json:"description"`
-			IndustryIdentifiers []struct {
-				Type       string `json:"type"`
-				Identifier string `json:"identifier"`
-			} `json:"industryIdentifiers"`
-			PageCount      int      `json:"pageCount"`
-			PrintType      string   `json:"printType"`
-			Categories     []string `json:"categories"`
-			MaturityRating string   `json:"maturityRating"`
-			ImageLinks     struct {
-				SmallThumbnail string `json:"smallThumbnail"`
-				Thumbnail      string `json:"thumbnail"`
-			} `json:"imageLinks"`
-			Language            string `json:"language"`
-			PreviewLink         string `json:"previewLink"`
-			InfoLink            string `json:"infoLink"`
-			CanonicalVolumeLink string `json:"canonicalVolumeLink"`
-		} `json:"volumeInfo"`
-	} `json:"items"`
+	Kind       string            `json:"kind"`
+	TotalItems int               `json:"totalItems"`
+	Items      []GoogleBooksItem `json:"items"`
 }
 
-func SearchGoogleBooks(params SearchParams, key string) (SearchResults, error) {
+type GoogleBooksItem struct {
+	Kind       string `json:"kind"`
+	ID         string `json:"id"`
+	Etag       string `json:"etag"`
+	SelfLink   string `json:"selfLink"`
+	VolumeInfo struct {
+		Title               string   `json:"title"`
+		Subtitle            string   `json:"subtitle"`
+		Authors             []string `json:"authors"`
+		Publisher           string   `json:"publisher"`
+		PublishedDate       string   `json:"publishedDate"`
+		Description         string   `json:"description"`
+		IndustryIdentifiers []struct {
+			Type       string `json:"type"`
+			Identifier string `json:"identifier"`
+		} `json:"industryIdentifiers"`
+		PageCount           int              `json:"pageCount"`
+		PrintType           string           `json:"printType"`
+		Categories          []string         `json:"categories"`
+		MaturityRating      string           `json:"maturityRating"`
+		ImageLinks          GoogleImageLinks `json:"imageLinks"`
+		Language            string           `json:"language"`
+		PreviewLink         string           `json:"previewLink"`
+		InfoLink            string           `json:"infoLink"`
+		CanonicalVolumeLink string           `json:"canonicalVolumeLink"`
+	} `json:"volumeInfo"`
+}
+
+type GoogleImageLinks struct {
+	SmallThumbnail *string `json:"smallThumbnail"`
+	Thumbnail      *string `json:"thumbnail"`
+	Small          *string `json:"small"`
+	Medium         *string `json:"medium"`
+	Large          *string `json:"large"`
+	ExtraLarge     *string `json:"extraLarge"`
+}
+
+func SearchGoogleBooks(params SearchParams, key string, cache *cache.Cache) (SearchResults, error) {
 
 	u := url.URL{
 		Scheme: "https",
@@ -79,10 +88,19 @@ func SearchGoogleBooks(params SearchParams, key string) (SearchResults, error) {
 	q := u.Query()
 	q.Add("q", strings.Join(searchItems, " "))
 
-	pageOffset := (*params.Page - 1) * 10
+	pageOffset := 0
 	if params.Page != nil {
+
+		limit := 10
+		if params.Limit != nil {
+			limit = *params.Limit
+		}
+
+		pageOffset = (*params.Page - 1) * limit
+		log.Println(pageOffset)
 		q.Add("startIndex", fmt.Sprint(pageOffset))
 	}
+
 	if params.Sort != nil {
 		q.Add("orderBy", *params.Sort)
 	}
@@ -93,26 +111,47 @@ func SearchGoogleBooks(params SearchParams, key string) (SearchResults, error) {
 
 	log.Println("Querying GoogleBooks:", u.String())
 
-	resp, err := http.Get(u.String())
+	body, err := cache.HttpGet(u.String())
 	if err != nil {
 		return SearchResults{}, err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return SearchResults{}, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
 	}
 
 	var results GoogleBooksSearchResults
-	err = json.NewDecoder(resp.Body).Decode(&results)
+	err = json.Unmarshal(body, &results)
 	if err != nil {
 		return SearchResults{}, err
 	}
 
-	return results.Parse(pageOffset), nil
+	return results.parseSearch(pageOffset), nil
 }
 
-func (results *GoogleBooksSearchResults) Parse(offset int) SearchResults {
+func GetFromGoogleBooks(id, key string, cache *cache.Cache) (database.BookParams, error) {
+	u := url.URL{
+		Scheme: "https",
+		Host:   "www.googleapis.com",
+		Path:   fmt.Sprintf("books/v1/volumes/%s", id),
+	}
+	q := u.Query()
+	q.Add("key", key)
+	u.RawQuery = q.Encode()
+
+	log.Println("Querying GoogleBooks", u.String())
+
+	body, err := cache.HttpGet(u.String())
+	if err != nil {
+		return database.BookParams{}, err
+	}
+
+	var item GoogleBooksItem
+	err = json.Unmarshal(body, &item)
+	if err != nil {
+		return database.BookParams{}, err
+	}
+
+	return item.parse()
+}
+
+func (results *GoogleBooksSearchResults) parseSearch(offset int) SearchResults {
 
 	standardResults := SearchResults{
 		TotalCount: results.TotalItems,
@@ -121,49 +160,94 @@ func (results *GoogleBooksSearchResults) Parse(offset int) SearchResults {
 	}
 
 	for _, result := range results.Items {
-
-		year, err := strconv.Atoi(result.VolumeInfo.PublishedDate)
+		book, err := result.parse()
 		if err != nil {
 			log.Println(err)
 			continue
 		}
-
-		isbn := ""
-		for _, id := range result.VolumeInfo.IndustryIdentifiers {
-			if id.Type == "ISBN_13" {
-				isbn = id.Identifier
-				break
-			}
-		}
-
-		authors := []database.Category{}
-		for _, author := range result.VolumeInfo.Authors {
-			authors = append(authors, database.Category{
-				Name: author,
-			})
-		}
-
-		genres := []database.Category{}
-		for _, genre := range result.VolumeInfo.Categories {
-			genres = append(genres, database.Category{
-				Name: genre,
-			})
-		}
-
-		book := database.BookParams{
-			Title:       &result.VolumeInfo.Title,
-			Subtitle:    &result.VolumeInfo.Subtitle,
-			Description: &result.VolumeInfo.Description,
-			Year:        &year,
-			Publisher:   &result.VolumeInfo.Publisher,
-			ISBN:        &isbn,
-			Authors:     &authors,
-			Genres:      &genres,
-			Cover:       &result.VolumeInfo.ImageLinks.Thumbnail,
-		}
-
 		standardResults.Items = append(standardResults.Items, book)
 	}
 
 	return standardResults
+}
+
+func (result *GoogleBooksItem) parse() (database.BookParams, error) {
+	var year int
+	var err error
+
+	if dateStr := result.VolumeInfo.PublishedDate; dateStr != "" {
+		if split := strings.Split(dateStr, "-"); len(split) > 1 {
+			dateStr = split[0]
+		}
+
+		year, err = strconv.Atoi(dateStr)
+		if err != nil {
+			log.Println(err)
+		}
+	}
+
+	isbn := ""
+	for _, id := range result.VolumeInfo.IndustryIdentifiers {
+		if id.Type == "ISBN_13" {
+			isbn = id.Identifier
+			break
+		}
+	}
+
+	authors := []database.Category{}
+	for _, author := range result.VolumeInfo.Authors {
+		authors = append(authors, database.Category{
+			Name: author,
+		})
+	}
+
+	genres := []database.Category{}
+	genresStr := []string{}
+	for _, genre := range result.VolumeInfo.Categories {
+		split := strings.Split(genre, "/")
+		for _, s := range split {
+			genresStr = append(genresStr, strings.TrimSpace(s))
+		}
+	}
+	slices.Sort(genresStr)
+	genresStr = slices.Compact(genresStr)
+	for _, genre := range genresStr {
+		genres = append(genres, database.Category{
+			Name: genre,
+		})
+	}
+
+	key := fmt.Sprintf("/api/metadata/%s?source=%s", result.ID, "google%20books")
+	desc := stripTags(result.VolumeInfo.Description)
+
+	return database.BookParams{
+		Title:       &result.VolumeInfo.Title,
+		Subtitle:    &result.VolumeInfo.Subtitle,
+		Description: &desc,
+		Year:        &year,
+		Publisher:   &result.VolumeInfo.Publisher,
+		ISBN:        &isbn,
+		Authors:     &authors,
+		Genres:      &genres,
+		Cover:       result.VolumeInfo.ImageLinks.GetBiggestImage(),
+		Key:         &key,
+	}, nil
+}
+
+func (covers *GoogleImageLinks) GetBiggestImage() *string {
+	if covers.ExtraLarge != nil {
+		return covers.ExtraLarge
+	} else if covers.Large != nil {
+		return covers.Large
+	} else if covers.Medium != nil {
+		return covers.Medium
+	} else if covers.Small != nil {
+		return covers.Small
+	} else if covers.Thumbnail != nil {
+		return covers.Thumbnail
+	} else if covers.SmallThumbnail != nil {
+		return covers.SmallThumbnail
+	}
+
+	return nil
 }

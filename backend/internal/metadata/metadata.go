@@ -2,6 +2,7 @@ package metadata
 
 import (
 	"fmt"
+	"regexp"
 
 	"github.com/Ethanol2/book-organizer/internal/database"
 )
@@ -15,8 +16,9 @@ type SearchParams struct {
 	Languages *[]string `json:"languages"`
 	ISBN      *string   `json:"isbn"`
 
-	Page *int    `json:"page"`
-	Sort *string `json:"sort"`
+	Page  *int    `json:"page"`
+	Limit *int    `json:"limit"`
+	Sort  *string `json:"sort"`
 }
 
 type SearchResults struct {
@@ -62,10 +64,16 @@ func MetadataFileFromBook(book database.Book) MetadataFile {
 	md.Series = database.CategoryToStrSlice(book.Series)
 	md.Genres = database.CategoryToStrSlice(book.Genres)
 	md.PublishedYear = fmt.Sprint(book.Year)
-	md.Publisher = book.Publisher
-	md.Description = book.Description
-	md.Isbn = book.ISBN
-	md.Asin = book.ASIN
+	md.Publisher = *book.Publisher
+	md.Description = *book.Description
+	md.Isbn = *book.ISBN
+	md.Asin = *book.ASIN
 
 	return md
+}
+
+func stripTags(s string) string {
+	// Regular expression to match any content within brackets
+	re := regexp.MustCompile(`<.*?>`)
+	return re.ReplaceAllString(s, "")
 }

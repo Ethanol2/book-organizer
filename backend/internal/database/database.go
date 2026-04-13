@@ -235,7 +235,8 @@ func (c Client) InsertTestData() error {
 		"series": [],
 		"authors": [{"name": "Andy Weir"}],
 		"genres": [{"name": "Science Fiction"}],
-		"narrators": [{"name": "R.C. Bray"}]
+		"narrators": [{"name": "R.C. Bray"}],
+		"cover": "https://ia800505.us.archive.org/view_archive.php?archive=/35/items/l_covers_0014/l_covers_0014_64.zip&file=0014641755-L.jpg"
 	  }	  
 	`
 	var theMartian BookParams

@@ -17,12 +17,12 @@ type Book struct {
 	Id          *uuid.UUID `json:"id,omitempty"`
 	Title       string     `json:"title"`
 	Subtitle    *string    `json:"subtitle"`
-	Description string     `json:"description"`
+	Description *string    `json:"description"`
 	Year        *int       `json:"year"`
-	ISBN        string     `json:"isbn"`
-	ASIN        string     `json:"asin"`
+	ISBN        *string    `json:"isbn"`
+	ASIN        *string    `json:"asin"`
 	Tags        []string   `json:"tags"`
-	Publisher   string     `json:"publisher"`
+	Publisher   *string    `json:"publisher"`
 	CreatedAt   *time.Time `json:"created_at,omitempty"`
 	UpdatedAt   *time.Time `json:"updated_at,omitempty"`
 
@@ -59,7 +59,9 @@ type BookParams struct {
 	Genres    *[]Category `json:"genres"`
 	Narrators *[]Category `json:"narrators"`
 
+	// URIs
 	Cover *string `json:"cover"`
+	Key   *string `json:"key"`
 }
 
 func (c Client) CheckBookExists(id uuid.UUID) (bool, error) {
@@ -95,9 +97,13 @@ func (c Client) AddBook(params BookParams) (Book, error) {
 		return Book{}, err
 	}
 
-	log.Println("Added \"", params.Title, "\" to books")
+	sortCats := func(catType CategoryType, catsPtr *[]Category) error {
 
-	sortCats := func(catType CategoryType, cats []Category) error {
+		if catsPtr == nil {
+			return nil
+		}
+		cats := *catsPtr
+
 		log.Println("Associating", catType)
 
 		for i, cat := range cats {
@@ -127,22 +133,22 @@ func (c Client) AddBook(params BookParams) (Book, error) {
 		return nil
 	}
 
-	err = sortCats(Series, *params.Series)
+	err = sortCats(Series, params.Series)
 	if err != nil {
 		return Book{}, err
 	}
 
-	err = sortCats(Genres, *params.Genres)
+	err = sortCats(Genres, params.Genres)
 	if err != nil {
 		return Book{}, err
 	}
 
-	err = sortCats(Narrators, *params.Narrators)
+	err = sortCats(Narrators, params.Narrators)
 	if err != nil {
 		return Book{}, err
 	}
 
-	err = sortCats(Authors, *params.Authors)
+	err = sortCats(Authors, params.Authors)
 
 	if err != nil {
 		return Book{}, err
@@ -152,6 +158,7 @@ func (c Client) AddBook(params BookParams) (Book, error) {
 	if err != nil {
 		return Book{}, err
 	}
+	log.Println("Added \"", *params.Title, "\" to books")
 
 	return c.GetBook(id)
 }

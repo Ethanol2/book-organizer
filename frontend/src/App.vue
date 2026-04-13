@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { RouterLink, RouterView } from 'vue-router'
+import Notifications from '@/components/Notifications.vue'
 </script>
 
 <template>
@@ -14,6 +15,7 @@ import { RouterLink, RouterView } from 'vue-router'
     <section class="body">
       <aside class="sidebar">
         <nav>
+          <RouterLink to="/add-book">Add Book</RouterLink>
           <RouterLink to="/">Library</RouterLink>
           <RouterLink to="/downloads">Downloads</RouterLink>
           <RouterLink to="/about">About</RouterLink>
@@ -24,6 +26,8 @@ import { RouterLink, RouterView } from 'vue-router'
         <RouterView />
       </main>
     </section>
+
+    <Notifications />
   </div>
 </template>
 
