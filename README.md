@@ -2,14 +2,6 @@
 
 An app written in Go and designed to run in Docker that helps organize a book library.
 
-**Currently on hold**
-
-This project benefits me, so I definitely want to continue work and finish it. Due to life circumstances and minor burnout, I'm shelving the project for now. Might come back to this in a week, might be 6 months.
-
-The backend portion is pretty complete. I'm sure as the frontend continues development I'll have to make changes.
-
-The frontend development is where I'm technically most weak. What is currently developed is a combination of my learning and assists from ChatGPT. I'm hopeful that I can power through the learning curve and create something useable.
-
 ## Description and Motivation
 
 This app will scan a downloads folder for new book directories, let users associate each download with a book entry, and then move the files into a structured library folder. It’s heavily inspired by the *arr* apps (RIP Readarr).
