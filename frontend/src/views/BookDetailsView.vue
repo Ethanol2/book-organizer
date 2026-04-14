@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { Book, BookParams } from '@/types/book';
+import { getSeriesString, type Book, type BookParams } from '@/types/book';
 import { computed, onMounted, ref } from 'vue';
 import { RouterLink, useRoute } from 'vue-router';
 import AddBookModal from '@/components/AddBookModal.vue';
@@ -43,10 +43,22 @@ function closeEditModal() {
   editParams.value = null;
 }
 
-async function submitEdit(bookData: BookParams) {
+async function submitEdit(newData: BookParams) {
   if (!book.value) {
     return;
   }
+  
+  newData.title = newData.title == book.value.title ? undefined : newData.title;
+  newData.subtitle = newData.subtitle == book.value.subtitle ? undefined : newData.subtitle;
+  newData.description = newData.description == book.value.description ? undefined : newData.description;
+  newData.year = newData.year == book.value.year ? undefined : newData.year;
+  newData.isbn = newData.isbn == book.value.isbn ? undefined : newData.isbn;
+  newData.publisher = newData.publisher == book.value.publisher ? undefined : newData.publisher;
+  newData.series = JSON.stringify(newData.series) === JSON.stringify(book.value.series) ? undefined : newData.series;
+  newData.authors = JSON.stringify(newData.authors) === JSON.stringify(book.value.authors) ? undefined : newData.authors;
+  newData.genres = JSON.stringify(newData.genres) === JSON.stringify(book.value.genres) ? undefined : newData.genres;
+  newData.narrators = JSON.stringify(newData.narrators) === JSON.stringify(book.value.narrators) ? undefined : newData.narrators;
+  newData.cover = newData.cover == book.value.files?.cover ? undefined : newData.cover;
 
   try {
     const resp = await fetch(`/api/books/${book.value.id}`, {
@@ -54,7 +66,7 @@ async function submitEdit(bookData: BookParams) {
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify(bookData),
+      body: JSON.stringify(newData),
     });
 
     if (!resp.ok) {
@@ -80,27 +92,27 @@ const coverSrc = computed(() => {
 
 const formattedAuthors = computed(() => {
   const authors = book.value?.authors ?? [];
-  return authors.length ? authors.map(a => a.name).join(', ') : 'Unknown';
+  return authors.length ? authors.map(a => a.name).join(', ') : '';
 });
 
 const formattedGenres = computed(() => {
   const genres = book.value?.genres ?? [];
-  return genres.length ? genres.map(g => g.name).join(', ') : 'Unknown';
+  return genres.length ? genres.map(g => g.name).join(', ') : '';
 });
 
 const formattedSeries = computed(() => {
-  const series = book.value?.series ?? [];
-  return series.length ? series.map(s => `${s.name} #${s.index}`).join(', ') : 'None';
+    var series = getSeriesString(book.value?.series ?? []);
+    return series.length == 0 ? '' : series;
 });
 
 const formattedNarrators = computed(() => {
   const narrators = book.value?.narrators ?? [];
-  return narrators.length ? narrators.map(n => n.name).join(', ') : 'None';
+  return narrators.length ? narrators.map(n => n.name).join(', ') : '';
 });
 
 const formattedTags = computed(() => {
   const tags = book.value?.tags ?? [];
-  return tags.length ? tags.join(', ') : 'None';
+  return tags.length ? tags.join(', ') : '';
 });
 
 const audioFiles = computed(() => book.value?.files?.audio_files ?? []);

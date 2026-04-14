@@ -47,17 +47,23 @@ func (c Client) AddCategory(categoryType CategoryType, name string) (Category, e
 		(id, name)
 	VALUES
 		(NULL, ?)
+	ON CONFLICT(name)
+		DO NOTHING
 	`, categoryType)
 
-	result, err := c.tx.Exec(query, name)
+	_, err = c.tx.Exec(query, name)
 	if err != nil {
 		return Category{}, err
 	}
 
 	log.Println("Added \"", name, "\" to", categoryType)
 
-	id64, err := result.LastInsertId()
-	id := int(id64)
+	query = fmt.Sprintf(`
+	SELECT id FROM %s WHERE name = ?
+	`, categoryType)
+
+	var id int
+	err = c.tx.QueryRow(query, name).Scan(&id)
 	if err != nil {
 		return Category{}, err
 	}
@@ -197,7 +203,17 @@ func (c Client) GetAllOfCategory(categoryType CategoryType) ([]Category, error) 
 	return categories, nil
 }
 
+// The Type field of the category must not be nil
 func (c Client) associateBookAndCategoryType(bookId string, category Category, rank int) error {
+
+	if category.Id == nil {
+		cat, err := c.AddCategory(category.Type, category.Name)
+		if err != nil {
+			return err
+		}
+		cat.Index = category.Index
+		category = cat
+	}
 
 	insertLine := ""
 	var args []any

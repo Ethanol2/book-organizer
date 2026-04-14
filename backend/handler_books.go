@@ -2,7 +2,6 @@ package main
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"log"
 	"net/http"
@@ -101,10 +100,11 @@ func (cfg *apiConfig) handlerPostBook(w http.ResponseWriter, r *http.Request) {
 
 	book, err := cfg.db.AddBook(bookParams)
 	if err != nil {
-
-		if errors.Is(err, sqlite3.ErrConstraintUnique) {
-			respondWithError(w, http.StatusBadRequest, "Books can't share ISBN or ASIN numbers to prevent duplicates", err)
-			return
+		if sqliteErr, ok := err.(sqlite3.Error); ok {
+			if sqliteErr.ExtendedCode == sqlite3.ErrConstraintUnique {
+				respondWithError(w, http.StatusBadRequest, "Books can't share ISBN or ASIN numbers to prevent duplicates", err)
+				return
+			}
 		}
 
 		respondWithError(w, http.StatusInternalServerError, "Couldn't add book to db", err)

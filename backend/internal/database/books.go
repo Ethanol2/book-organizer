@@ -107,24 +107,7 @@ func (c Client) AddBook(params BookParams) (Book, error) {
 		log.Println("Associating", catType)
 
 		for i, cat := range cats {
-
-			if cat.Id == nil {
-				result, err := c.GetCategoryByValue(catType, cat.Name)
-
-				if err != nil {
-					return err
-				}
-
-				if result == (Category{}) {
-					result, err = c.AddCategory(catType, cat.Name)
-					if err != nil {
-						return err
-					}
-				}
-				result.Index = cat.Index
-				cat = result
-			}
-
+			cat.Type = catType
 			err := c.associateBookAndCategoryType(id.String(), cat, i)
 			if err != nil {
 				return err
@@ -149,7 +132,6 @@ func (c Client) AddBook(params BookParams) (Book, error) {
 	}
 
 	err = sortCats(Authors, params.Authors)
-
 	if err != nil {
 		return Book{}, err
 	}
@@ -426,7 +408,7 @@ func (c Client) UpdateBook(id uuid.UUID, update BookParams) (Book, error) {
 	}
 
 	if len(setParts) > 0 {
-		query := "UPDATE books SET " + strings.Join(setParts, ", ") + "WHERE id = ?"
+		query := "UPDATE books SET " + strings.Join(setParts, ", ") + " WHERE id = ?"
 		args = append(args, id)
 		_, err := c.tx.Exec(query, args...)
 		if err != nil {
@@ -440,8 +422,12 @@ func (c Client) UpdateBook(id uuid.UUID, update BookParams) (Book, error) {
 		removed := old
 
 		for _, cat := range update {
-			if slices.Contains(old, cat) {
-				index := slices.Index(removed, cat)
+			if slices.ContainsFunc(old, func(c Category) bool {
+				return c.Name == cat.Name && c.Index == cat.Index
+			}) {
+				index := slices.IndexFunc(removed, func(c Category) bool {
+					return c.Name == cat.Name
+				})
 				removed = slices.Delete(removed, index, index+1)
 			} else {
 				cat.Type = catType
@@ -450,6 +436,7 @@ func (c Client) UpdateBook(id uuid.UUID, update BookParams) (Book, error) {
 		}
 
 		for _, cat := range removed {
+			log.Println("Removing", cat.Name)
 			_, err := c.tx.Exec(deleteQuery, id, cat.Id)
 			if err != nil {
 				return err
@@ -457,6 +444,7 @@ func (c Client) UpdateBook(id uuid.UUID, update BookParams) (Book, error) {
 		}
 
 		for i, cat := range new {
+			log.Println("Adding", cat.Name)
 			err := c.associateBookAndCategoryType(idStr, cat, i)
 			if err != nil {
 				return err
@@ -514,7 +502,7 @@ func (c Client) UpdateBook(id uuid.UUID, update BookParams) (Book, error) {
 		return Book{}, err
 	}
 
-	log.Println("Updated book \"", *update.Title, "\" (", id, ")")
+	log.Println("Updated book", id)
 
 	return c.GetBook(id)
 }
