@@ -24,6 +24,7 @@ export type BookParams = {
   year?: number | null
   isbn?: string | null
   publisher?: string | null
+  tags?: string[] | null
 
   series?: Series[] | null
   authors?: Author[] | null

@@ -15,6 +15,7 @@ const authorsInput = ref('')
 const narratorsInput = ref('')
 const seriesInput = ref('')
 const genresInput = ref('')
+const tagsInput = ref('')
 
 interface ModalProps {
   show: boolean
@@ -45,6 +46,7 @@ function resetFormFields() {
   narratorsInput.value = getCategoriesString(params?.narrators ?? [])
   seriesInput.value = getSeriesString(params?.series ?? [])
   genresInput.value = getCategoriesString(params?.genres ?? [])
+  tagsInput.value =  params?.tags ? params.tags.join(', ') : ''
 }
 
 function handleSubmit() {
@@ -63,6 +65,7 @@ function handleSubmit() {
     narrators: getCategoriesArray(narratorsInput.value),
     series: getSeriesArray(seriesInput.value),
     genres: getCategoriesArray(genresInput.value),
+    tags: tagsInput.value ? tagsInput.value.split(',').map(tag => tag.trim()).filter(tag => tag) : null,
   }
 
   if (params.year !== null && Number.isNaN(params.year)) {
@@ -112,6 +115,7 @@ watch(
         <label>Authors (comma-separated): <input v-model="authorsInput" type="text" /></label>
         <label>Narrators (comma-separated): <input v-model="narratorsInput" type="text" /></label>
         <label>Genres (comma-separated): <input v-model="genresInput" type="text" /></label>
+        <label>Tags (comma-separated): <input v-model="tagsInput" type="text" /></label>
         <label>Cover URL: <input v-model="coverInput" type="text" /></label>
 
         <!-- Action buttons -->

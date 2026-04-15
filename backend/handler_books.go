@@ -35,7 +35,7 @@ func (cfg *apiConfig) handlerGetBooks(w http.ResponseWriter, r *http.Request) {
 
 	switch getFullResults {
 	case "full":
-		books, err := cfg.db.GetBooks()
+		books, err := cfg.db.GetBooks(r.URL.Query())
 		if err != nil {
 			respondWithError(w, http.StatusInternalServerError, "Database error", err)
 			return

@@ -93,7 +93,7 @@ function syncRouteQuery() {
             ...(sortOrder.value ? { sortOrder: sortOrder.value } : {}),
             ...(subtitle.value.trim() ? { subtitle: subtitle.value.trim() } : {}),
             ...(description.value.trim() ? { description: description.value.trim() } : {}),
-            ...(year.value.trim() ? { year: year.value.trim() } : {}),
+            ...(year.value.trim() ? { publish_year: year.value.trim() } : {}),
             ...(isbn.value.trim() ? { isbn: isbn.value.trim() } : {}),
             ...(asin.value.trim() ? { asin: asin.value.trim() } : {}),
             ...(publisher.value.trim() ? { publisher: publisher.value.trim() } : {}),
@@ -170,7 +170,7 @@ onMounted(async () => {
                   <button class="toggle-button" type="button" @click="showAdvanced = !showAdvanced">
                       {{ showAdvanced ? 'Hide Advanced' : 'Advanced Search' }}
                   </button>
-                  <button class="reset-button" type="button" @click="resetFilters">Reset</button>
+                  <button class="toggle-button" type="button" @click="resetFilters">Reset</button>
               </div>
 
               <div v-if="showAdvanced" class="advanced-panel">

@@ -26,6 +26,7 @@ function buildEditParams(book: Book): BookParams {
     genres: book.genres,
     narrators: book.narrators,
     cover: book.files?.cover ?? null,
+    tags: book.tags ?? null,
   };
 }
 

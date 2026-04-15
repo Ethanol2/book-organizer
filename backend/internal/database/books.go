@@ -4,7 +4,6 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"log"
 	"path"
 	"slices"
@@ -64,6 +63,8 @@ type BookParams struct {
 	Cover *string `json:"cover"`
 	Key   *string `json:"key"`
 }
+
+var advSearchFields = [...]string{"authors", "narrators", "genres", "series", "publisher", "publish_year", "isbn", "asin", "tags"}
 
 func (c Client) CheckBookExists(id uuid.UUID) (bool, error) {
 	var exists bool
@@ -208,14 +209,14 @@ func (c Client) GetBook(id uuid.UUID) (Book, error) {
 	return book, nil
 }
 
-func (c Client) GetBooks() ([]Book, error) {
+func (c Client) GetBooks(filters map[string][]string) ([]Book, error) {
 
 	c.Begin()
 	defer c.Rollback()
 
 	books := []Book{}
 
-	rows, err := c.tx.Query("SELECT * FROM books")
+	rows, err := c.tx.Query("SELECT * FROM books " + buildSearchQuery(filters))
 	if err != nil {
 		return []Book{}, err
 	}
@@ -287,50 +288,7 @@ func (c Client) GetBooksSummary(filters map[string][]string) ([]BookOverview, er
 	}
 	defer c.Rollback()
 
-	filterQ := ""
-	if search, ok := filters["search"]; ok {
-		filterQ = `
-		WHERE books.title LIKE '%` + search[0] + `%' OR 
-		books.subtitle LIKE '%` + search[0] + `%' OR 
-		books.description LIKE '%` + search[0] + `%'`
-	}
-
-	join := " FROM books"
-	sort := ""
-	if sortType, ok := filters["sortBy"]; ok {
-		order := ""
-		if o, ok := filters["sortOrder"]; ok {
-			order = o[0]
-		}
-
-		switch sortType[0] {
-		case "title", "publisher", "created_at", "publish_year":
-			sort = " ORDER BY " + sortType[0] + " " + order
-
-		default:
-			tables := map[string]string{
-				"author":   "authors",
-				"narrator": "narrators",
-				"series":   "series",
-			}
-
-			join = fmt.Sprintf(
-				` FROM books 
-				JOIN books_%s ON books.id = books_%s.book_id
-				JOIN %s ON books_%s.%s_id = %s.id `,
-
-				tables[sortType[0]],
-				tables[sortType[0]],
-				tables[sortType[0]],
-				tables[sortType[0]],
-				sortType[0],
-				tables[sortType[0]],
-			)
-			sort = " ORDER BY " + tables[sortType[0]] + ".name"
-		}
-	}
-
-	query := "SELECT books.id, books.title, books.subtitle, books.cover" + join + filterQ + sort
+	query := "SELECT books.id, books.title, books.subtitle, books.cover FROM books " + buildSearchQuery(filters)
 	log.Println(query)
 
 	rows, err := c.tx.Query(query)
@@ -442,7 +400,7 @@ func (c Client) UpdateBook(id uuid.UUID, update BookParams) (Book, error) {
 		if err != nil {
 			return Book{}, err
 		}
-		add("tags", tagsJson)
+		add("tags", string(tagsJson))
 	}
 	if update.ISBN != nil {
 		add("isbn", update.ISBN)

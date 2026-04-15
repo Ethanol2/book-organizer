@@ -318,3 +318,18 @@ func CategoryToStrSlice(items []Category) []string {
 
 	return strings
 }
+
+func stringToCategoryType(str string) CategoryType {
+	switch str {
+	case "authors", "author":
+		return Authors
+	case "narrators", "narrator":
+		return Narrators
+	case "genres", "genre":
+		return Genres
+	case "series":
+		return Series
+	default:
+		return NoType
+	}
+}
