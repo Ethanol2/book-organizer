@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log"
 	"path"
 	"slices"
@@ -278,7 +279,7 @@ func (c Client) GetBooks() ([]Book, error) {
 	return books, nil
 }
 
-func (c Client) GetBooksSummary() ([]BookOverview, error) {
+func (c Client) GetBooksSummary(filters map[string][]string) ([]BookOverview, error) {
 
 	err := c.Begin()
 	if err != nil {
@@ -286,7 +287,53 @@ func (c Client) GetBooksSummary() ([]BookOverview, error) {
 	}
 	defer c.Rollback()
 
-	rows, err := c.tx.Query("SELECT id, title, subtitle, cover FROM books")
+	filterQ := ""
+	if search, ok := filters["search"]; ok {
+		filterQ = `
+		WHERE books.title LIKE '%` + search[0] + `%' OR 
+		books.subtitle LIKE '%` + search[0] + `%' OR 
+		books.description LIKE '%` + search[0] + `%'`
+	}
+
+	join := " FROM books"
+	sort := ""
+	if sortType, ok := filters["sortBy"]; ok {
+		order := ""
+		if o, ok := filters["sortOrder"]; ok {
+			order = o[0]
+		}
+
+		switch sortType[0] {
+		case "title", "publisher", "created_at", "publish_year":
+			sort = " ORDER BY " + sortType[0] + " " + order
+
+		default:
+			tables := map[string]string{
+				"author":   "authors",
+				"narrator": "narrators",
+				"series":   "series",
+			}
+
+			join = fmt.Sprintf(
+				` FROM books 
+				JOIN books_%s ON books.id = books_%s.book_id
+				JOIN %s ON books_%s.%s_id = %s.id `,
+
+				tables[sortType[0]],
+				tables[sortType[0]],
+				tables[sortType[0]],
+				tables[sortType[0]],
+				sortType[0],
+				tables[sortType[0]],
+			)
+			sort = " ORDER BY " + tables[sortType[0]] + ".name"
+		}
+	}
+
+	query := "SELECT books.id, books.title, books.subtitle, books.cover" + join + filterQ + sort
+	log.Println(query)
+
+	rows, err := c.tx.Query(query)
 	if err != nil {
 		return []BookOverview{}, err
 	}

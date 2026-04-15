@@ -244,76 +244,94 @@ async function addBook(bookData: BookParams) {
   <section class="add-book">
     <h2>Add Book</h2>
 
-    <div class="search-row">
-      <select v-model="source" aria-label="Metadata source">
-        <option value="open library">Open Library</option>
-        <option value="google books">Google Books</option>
-      </select>
-      <input
-        v-model="title"
-        type="text"
-        placeholder="Enter title"
-        @keyup.enter="searchBooksAndResetPage"
-        aria-label="Book title"
-      />
-      <button type="button" @click="searchBooksAndResetPage" :disabled="loading">Search</button>
-    </div>
-
-    <div class="advanced-toggle">
-      <button type="button" @click="showAdvanced = !showAdvanced">
-        {{ showAdvanced ? 'Hide' : 'Show' }} Advanced Search
-      </button>
-      <button type="button" @click="resetSearch">Reset</button>
-    </div>
-
-    <div v-if="showAdvanced" class="advanced-search">
+    <div class="search-panel">
       <div class="search-row">
+        <select class="search-select" v-model="source" aria-label="Metadata source">
+          <option value="open library">Open Library</option>
+          <option value="google books">Google Books</option>
+        </select>
         <input
-          v-model="author"
+          class="search-input"
+          v-model="title"
           type="text"
-          placeholder="Author"
-          aria-label="Author"
-        @keyup.enter="searchBooksAndResetPage"
+          placeholder="Enter title"
+          @keyup.enter="searchBooksAndResetPage"
+          aria-label="Book title"
         />
-        <input
-          v-model="year"
-          type="text"
-          placeholder="Year"
-          aria-label="Year"
-        @keyup.enter="searchBooksAndResetPage"
-        />
+        <button class="search-button" type="button" @click="searchBooksAndResetPage" :disabled="loading">Search</button>
+        <button class="toggle-button" type="button" @click="showAdvanced = !showAdvanced">
+          {{ showAdvanced ? 'Hide Advanced' : 'Advanced Search' }}
+        </button>
+        <button class="toggle-button" type="button" @click="resetSearch">Reset</button>
       </div>
-      <div class="search-row">
-        <input
-          v-model="publisher"
-          type="text"
-          placeholder="Publisher"
-          aria-label="Publisher"
-        @keyup.enter="searchBooksAndResetPage"
-        />
-        <input
-          v-model="isbn"
-          type="text"
-          placeholder="ISBN"
-          aria-label="ISBN"
-        @keyup.enter="searchBooksAndResetPage"
-        />
-      </div>
-      <div class="search-row">
-        <input
-          v-model="genres"
-          type="text"
-          placeholder="Genres (comma-separated)"
-          aria-label="Genres"
-        @keyup.enter="searchBooksAndResetPage"
-        />
-        <input
-          v-model="languages"
-          type="text"
-          placeholder="Languages (comma-separated)"
-          aria-label="Languages"
-        @keyup.enter="searchBooksAndResetPage"
-        />
+
+      <div v-if="showAdvanced" class="advanced-panel">
+        <label class="search-field">
+          <span>Author</span>
+          <input
+            class="search-input"
+            v-model="author"
+            type="text"
+            placeholder="Author"
+            aria-label="Author"
+            @keyup.enter="searchBooksAndResetPage"
+          />
+        </label>
+        <label class="search-field">
+          <span>Year</span>
+          <input
+            class="search-input"
+            v-model="year"
+            type="text"
+            placeholder="Year"
+            aria-label="Year"
+            @keyup.enter="searchBooksAndResetPage"
+          />
+        </label>
+        <label class="search-field">
+          <span>Publisher</span>
+          <input
+            class="search-input"
+            v-model="publisher"
+            type="text"
+            placeholder="Publisher"
+            aria-label="Publisher"
+            @keyup.enter="searchBooksAndResetPage"
+          />
+        </label>
+        <label class="search-field">
+          <span>ISBN</span>
+          <input
+            class="search-input"
+            v-model="isbn"
+            type="text"
+            placeholder="ISBN"
+            aria-label="ISBN"
+            @keyup.enter="searchBooksAndResetPage"
+          />
+        </label>
+        <label class="search-field">
+          <span>Genres</span>
+          <input
+            class="search-input"
+            v-model="genres"
+            type="text"
+            placeholder="Genres (comma-separated)"
+            aria-label="Genres"
+            @keyup.enter="searchBooksAndResetPage"
+          />
+        </label>
+        <label class="search-field">
+          <span>Languages</span>
+          <input
+            class="search-input"
+            v-model="languages"
+            type="text"
+            placeholder="Languages (comma-separated)"
+            aria-label="Languages"
+            @keyup.enter="searchBooksAndResetPage"
+          />
+        </label>
       </div>
     </div>
 
@@ -364,51 +382,10 @@ async function addBook(bookData: BookParams) {
   box-sizing: border-box;
 }
 
-/* Search controls section */
-.search-row {
+.add-book .search-row {
   display: grid;
-  grid-template-columns: 180px 1fr auto;
+  grid-template-columns: minmax(150px, 190px) minmax(280px, 1fr) auto auto auto;
   gap: 0.7rem;
-  margin-bottom: 0.8rem;
-}
-
-.search-row select,
-.search-row input,
-.search-row button {
-  padding: 0.65rem;
-  border: 1px solid #ccc;
-  border-radius: 6px;
-  font-size: 0.95rem;
-}
-
-.search-row button {
-  min-width: 120px;
-}
-
-/* Advanced search toggle button */
-.advanced-toggle {
-  margin-bottom: 0.8rem;
-}
-
-.advanced-toggle button {
-  padding: 0.5rem 1rem;
-  border: 1px solid #ccc;
-  border-radius: 6px;
-  background: #f9f9f9;
-  cursor: pointer;
-}
-
-.advanced-toggle button:hover {
-  background: #e9e9e9;
-}
-
-/* Advanced search fields - two columns */
-.advanced-search .search-row {
-  grid-template-columns: 1fr 1fr;
-  margin-bottom: 0.5rem;
-}
-
-.advanced-search .search-row:last-child {
   margin-bottom: 0.8rem;
 }
 
@@ -483,27 +460,8 @@ async function addBook(bookData: BookParams) {
     padding: 0.5rem;
   }
 
-  .search-row {
-    margin-bottom: 0.4rem;
-  }
-
-  .advanced-toggle {
-    margin-bottom: 0.4rem;
-  }
-
   .results {
     gap: 0.4rem;
-  }
-}
-
-/* Responsive design for smaller screens */
-@media (max-width: 600px) {
-  .search-row {
-    grid-template-columns: 1fr;
-  }
-
-  .advanced-search .search-row {
-    grid-template-columns: 1fr;
   }
 }
 </style>

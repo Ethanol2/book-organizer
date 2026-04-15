@@ -34,7 +34,6 @@ func (cfg *apiConfig) handlerGetBooks(w http.ResponseWriter, r *http.Request) {
 	getFullResults := r.URL.Query().Get("view")
 
 	switch getFullResults {
-
 	case "full":
 		books, err := cfg.db.GetBooks()
 		if err != nil {
@@ -52,7 +51,7 @@ func (cfg *apiConfig) handlerGetBooks(w http.ResponseWriter, r *http.Request) {
 
 	case "":
 	case "summary":
-		books, err := cfg.db.GetBooksSummary()
+		books, err := cfg.db.GetBooksSummary(r.URL.Query())
 		if err != nil {
 			respondWithError(w, http.StatusInternalServerError, "Database error", err)
 			return
