@@ -64,8 +64,6 @@ type BookParams struct {
 	Key   *string `json:"key"`
 }
 
-var advSearchFields = [...]string{"authors", "narrators", "genres", "series", "publisher", "publish_year", "isbn", "asin", "tags"}
-
 func (c Client) CheckBookExists(id uuid.UUID) (bool, error) {
 	var exists bool
 	err := c.db.QueryRow("SELECT EXISTS(SELECT 1 FROM books WHERE id = ?)", id).Scan(&exists)
@@ -216,8 +214,10 @@ func (c Client) GetBooks(filters map[string][]string) ([]Book, error) {
 
 	books := []Book{}
 
-	rows, err := c.tx.Query("SELECT * FROM books " + buildSearchQuery(filters))
+	query := "SELECT * FROM books " + buildSearchQuery(filters)
+	rows, err := c.tx.Query(query)
 	if err != nil {
+		log.Println("Query:\n", query)
 		return []Book{}, err
 	}
 
@@ -289,10 +289,10 @@ func (c Client) GetBooksSummary(filters map[string][]string) ([]BookOverview, er
 	defer c.Rollback()
 
 	query := "SELECT books.id, books.title, books.subtitle, books.cover FROM books " + buildSearchQuery(filters)
-	log.Println(query)
 
 	rows, err := c.tx.Query(query)
 	if err != nil {
+		log.Println("Query:\n", query)
 		return []BookOverview{}, err
 	}
 
@@ -555,6 +555,24 @@ func (c Client) GetPrimaryAuthorAndSeries(id uuid.UUID) (string, string, error) 
 	}
 
 	return authorDir, seriesDir, nil
+}
+
+func (c Client) DeleteBook(id uuid.UUID) error {
+
+	c.Begin()
+	defer c.Rollback()
+
+	_, err := c.tx.Exec("DELETE FROM books WHERE id = ?", id)
+	if err != nil {
+		return err
+	}
+
+	err = c.Commit()
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 // #region Book Methods

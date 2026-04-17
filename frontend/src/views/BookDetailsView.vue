@@ -1,16 +1,18 @@
 <script setup lang="ts">
 import { getSeriesString, type Book, type BookParams } from '@/types/book';
 import { computed, onMounted, ref } from 'vue';
-import { RouterLink, useRoute } from 'vue-router';
+import { RouterLink, useRoute, useRouter } from 'vue-router';
 import AddBookModal from '@/components/AddBookModal.vue';
 import { useNotificationsStore } from '@/stores/notifications';
 
 const route = useRoute();
+const router = useRouter();
 const book = ref<Book | null>(null);
 const loading = ref(true);
 const error = ref<string | null>(null);
 const showEditModal = ref(false);
 const editParams = ref<BookParams | null>(null);
+const deleting = ref(false);
 const notifications = useNotificationsStore();
 
 function buildEditParams(book: Book): BookParams {
@@ -81,6 +83,38 @@ async function submitEdit(newData: BookParams) {
   } catch (err) {
     console.error('Update book error:', err);
     notifications.notifyError('Failed to update book: ' + (err instanceof Error ? err.message : String(err)));
+  }
+}
+
+async function deleteBook(payload: { deleteFiles: boolean }) {
+  if (!book.value || deleting.value) {
+    return;
+  }
+
+  deleting.value = true;
+
+  try {
+    const resp = await fetch(`/api/books/${book.value.id}`, {
+      method: 'DELETE',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ deleteFiles: payload.deleteFiles }),
+    });
+
+    if (!resp.ok) {
+      const body = await resp.text();
+      throw new Error(`${resp.status} ${resp.statusText}: ${body}`);
+    }
+
+    closeEditModal();
+    notifications.notifySuccess('Book deleted successfully!');
+    await router.push('/');
+  } catch (err) {
+    console.error('Delete book error:', err);
+    notifications.notifyError('Failed to delete book: ' + (err instanceof Error ? err.message : String(err)));
+  } finally {
+    deleting.value = false;
   }
 }
 
@@ -268,8 +302,10 @@ onMounted(async () => {
     <AddBookModal
       :show="showEditModal"
       :params="editParams"
+      :showDeleteButton="true"
       @close="closeEditModal"
       @add-book="submitEdit"
+      @delete-book="deleteBook"
     />
   </div>
 </template>

@@ -16,21 +16,32 @@ const narratorsInput = ref('')
 const seriesInput = ref('')
 const genresInput = ref('')
 const tagsInput = ref('')
+const showDeleteConfirm = ref(false)
+const deleteBookText = ref('Delete Book')
+const deleteFiles = ref(true)
 
 interface ModalProps {
   show: boolean
   params: BookParams | null
+  showDeleteButton?: boolean
 }
 
 const props = withDefaults(defineProps<ModalProps>(), {
   show: false,
   params: null,
+  showDeleteButton: false,
 })
 
 const emit = defineEmits<{
   close: []
   'add-book': [BookParams]
+  'delete-book': [{ deleteFiles: boolean }]
 }>()
+
+function resetConfirmState() {
+  showDeleteConfirm.value = false
+  deleteFiles.value = true
+}
 
 function resetFormFields() {
   const params = props.params
@@ -47,6 +58,7 @@ function resetFormFields() {
   seriesInput.value = getSeriesString(params?.series ?? [])
   genresInput.value = getCategoriesString(params?.genres ?? [])
   tagsInput.value =  params?.tags ? params.tags.join(', ') : ''
+  resetConfirmState()
 }
 
 function handleSubmit() {
@@ -76,7 +88,22 @@ function handleSubmit() {
 }
 
 function handleOverlayClick() {
+  resetConfirmState()
   emit('close')
+}
+
+function handleDeleteClick() {
+  showDeleteConfirm.value = !showDeleteConfirm.value
+  deleteBookText.value = showDeleteConfirm.value ? 'Nevermind' : 'Delete Book'
+}
+
+function handleCancelDelete() {
+  resetConfirmState()
+}
+
+function confirmDelete() {
+  emit('delete-book', { deleteFiles: deleteFiles.value })
+  resetConfirmState()
 }
 
 function handleModalClick(e: Event) {
@@ -123,6 +150,22 @@ watch(
           <button type="button" @click="handleOverlayClick">Cancel</button>
           <button type="submit">{{ submitLabel }}</button>
         </div>
+
+        <div v-if="props.params && props.showDeleteButton" class="modal-delete-wrap">
+          <button type="button" class="delete-book-button" @click="handleDeleteClick">{{ deleteBookText }}</button>
+
+          <div v-if="showDeleteConfirm" class="delete-confirmation">
+            <div class="delete-confirmation-row">
+              <p class="delete-confirmation-copy">Are you sure you want to delete this book?</p>
+              <button type="button" class="confirm-delete-button" @click="confirmDelete">Delete</button>
+            </div>
+            <label class="delete-files-checkbox">
+              <input type="checkbox" v-model="deleteFiles" />
+              Also delete book files
+            </label>
+          </div>
+        </div>
+
       </form>
     </div>
   </div>
@@ -214,5 +257,88 @@ watch(
 
 .modal-buttons button[type="submit"]:hover {
   background: #45a049;
+}
+
+.modal-delete-wrap {
+  margin-top: 1rem;
+  border-top: 1px solid #ddd;
+  padding-top: 1rem;
+}
+
+.delete-book-button {
+  padding: 0.5rem 1rem;
+  border: 1px solid #d43f3a;
+  border-radius: 4px;
+  background: #d9534f;
+  color: white;
+  cursor: pointer;
+  font-size: 0.95rem;
+  transition: background-color 0.2s;
+}
+
+.delete-book-button:hover {
+  background: #c9302c;
+}
+
+.delete-confirmation {
+  margin-top: 1rem;
+  padding: 1rem;
+  background: #fff4f5;
+  border: 1px solid #f5c2c7;
+  border-radius: 6px;
+}
+
+.delete-confirmation-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.delete-confirmation-copy {
+  margin: 0;
+  color: #842029;
+  font-weight: 600;
+  text-align: left;
+  flex: 1;
+}
+
+.delete-files-checkbox {
+  display: inline-flex;
+  align-items: center;
+  gap: 1rem;
+  font-weight: 500;
+  margin-top: 1rem;
+}
+
+.delete-files-checkbox input[type="checkbox"] {
+  width: auto;
+  margin: 0;
+  flex-shrink: 0;
+}
+
+.delete-book-button,
+.confirm-delete-button {
+  padding: 0.5rem 1rem;
+  border-radius: 4px;
+  color: white;
+  cursor: pointer;
+  font-size: 0.95rem;
+  transition: background-color 0.2s;
+}
+
+.delete-book-button {
+  border: 1px solid #d43f3a;
+  background: #d9534f;
+}
+
+.delete-book-button:hover,
+.confirm-delete-button:hover {
+  background: #c9302c;
+}
+
+.confirm-delete-button {
+  border: 1px solid #d43f3a;
+  background: #d9534f;
 }
 </style>

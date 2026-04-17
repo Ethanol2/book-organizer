@@ -322,7 +322,13 @@ func (c *Client) Commit() error {
 }
 
 func buildSearchQuery(filters map[string][]string) string {
-	joinList := []CategoryType{}
+	var advSearchFields = [...]string{"authors", "narrators", "genres", "series", "publisher", "publish_year", "isbn", "asin", "tags"}
+	joinList := map[CategoryType]bool{
+		Authors:   false,
+		Genres:    false,
+		Narrators: false,
+		Series:    false,
+	}
 
 	hasFilter := false
 	filter := ""
@@ -350,7 +356,7 @@ func buildSearchQuery(filters map[string][]string) string {
 			} else {
 				// Field is attached via joining table
 
-				joinList = append(joinList, cat)
+				joinList[cat] = true
 				advFilter = append(advFilter, string(cat)+".name IN ('"+strings.ReplaceAll(terms[0], ",", "','")+"')")
 			}
 		}
@@ -373,24 +379,25 @@ func buildSearchQuery(filters map[string][]string) string {
 
 		default:
 			cat := stringToCategoryType(sortType[0])
-			joinList = append(joinList, cat)
-
+			joinList[cat] = true
 			sort = " ORDER BY " + string(cat) + ".name"
 		}
 	}
 
 	join := ""
-	for _, cat := range joinList {
-		join += fmt.Sprintf(
-			`JOIN books_%s ON books.id = books_%s.book_id JOIN %s ON books_%s.%s_id = %s.id `,
+	for cat, ok := range joinList {
+		if ok {
+			join += fmt.Sprintf(
+				`JOIN books_%s ON books.id = books_%s.book_id JOIN %s ON books_%s.%s_id = %s.id `,
 
-			string(cat),
-			string(cat),
-			string(cat),
-			string(cat),
-			categorySingular[cat],
-			string(cat),
-		)
+				string(cat),
+				string(cat),
+				string(cat),
+				string(cat),
+				categorySingular[cat],
+				string(cat),
+			)
+		}
 	}
 
 	return join + filter + strings.Join(advFilter, " AND ") + sort

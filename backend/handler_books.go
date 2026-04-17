@@ -22,6 +22,11 @@ func (cfg *apiConfig) handlerGetBook(id uuid.UUID, w http.ResponseWriter, r *htt
 		return
 	}
 
+	if book.Id == nil {
+		w.WriteHeader(http.StatusNotFound)
+		return
+	}
+
 	book.Files.Prepend(cfg.libraryName)
 
 	log.Println("Fetching \"", book.Title, "\" book details")
@@ -227,4 +232,25 @@ func (cfg *apiConfig) handlerGetBookCover(id uuid.UUID, w http.ResponseWriter, r
 	log.Println("Serving book cover from", coverPath)
 
 	http.ServeFile(w, r, coverPath)
+}
+
+func (cfg *apiConfig) handlerDeleteBook(id uuid.UUID, w http.ResponseWriter, r *http.Request) {
+
+	exists, err := cfg.db.CheckBookExists(id)
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Something went wrong while querying the database", err)
+		return
+	}
+
+	if !exists {
+		w.WriteHeader(http.StatusNotFound)
+		return
+	}
+
+	err = cfg.db.DeleteBook(id)
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Failed to delete book from database", err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
 }
