@@ -2,7 +2,6 @@ package main
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"log"
 	"net/http"
@@ -23,6 +22,11 @@ func (cfg *apiConfig) handlerGetBook(id uuid.UUID, w http.ResponseWriter, r *htt
 		return
 	}
 
+	if book.Id == nil {
+		w.WriteHeader(http.StatusNotFound)
+		return
+	}
+
 	book.Files.Prepend(cfg.libraryName)
 
 	log.Println("Fetching \"", book.Title, "\" book details")
@@ -35,9 +39,8 @@ func (cfg *apiConfig) handlerGetBooks(w http.ResponseWriter, r *http.Request) {
 	getFullResults := r.URL.Query().Get("view")
 
 	switch getFullResults {
-
 	case "full":
-		books, err := cfg.db.GetBooks()
+		books, err := cfg.db.GetBooks(r.URL.Query())
 		if err != nil {
 			respondWithError(w, http.StatusInternalServerError, "Database error", err)
 			return
@@ -53,7 +56,7 @@ func (cfg *apiConfig) handlerGetBooks(w http.ResponseWriter, r *http.Request) {
 
 	case "":
 	case "summary":
-		books, err := cfg.db.GetBooksSummary()
+		books, err := cfg.db.GetBooksSummary(r.URL.Query())
 		if err != nil {
 			respondWithError(w, http.StatusInternalServerError, "Database error", err)
 			return
@@ -101,10 +104,11 @@ func (cfg *apiConfig) handlerPostBook(w http.ResponseWriter, r *http.Request) {
 
 	book, err := cfg.db.AddBook(bookParams)
 	if err != nil {
-
-		if errors.Is(err, sqlite3.ErrConstraintUnique) {
-			respondWithError(w, http.StatusBadRequest, "Books can't share ISBN or ASIN numbers to prevent duplicates", err)
-			return
+		if sqliteErr, ok := err.(sqlite3.Error); ok {
+			if sqliteErr.ExtendedCode == sqlite3.ErrConstraintUnique {
+				respondWithError(w, http.StatusBadRequest, "Books can't share ISBN or ASIN numbers to prevent duplicates", err)
+				return
+			}
 		}
 
 		respondWithError(w, http.StatusInternalServerError, "Couldn't add book to db", err)
@@ -228,4 +232,25 @@ func (cfg *apiConfig) handlerGetBookCover(id uuid.UUID, w http.ResponseWriter, r
 	log.Println("Serving book cover from", coverPath)
 
 	http.ServeFile(w, r, coverPath)
+}
+
+func (cfg *apiConfig) handlerDeleteBook(id uuid.UUID, w http.ResponseWriter, r *http.Request) {
+
+	exists, err := cfg.db.CheckBookExists(id)
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Something went wrong while querying the database", err)
+		return
+	}
+
+	if !exists {
+		w.WriteHeader(http.StatusNotFound)
+		return
+	}
+
+	err = cfg.db.DeleteBook(id)
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Failed to delete book from database", err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
 }

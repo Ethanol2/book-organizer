@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"strings"
 )
 
 type Client struct {
@@ -318,4 +319,86 @@ func (c *Client) Commit() error {
 	}
 	c.tx = nil
 	return nil
+}
+
+func buildSearchQuery(filters map[string][]string) string {
+	var advSearchFields = [...]string{"authors", "narrators", "genres", "series", "publisher", "publish_year", "isbn", "asin", "tags"}
+	joinList := map[CategoryType]bool{
+		Authors:   false,
+		Genres:    false,
+		Narrators: false,
+		Series:    false,
+	}
+
+	hasFilter := false
+	filter := ""
+	if search, ok := filters["search"]; ok {
+		hasFilter = true
+		filter += `
+		(books.title LIKE '%` + search[0] + `%' OR 
+		books.subtitle LIKE '%` + search[0] + `%' OR 
+		books.description LIKE '%` + search[0] + `%') `
+	}
+
+	advFilter := []string{}
+	for _, field := range advSearchFields {
+		if terms, ok := filters[field]; ok {
+			hasFilter = true
+
+			if cat := stringToCategoryType(field); cat == NoType {
+				// Field is a part of the books table
+
+				split := strings.Split(terms[0], ",")
+				for _, term := range split {
+					term = strings.TrimSpace(term)
+					advFilter = append(advFilter, `books.`+field+` LIKE "%`+term+`%" `)
+				}
+			} else {
+				// Field is attached via joining table
+
+				joinList[cat] = true
+				advFilter = append(advFilter, string(cat)+".name IN ('"+strings.ReplaceAll(terms[0], ",", "','")+"')")
+			}
+		}
+	}
+
+	if hasFilter {
+		filter = "WHERE " + filter
+	}
+
+	sort := ""
+	if sortType, ok := filters["sortBy"]; ok {
+		order := ""
+		if o, ok := filters["sortOrder"]; ok {
+			order = o[0]
+		}
+
+		switch sortType[0] {
+		case "title", "publisher", "created_at", "publish_year":
+			sort = " ORDER BY " + sortType[0] + " " + order
+
+		default:
+			cat := stringToCategoryType(sortType[0])
+			joinList[cat] = true
+			sort = " ORDER BY " + string(cat) + ".name"
+		}
+	}
+
+	join := ""
+	for cat, ok := range joinList {
+		if ok {
+			join += fmt.Sprintf(
+				`JOIN books_%s ON books.id = books_%s.book_id JOIN %s ON books_%s.%s_id = %s.id `,
+
+				string(cat),
+				string(cat),
+				string(cat),
+				string(cat),
+				categorySingular[cat],
+				string(cat),
+			)
+		}
+	}
+
+	return join + filter + strings.Join(advFilter, " AND ") + sort
 }

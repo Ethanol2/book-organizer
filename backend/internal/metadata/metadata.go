@@ -3,6 +3,7 @@ package metadata
 import (
 	"fmt"
 	"regexp"
+	"strings"
 
 	"github.com/Ethanol2/book-organizer/internal/database"
 )
@@ -73,6 +74,9 @@ func MetadataFileFromBook(book database.Book) MetadataFile {
 }
 
 func stripTags(s string) string {
+
+	s = strings.ReplaceAll(s, "<br>", "\n")
+
 	// Regular expression to match any content within brackets
 	re := regexp.MustCompile(`<.*?>`)
 	return re.ReplaceAllString(s, "")

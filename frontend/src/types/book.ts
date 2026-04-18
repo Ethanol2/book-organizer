@@ -24,6 +24,7 @@ export type BookParams = {
   year?: number | null
   isbn?: string | null
   publisher?: string | null
+  tags?: string[] | null
 
   series?: Series[] | null
   authors?: Author[] | null
@@ -99,7 +100,7 @@ export function getSeriesString(series: Series[]): string {
         return ''
     }
 
-    return series.map(s => `${s.name} #${s.index}`).join(', ')
+    return series.map(s => `${s.name}` + (s.index ? ` #${s.index}` : '')).join(', ')
 }
 export function getSeriesArray(series: string): Series[] {
     if (series.trim() === "") {
