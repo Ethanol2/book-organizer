@@ -4,6 +4,9 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"log"
+	"os"
+	"path"
 	"strings"
 )
 
@@ -164,7 +167,7 @@ func (c Client) generateJoiningTable(type1, type1Table, type2, type2Table string
 	return err
 }
 
-func (c Client) InsertTestData() error {
+func (c Client) InsertTestData(metadataPath string, downloadTempFile func(string) (*os.File, error), moveFiles func(string, string) error) error {
 
 	c.Begin()
 	defer c.Rollback()
@@ -223,64 +226,45 @@ func (c Client) InsertTestData() error {
 		return err
 	}
 
-	// 1. The Martian by Andy Weir
-	theMartianJson := `
-	{
-		"title": "The Martian",
-		"description": "Six days ago, astronaut Mark Watney became one of the first people to walk on Mars. Now, he's sure he'll be the first person to die there.",
-		"year": 2011,
-		"isbn": "9780553418026",
-		"asin": "B00EMXBDMA",
-		"tags": ["Sci-Fi", "Survival", "Hard Science Fiction"],
-		"publisher": "Crown",
-		"series": [],
-		"authors": [{"name": "Andy Weir"}],
-		"genres": [{"name": "Science Fiction"}],
-		"narrators": [{"name": "R.C. Bray"}],
-		"cover": "https://ia800505.us.archive.org/view_archive.php?archive=/35/items/l_covers_0014/l_covers_0014_64.zip&file=0014641755-L.jpg"
-	  }	  
-	`
-	var theMartian BookParams
-	err = json.Unmarshal([]byte(theMartianJson), &theMartian)
+	var testBooks []BookParams
+	err = json.Unmarshal([]byte(testData), &testBooks)
 	if err != nil {
 		return err
 	}
 
-	// 2. The Primal Hunter by Zogarth
-	thePrimalHunterJson := `
-	{
-		"title": "The Primal Hunter",
-		"description": "A world changed. An ancient system awakened. Jake, a corporate drone, finds himself in a tutorial that will change his life forever.",
-		"year": 2022,
-		"isbn": "9798834943709",
-		"asin": "B09MV5TTSM",
-		"tags": ["LitRPG", "Progression Fantasy", "Action"],
-		"publisher": "Aethon Books",
-		"series": [
-		  {
-			"name": "The Primal Hunter",
-			"index": "1"
-		  }
-		],
-		"authors": [{"name": "Zogarth"}],
-		"genres": [{"name": "Fantasy"}, {"name": "LitRPG"}],
-		"narrators": [{"name": "Travis Baldree"}]
-	  }	  
-	`
-	var thePrimalHunter BookParams
-	err = json.Unmarshal([]byte(thePrimalHunterJson), &thePrimalHunter)
-	if err != nil {
-		return err
-	}
+	for _, bookParams := range testBooks {
+		book, err := c.AddBook(bookParams)
+		if err != nil {
+			return err
+		}
 
-	_, err = c.AddBook(theMartian)
-	if err != nil {
-		return err
-	}
+		cover := ""
+		hasCover := false
+		if bookParams.Cover != nil {
+			hasCover = true
+			cover = *bookParams.Cover
+		} else if bookParams.ISBN != nil {
+			hasCover = true
+			cover = fmt.Sprintf("https://covers.openlibrary.org/b/isbn/%s-L.jpg", *bookParams.ISBN)
+		}
 
-	_, err = c.AddBook(thePrimalHunter)
-	if err != nil {
-		return err
+		if hasCover {
+			var coverFile *os.File
+			coverFile, err = downloadTempFile(cover)
+			if err != nil {
+				log.Println(err)
+				log.Print("\nFailed to get cover for \"", book.Title, "\" => ", cover, "\n\n")
+				continue
+			}
+
+			err = moveFiles(coverFile.Name(), path.Join(metadataPath, book.Id.String()+path.Ext(coverFile.Name())))
+			if err != nil {
+				log.Println(err)
+				log.Print("\nFailed to save cover for \"", book.Title, "\"\n\n")
+			}
+
+			coverFile.Close()
+		}
 	}
 
 	fmt.Print("\n======= Finished Inserting Test Data =======\n\n")

@@ -73,13 +73,13 @@ func (cfg *apiConfig) handlerAssociateDownloadToBook(downloadId uuid.UUID, w htt
 		return
 	}
 
-	authorDir, seriesDir, err := cfg.db.GetPrimaryAuthorAndSeries(bookIdStruct.BookId)
+	authorDir, seriesDir, bookDir, err := cfg.db.GetPathComponents(bookIdStruct.BookId)
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, "Database error", err)
 		return
 	}
 
-	oldPath, newPath, err := fileManagement.MoveFiles(downloadDir, cfg.downloadsPath, cfg.libraryPath, authorDir, seriesDir)
+	oldPath, newPath, err := fileManagement.MoveFiles(downloadDir, cfg.downloadsPath, bookDir, cfg.libraryPath, authorDir, seriesDir)
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, "Something went wrong moving files", err)
 		return

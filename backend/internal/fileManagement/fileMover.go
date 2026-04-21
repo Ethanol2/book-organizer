@@ -5,7 +5,7 @@ import (
 	"path"
 )
 
-func MoveFiles(targetDir, oldDir, newDir, author, series string) (string, string, error) {
+func MoveFiles(oldDirName, oldDir, newDirName, newDir, author, series string) (string, string, error) {
 
 	authorDir := path.Join(newDir, author)
 	if _, err := os.Stat(authorDir); os.IsNotExist(err) {
@@ -25,8 +25,8 @@ func MoveFiles(targetDir, oldDir, newDir, author, series string) (string, string
 		}
 	}
 
-	oldPath := path.Join(oldDir, targetDir)
-	newPath := path.Join(seriesDir, targetDir)
+	oldPath := path.Join(oldDir, oldDirName)
+	newPath := path.Join(seriesDir, newDirName)
 
 	err := os.Rename(oldPath, newPath)
 	if err != nil {

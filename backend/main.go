@@ -156,8 +156,10 @@ func initConfig(dbReset, insertTestData bool) (*apiConfig, error) {
 		log.Println("no google books api key in env variables. Google books search won't work")
 	}
 
+	metadataPath := "./data/metadata"
+
 	if insertTestData {
-		err = db.InsertTestData()
+		err = db.InsertTestData(metadataPath, fileManagement.DownloadTempFile, fileManagement.MoveFilesWithPaths)
 		if err != nil {
 			return nil, err
 		}
@@ -171,7 +173,7 @@ func initConfig(dbReset, insertTestData bool) (*apiConfig, error) {
 		downloadsName:     "/media/downloads",
 		libraryPath:       lPath,
 		libraryName:       "/media/library",
-		metadataPath:      "./data/metadata",
+		metadataPath:      metadataPath,
 		port:              port,
 		googleBooksApiKey: gbApiKey,
 	}, nil

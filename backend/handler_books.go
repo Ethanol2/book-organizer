@@ -221,7 +221,7 @@ func (cfg *apiConfig) handlerGetBookCover(id uuid.UUID, w http.ResponseWriter, r
 	if book.Files.Root == nil {
 		coverPath = path.Join(cfg.metadataPath, *book.Files.Cover)
 	} else {
-		author, series, err := cfg.db.GetPrimaryAuthorAndSeries(id)
+		author, series, _, err := cfg.db.GetPathComponents(id)
 		if err != nil {
 			respondWithError(w, http.StatusInternalServerError, "Database error", err)
 			return

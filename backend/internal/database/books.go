@@ -535,11 +535,12 @@ func (c Client) UpdateBookCover(id uuid.UUID, ext string) (string, string, error
 	return *cover, newCover, nil
 }
 
-func (c Client) GetPrimaryAuthorAndSeries(id uuid.UUID) (string, string, error) {
+// Author -> Series -> Book Title
+func (c Client) GetPathComponents(id uuid.UUID) (string, string, string, error) {
 	authorDir := "Unknown"
 	authors, err := c.GetCategoryTypesAssociatedWithBook(id.String(), Authors)
 	if err != nil {
-		return "", "", err
+		return "", "", "", err
 	}
 	if len(authors) > 0 {
 		authorDir = authors[0].Name
@@ -548,13 +549,19 @@ func (c Client) GetPrimaryAuthorAndSeries(id uuid.UUID) (string, string, error) 
 	seriesDir := ""
 	series, err := c.GetCategoryTypesAssociatedWithBook(id.String(), Series)
 	if err != nil {
-		return "", "", err
+		return "", "", "", err
 	}
 	if len(series) > 0 {
 		seriesDir = series[0].Name
 	}
 
-	return authorDir, seriesDir, nil
+	title := ""
+	err = c.db.QueryRow("SELECT title FROM books WHERE id = ?", id).Scan(&title)
+	if err != nil {
+		return "", "", "", err
+	}
+
+	return authorDir, seriesDir, title, nil
 }
 
 func (c Client) DeleteBook(id uuid.UUID) error {
