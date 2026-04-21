@@ -4,6 +4,7 @@ import { computed, onMounted, ref } from 'vue';
 import { RouterLink, useRoute, useRouter } from 'vue-router';
 import AddBookModal from '@/components/AddBookModal.vue';
 import { useNotificationsStore } from '@/stores/notifications';
+import {basename} from '@/types/download';
 
 const route = useRoute();
 const router = useRouter();
@@ -284,14 +285,14 @@ onMounted(async () => {
           <div class="file-list-group" v-if="audioFiles.length">
             <h3>Audio file names</h3>
             <ul class="file-list">
-              <li v-for="path in audioFiles" :key="path">{{ path }}</li>
+              <li v-for="filePath in audioFiles" :key="filePath">{{ basename(filePath) }}</li>
             </ul>
           </div>
 
           <div class="file-list-group" v-if="textFiles.length">
             <h3>Text file names</h3>
             <ul class="file-list">
-              <li v-for="path in textFiles" :key="path">{{ path }}</li>
+              <li v-for="filePath in textFiles" :key="filePath">{{ basename(filePath) }}</li>
             </ul>
           </div>
         </section>

@@ -33,3 +33,7 @@ export function getTimeAdded(download: Download): string {
 
     return `Added ${hours == 0 ? "" : Math.round(hours) + " hours"} ${min == 0 ? "" : Math.round(min) + " minutes"} ago`
 }
+
+export function basename(filePath: string): string {
+  return filePath.split(/[\\/]/).pop() || '';
+}
