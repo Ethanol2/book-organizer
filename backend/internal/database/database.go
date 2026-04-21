@@ -346,7 +346,21 @@ func buildSearchQuery(filters map[string][]string) string {
 		}
 	}
 
+	if files, ok := filters["files"]; ok {
+		switch files[0] {
+		case "with_files":
+			hasFilter = true
+			advFilter = append(advFilter, "directory IS NOT NULL")
+		case "without_files":
+			hasFilter = true
+			advFilter = append(advFilter, "directory IS NULL")
+		}
+	}
+
 	if hasFilter {
+		if len(advFilter) > 0 && filter != "" {
+			filter += " AND "
+		}
 		filter = "WHERE " + filter
 	}
 

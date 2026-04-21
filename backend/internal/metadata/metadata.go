@@ -84,7 +84,7 @@ func MetadataFileFromBook(book database.Book) MetadataFile {
 	md.Narrators = database.CategoryToStrSlice(book.Narrators)
 	md.Series = database.CategoryToStrSlice(book.Series)
 	md.Genres = database.CategoryToStrSlice(book.Genres)
-	md.PublishedYear = fmt.Sprint(book.Year)
+	md.PublishedYear = fmt.Sprint(*book.Year)
 	md.Publisher = pub
 	md.Description = desc
 	md.Isbn = isbn

@@ -68,6 +68,7 @@ const performSearch = async () => {
   try {
     const params = new URLSearchParams();
     params.append('view', 'summary');
+    params.append('files', 'without_files');
     if (searchQuery.value.trim()) {
       params.append('search', searchQuery.value.trim());
     }

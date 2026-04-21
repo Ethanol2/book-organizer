@@ -51,18 +51,37 @@ func (files *BookFiles) Prepend(p string) {
 		return &items
 	}
 
+	files.applyModifier(prepend)
+}
+
+func (files *BookFiles) ReplaceDirectory(dir string) {
+
+	replace := func(items []string) *[]string {
+		for i := range items {
+			fileName := path.Base(items[i])
+			items[i] = path.Join(dir, fileName)
+		}
+		return &items
+	}
+
+	files.applyModifier(replace)
+}
+
+func (files *BookFiles) applyModifier(mod func([]string) *[]string) {
 	if files.AudioFiles != nil {
-		files.AudioFiles = prepend(*files.AudioFiles)
+		files.AudioFiles = mod(*files.AudioFiles)
 	}
 	if files.TextFiles != nil {
-		files.TextFiles = prepend(*files.TextFiles)
+		files.TextFiles = mod(*files.TextFiles)
 	}
 	if files.Cover != nil {
-		cover := path.Join(p, *files.Cover)
+		arr := []string{*files.Cover}
+		cover := (*mod(arr))[0]
 		files.Cover = &cover
 	}
 	if files.Root != nil {
-		root := path.Join(p, *files.Root)
+		arr := []string{*files.Root}
+		root := (*mod(arr))[0]
 		files.Root = &root
 	}
 }

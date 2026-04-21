@@ -22,6 +22,7 @@ const tags = ref('');
 const genres = ref('');
 const authors = ref('');
 const narrators = ref('');
+const files = ref(null);
 const showAdvanced = ref(false);
 
 function normalizeQueryValue(value: LocationQueryValue | LocationQueryValue[] | undefined): string {
@@ -80,6 +81,7 @@ function buildQueryString() {
     if (genres.value.trim()) params.append('genres', genres.value.trim());
     if (authors.value.trim()) params.append('authors', authors.value.trim());
     if (narrators.value.trim()) params.append('narrators', narrators.value.trim());
+    if (files.value) params.append('files', files.value);
 
     const queryString = params.toString();
     return queryString ? `?${queryString}` : '';
@@ -214,6 +216,15 @@ onMounted(async () => {
 
               <div class="sort-row">
                   <label class="search-field">
+                      <span>Files</span>
+                      <select class="search-select" v-model="files" @change="searchBooks">
+                          <option value=null>All</option>
+                          <option value="with_files">Has Files</option>
+                          <option value="without_files">No Files</option>
+                      </select>
+                  </label>
+
+                  <label class="search-field">
                       <span>Sort by</span>
                       <select class="search-select" v-model="sortBy" @change="searchBooks">
                           <option value="created_at">Date Added</option>
@@ -288,9 +299,11 @@ onMounted(async () => {
 }
 
 .sort-row {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(160px, 1fr));
-    gap: 0.75rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: center;
+  justify-content: flex-start;
 }
 
 @media (max-width: 900px) {
@@ -303,6 +316,10 @@ onMounted(async () => {
 @media (max-width: 600px) {
     .advanced-panel {
         grid-template-columns: 1fr;
+    }
+    .sort-row {
+        flex-direction: column;
+        align-items: flex-start;
     }
 }
 </style>

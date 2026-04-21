@@ -343,6 +343,14 @@ func (c Client) AssociateBookAndDownload(bookId, downloadId uuid.UUID, author, s
 		return Book{}, err
 	}
 
+	var title string
+	err = tx.QueryRow("SELECT title FROM books WHERE id = ?", bookId).Scan(&title)
+	if err != nil {
+		return Book{}, err
+	}
+
+	files.ReplaceDirectory(title)
+
 	files.Prepend(path.Join(author, series))
 	audio, text, err := files.FileListsToJson()
 	if err != nil {
@@ -357,7 +365,7 @@ func (c Client) AssociateBookAndDownload(bookId, downloadId uuid.UUID, author, s
 		audio_files = ?,
 		text_files = ?,
 		cover = ?
-	WHERE id = ?`, files.Root, audio, text, files.Cover, bookId)
+	WHERE id = ?`, title, audio, text, files.Cover, bookId)
 	if err != nil {
 		return Book{}, err
 	}
