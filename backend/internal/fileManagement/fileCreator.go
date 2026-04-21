@@ -14,7 +14,7 @@ import (
 
 func CreateMetadataFile(metadata metadata.MetadataFile, path string) error {
 
-	jsonBytes, err := json.Marshal(metadata)
+	jsonBytes, err := json.MarshalIndent(metadata, "", "\t")
 	if err != nil {
 		return err
 	}

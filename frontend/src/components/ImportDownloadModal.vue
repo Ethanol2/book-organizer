@@ -63,16 +63,14 @@ const closeModal = () => {
 };
 
 const performSearch = async () => {
-  if (!searchQuery.value.trim()) {
-    searchResults.value = [];
-    return;
-  }
 
   isLoading.value = true;
   try {
     const params = new URLSearchParams();
     params.append('view', 'summary');
-    params.append('search', searchQuery.value.trim());
+    if (searchQuery.value.trim()) {
+      params.append('search', searchQuery.value.trim());
+    }
 
     const response = await fetch(`/api/books?${params.toString()}`);
     if (!response.ok) {
@@ -91,6 +89,7 @@ const performSearch = async () => {
 watch(() => props.modelShow, (newVal) => {
   if (newVal) {
     searchQuery.value = getDownloadName(props.download);
+    replaceCover.value = props.download.files.cover != null;
     performSearch();
   }
 });
@@ -104,10 +103,13 @@ watch(() => props.modelShow, (newVal) => {
     <div class="modal" @click.stop>
       <h3>Import Download - <strong>{{ downloadName }}</strong></h3>
 
-      <label>
-        <input type="checkbox" v-model="replaceCover" />
-        Replace book cover
-      </label>
+      <div v-if="download.files.cover != null">
+        <label>
+          <input type="checkbox" v-model="replaceCover" />
+          Use this cover
+        </label>
+        <img :src="download.files.cover" alt="no cover found" class="download-cover">
+      </div>
 
       <!-- Search bar -->
       <div class="search-section">
@@ -136,6 +138,11 @@ watch(() => props.modelShow, (newVal) => {
           :disabled="isAssociating"
           class="result-item result-button"
         >
+          <img
+            :src="'/media/metadata/' + book.id + '.jpg'"
+            alt=""
+            class="book-cover"
+          />
           <div class="book-info">
             <h4>{{ book.title }}</h4>
             <p v-if="book.subtitle">{{ book.subtitle }}</p>
@@ -143,12 +150,6 @@ watch(() => props.modelShow, (newVal) => {
               By: {{ book.authors.map(a => a.name).join(', ') }}
             </p>
           </div>
-          <img
-            v-if="book.cover"
-            :src="book.cover"
-            alt="Book cover"
-            class="book-cover"
-          />
         </button>
       </div>
 
@@ -182,7 +183,7 @@ watch(() => props.modelShow, (newVal) => {
   border-radius: 8px;
   max-width: 600px;
   width: 90%;
-  height: 600px;
+  height: 800px;
   display: flex;
   flex-direction: column;
 }
@@ -295,8 +296,9 @@ watch(() => props.modelShow, (newVal) => {
 }
 
 .book-cover {
-  width: 60px;
-  height: 80px;
+  height: 100px;
+  width: auto;
+  aspect-ratio: 2/3;
   object-fit: cover;
   border-radius: 4px;
   flex-shrink: 0;
@@ -322,5 +324,14 @@ watch(() => props.modelShow, (newVal) => {
 
 .modal-buttons button:hover {
   background: #e9e9e9;
+}
+
+.download-cover {
+  max-height: 150px;
+  aspect-ratio: 1;
+  object-fit: contain;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 </style>
