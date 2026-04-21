@@ -378,7 +378,11 @@ func buildSearchQuery(filters map[string][]string) string {
 		default:
 			cat := stringToCategoryType(sortType[0])
 			joinList[cat] = true
-			sort = " ORDER BY " + string(cat) + ".name"
+			sort = " ORDER BY " + string(cat) + ".name " + order
+
+			if cat == Series {
+				sort += ", books_series.series_index " + order
+			}
 		}
 	}
 
@@ -397,6 +401,8 @@ func buildSearchQuery(filters map[string][]string) string {
 			)
 		}
 	}
+
+	//fmt.Println(join + filter + strings.Join(advFilter, " AND ") + sort)
 
 	return join + filter + strings.Join(advFilter, " AND ") + sort
 }
