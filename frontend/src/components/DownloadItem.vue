@@ -1,8 +1,11 @@
 <script setup lang="ts">
+import { ref } from 'vue';
 import { getDownloadName, getTimeAdded, type Download } from '@/types/download';
+import ImportDownload from './ImportDownloadModal.vue';
 
 const props = defineProps<{
   download: Download
+  openModalFunc: (download: Download) => void
 }>()
 
 </script>
@@ -22,6 +25,7 @@ const props = defineProps<{
           Audio File Count: {{ download.files.audio_files == null ? 0 : download.files.audio_files.length }} <br>
           {{ getTimeAdded(download) }}
         </p>
+        <button @click="openModalFunc(download)" class="import-button">Import</button>
       </div>
     </div>
   </div>
@@ -70,5 +74,21 @@ h3 {
   font-weight: 500;
   margin-bottom: 0.4rem;
   color: var(--color-heading);
+}
+
+.import-button {
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  padding: 0.5rem 1rem;
+  background-color: #007bff;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.import-button:hover {
+  background-color: #0056b3;
 }
 </style>

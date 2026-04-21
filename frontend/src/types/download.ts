@@ -7,8 +7,9 @@ export type Download = {
 }
 
 export function getDownloadName(download: Download): string {
+    console.log(download)
     if (download == null || download.files.root == null) {
-        return "";
+        return "Error: No root found";
     }
     var items = download.files.root.split("/");
     return items[items.length - 1] ?? "";

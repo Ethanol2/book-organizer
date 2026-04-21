@@ -97,10 +97,6 @@ function handleDeleteClick() {
   deleteBookText.value = showDeleteConfirm.value ? 'Nevermind' : 'Delete Book'
 }
 
-function handleCancelDelete() {
-  resetConfirmState()
-}
-
 function confirmDelete() {
   emit('delete-book', { deleteFiles: deleteFiles.value })
   resetConfirmState()

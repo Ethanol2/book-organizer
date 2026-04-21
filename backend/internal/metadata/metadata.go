@@ -58,6 +58,26 @@ type MetadataFile struct {
 func MetadataFileFromBook(book database.Book) MetadataFile {
 	md := MetadataFile{}
 
+	pub := ""
+	if book.Publisher != nil {
+		pub = *book.Publisher
+	}
+
+	desc := ""
+	if book.Description != nil {
+		desc = *book.Description
+	}
+
+	isbn := ""
+	if book.ISBN != nil {
+		isbn = *book.ISBN
+	}
+
+	asin := ""
+	if book.ASIN != nil {
+		asin = *book.ASIN
+	}
+
 	md.Title = book.Title
 	md.Subtitle = book.Subtitle
 	md.Authors = database.CategoryToStrSlice(book.Authors)
@@ -65,10 +85,10 @@ func MetadataFileFromBook(book database.Book) MetadataFile {
 	md.Series = database.CategoryToStrSlice(book.Series)
 	md.Genres = database.CategoryToStrSlice(book.Genres)
 	md.PublishedYear = fmt.Sprint(book.Year)
-	md.Publisher = *book.Publisher
-	md.Description = *book.Description
-	md.Isbn = *book.ISBN
-	md.Asin = *book.ASIN
+	md.Publisher = pub
+	md.Description = desc
+	md.Isbn = isbn
+	md.Asin = asin
 
 	return md
 }

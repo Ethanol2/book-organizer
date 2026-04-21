@@ -2,6 +2,7 @@
 import { ref, onMounted, onUnmounted } from 'vue'
 import type { Download } from '@/types/download';
 import DownloadItem from '@/components/DownloadItem.vue';
+import ImportDownloadModal from '@/components/ImportDownloadModal.vue';
 
 const downloads = ref<Download[]>([]);
 const lastRefresh = ref<string>("Never refreshed");
@@ -9,6 +10,16 @@ const lastRefreshParams: { time: number, intervalId: number } = {
     time: -1,
     intervalId: 0
 }
+const showImportModal = ref(false);
+const selectedDownload = ref<Download>({
+    id: "if this shows up something went wrong",
+    files: {
+        cover: null,
+        text_files: null,
+        audio_files: null
+    },
+    created_at: ""
+});
 
 async function fetchDownloads() {
     downloads.value = [];
@@ -41,6 +52,11 @@ function updateLastRefresh() {
     lastRefresh.value = `${Math.round(timeSince)} seconds since last refresh`
 }
 
+function showModal(download: Download) {
+    showImportModal.value = true;
+    selectedDownload.value = download;
+}
+
 onMounted(async () => {
     await fetchDownloads();
     lastRefreshParams.intervalId = setInterval(updateLastRefresh, 1000)
@@ -63,9 +79,12 @@ onUnmounted(() => {
         </header>
 
         <div>
-            <DownloadItem v-for="download in downloads" :key="download.id" :download="download" />
+            <DownloadItem v-for="download in downloads" :key="download.id" :download="download" :openModalFunc="showModal" />
         </div>
     </section>
+    <div>
+        <ImportDownloadModal v-model="showImportModal" :download="selectedDownload" :modelShow="showImportModal" />
+    </div>
 </template>
 
 <style scoped>
