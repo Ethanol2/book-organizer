@@ -73,8 +73,10 @@ async function searchBooks() {
     pageLimit: limit,
   })
 
+  console.log(searchResults)
+
   results.value = searchResults?.items ?? []
-  totalCount.value = searchResults?.items?.length ?? 0
+  totalCount.value = searchResults?.total_count ?? 0
   offset.value = searchResults?.offset ?? 0
   count.value = searchResults?.count ?? 0
 

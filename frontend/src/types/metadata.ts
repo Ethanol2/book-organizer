@@ -82,8 +82,8 @@ export async function searchMetadataSource(params: MetadataSearchParams): Promis
     }
 
     const body = (await resp.json()) as MetadataSearchResults
-
     return body
+
   } catch (err) {
     console.error(err)
     useNotificationsStore().notifyError(`Metadata search failed: ${err}`)
