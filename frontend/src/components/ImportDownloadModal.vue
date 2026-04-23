@@ -5,6 +5,7 @@ import { useNotificationsStore } from '@/stores/notifications';
 import type { Download } from '@/types/download';
 import type { BookSummary } from '@/types/book';
 import { getDownloadName } from '@/types/download';
+import { MetadataType } from '@/types/metadata';
 
 const router = useRouter();
 const notificationsStore = useNotificationsStore();
@@ -22,6 +23,7 @@ const searchQuery = ref('');
 const searchResults = ref<BookSummary[]>([]);
 const isLoading = ref(false);
 const replaceCover = ref(true);
+const source = ref<MetadataType | string>('Library');
 
 const downloadName = computed(() => getDownloadName(props.download));
 const isAssociating = ref(false);
@@ -156,6 +158,16 @@ watch(() => props.modelShow, (newVal) => {
 
       <!-- Action buttons -->
       <div class="modal-buttons">
+
+        <label class="search-field">
+            <select class="search-select" v-model="source" @change="performSearch">
+                <option value='Library'>Library</option>
+                <option v-for="(type, value) in MetadataType" :key="value" :value="value">
+                  {{ type }}
+                </option>
+            </select>
+        </label>
+
         <button type="button" @click="closeModal">Cancel</button>
       </div>
     </div>
@@ -309,7 +321,7 @@ watch(() => props.modelShow, (newVal) => {
 .modal-buttons {
   display: flex;
   gap: 1rem;
-  justify-content: flex-end;
+  justify-content: space-between;
   margin-top: 1.5rem;
 }
 

@@ -5,23 +5,13 @@ import { useNotificationsStore } from '@/stores/notifications'
 import type { BookParams } from '@/types/book'
 import AddBookModal from '../components/AddBookModal.vue'
 import ResultItem from '../components/ResultItem.vue'
-
-// Type definitions for metadata search functionality
-type MetadataSource = 'open library' | 'google books'
-
-type SearchResults = {
-  total_count: number
-  count: number
-  offset: number
-  items: BookParams[]
-}
+import { MetadataType, searchMetadataSource, getMetadataDetails } from '@/types/metadata'
 
 // Router utilities for URL parameter management
 const route = useRoute()
-const router = useRouter()
 
 // Search filter state
-const source = ref<MetadataSource>('open library')
+const source = ref<MetadataType>(MetadataType.OpenLibrary)
 const title = ref('')
 const author = ref('')
 const year = ref('')
@@ -47,34 +37,10 @@ const selectedItem = ref<BookParams | null>(null)
 
 const notifications = useNotificationsStore()
 
-// Computed properties and utility functions
-const sourceLabel = (s: MetadataSource) => (s === 'open library' ? 'Open Library' : 'Google Books')
-const selectedSourceName = computed(() => sourceLabel(source.value))
-
 // Pagination computed properties
 const hasMultiplePages = computed(() => totalCount.value > limit)
 const isFirstPage = computed(() => page.value === 1)
 const isLastPage = computed(() => (page.value - 1) * limit + count.value >= totalCount.value)
-
-// Build URL query parameters from current search filters
-function buildQueryParams() {
-  const params = new URLSearchParams()
-  params.append('source', source.value)
-  if (title.value.trim()) params.append('title', title.value.trim())
-  if (author.value.trim()) params.append('author', author.value.trim())
-  if (year.value.trim()) params.append('year', year.value.trim())
-  if (publisher.value.trim()) params.append('publisher', publisher.value.trim())
-  if (isbn.value.trim()) params.append('isbn', isbn.value.trim())
-  if (genres.value.trim()) {
-    genres.value.split(',').forEach(g => params.append('genre', g.trim()))
-  }
-  if (languages.value.trim()) {
-    languages.value.split(',').forEach(l => params.append('language', l.trim()))
-  }
-  params.append('page', page.value.toString())
-  params.append('limit', limit.toString())
-  return params
-}
 
 function resetSearch() {
   title.value = ''
@@ -91,100 +57,35 @@ function resetSearch() {
   count.value = 0
 }
 
+async function searchBooks() {
+  loading.value = true
+
+  const searchResults = await searchMetadataSource({
+    source: source.value,
+    title: title.value,
+    author: author.value,
+    year: year.value,
+    publisher: publisher.value,
+    isbn: isbn.value,
+    genres: genres.value,
+    languages: languages.value,
+    page: page.value,
+    pageLimit: limit,
+  })
+
+  results.value = searchResults?.items ?? []
+  totalCount.value = searchResults?.items?.length ?? 0
+  offset.value = searchResults?.offset ?? 0
+  count.value = searchResults?.count ?? 0
+
+  loading.value = false
+}
+
 // Fetch search results from metadata API
 async function searchBooksAndResetPage() {
   page.value = 1
   await searchBooks()
 }
-async function searchBooks() {
-  error.value = ''
-  results.value = []
-
-  const hasQuery = title.value.trim() || author.value.trim() || year.value.trim() || publisher.value.trim() || isbn.value.trim() || genres.value.trim() || languages.value.trim()
-  if (!hasQuery) {
-    error.value = 'Enter at least one search term.'
-    return
-  }
-
-  const endpoint = '/api/metadata/'
-  const queryParams = buildQueryParams()
-
-  loading.value = true
-  try {
-    const resp = await fetch(`${endpoint}?${queryParams.toString()}`, {
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-    })
-
-    if (!resp.ok) {
-      const body = await resp.text()
-      throw new Error(`${resp.status} ${resp.statusText}: ${body}`)
-    }
-
-    const body = (await resp.json()) as SearchResults
-    totalCount.value = body.total_count ?? body.count ?? 0
-    offset.value = body.offset ?? 0
-    count.value = body.count ?? body.items?.length ?? 0
-    results.value = body.items ?? []
-
-    if (results.value.length === 0) {
-      error.value = `No results from ${selectedSourceName.value}`
-    }
-
-    // Update URL with pagination params
-    router.push({ query: { ...route.query, page: page.value.toString(), limit: limit.toString() } })
-  } catch (err) {
-    console.error('Search API error', err)
-    error.value = 'Search failed. ' + (err instanceof Error ? err.message : String(err))
-  } finally {
-    loading.value = false
-  }
-}
-
-async function getBookDetails(item: BookParams | null): Promise<BookParams | null> {
-    if (!item) return null
-    if (!item.key) {
-      notifications.notifyError('Selected item does not have a valid key for fetching details.')
-      return null
-    }
-
-    try {
-      const resp = await fetch(item.key, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      })
-  
-      if (!resp.ok) {
-        const body = await resp.text()
-        throw new Error(`${resp.status} ${resp.statusText}: ${body}`)
-      }
-  
-      var details: BookParams = (await resp.json()) as BookParams
-
-      details.title = details.title ?? item.title
-      details.subtitle = details.subtitle ?? item.subtitle
-      details.authors = details.authors ?? item.authors
-      details.genres = details.genres ?? item.genres
-      details.series = details.series ?? item.series
-      details.year = details.year ?? item.year
-      details.publisher = details.publisher ?? item.publisher
-      details.isbn = details.isbn ?? item.isbn
-      details.cover = details.cover ?? item.cover
-
-      return details
-
-    } catch (err) {
-      console.error('Get book details error', err)
-      notifications.notifyError('Failed to get book details: ' + (err instanceof Error ? err.message : String(err)))
-      return null
-    }
-}
-
-// Pagination handlers
 
 // Pagination handlers
 function prevPage() {
@@ -204,7 +105,7 @@ page.value = parseInt(route.query.page as string) || 1
 
 // Modal management functions
 async function openModal(item: BookParams) {
-  const details = await getBookDetails(item)
+  const details = await getMetadataDetails(item)
   selectedItem.value = details ?? item
   showModal.value = true
 }
@@ -247,8 +148,9 @@ async function addBook(bookData: BookParams) {
     <div class="search-panel">
       <div class="search-row">
         <select class="search-select" v-model="source" aria-label="Metadata source">
-          <option value="open library">Open Library</option>
-          <option value="google books">Google Books</option>
+          <option v-for="(type, value) in MetadataType" :key="value" :value="type">
+            {{ type }}
+          </option>
         </select>
         <input
           class="search-input"
@@ -336,7 +238,6 @@ async function addBook(bookData: BookParams) {
     </div>
 
     <div class="search-meta">
-      <span>Source: {{ selectedSourceName }}</span>
       <span v-if="count > 0">Results: {{ count }} / {{ totalCount }}</span>
       <span v-if="loading">Loading ...</span>
     </div>

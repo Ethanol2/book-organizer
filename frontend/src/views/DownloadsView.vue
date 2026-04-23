@@ -21,6 +21,7 @@ const selectedDownload = ref<Download>({
     created_at: ""
 });
 
+
 async function fetchDownloads() {
     downloads.value = [];
     try {
@@ -69,7 +70,7 @@ onUnmounted(() => {
 </script>
 
 <template>
-    <section>
+    <section class="downloads-view">
         <header class="toolbar">
             <h2>Downloads</h2>
             <div class="refresh">
@@ -88,6 +89,15 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
+
+.downloads-view {
+    display: block;
+    overflow-y: auto;
+    padding: 1rem;
+    padding-bottom: 10rem;
+    box-sizing: border-box;
+}
+
 .toolbar {
     display: flex;
     padding-bottom: 0.5rem;
