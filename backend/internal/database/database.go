@@ -314,14 +314,22 @@ func buildSearchQuery(filters map[string][]string) string {
 		Series:    false,
 	}
 
+	cleanString := func(term string) string {
+		term = strings.TrimSpace(term)
+		term = strings.ReplaceAll(term, ",", "','")
+		term = strings.ReplaceAll(term, "'", "''")
+		return term
+	}
+
 	hasFilter := false
 	filter := ""
 	if search, ok := filters["search"]; ok {
 		hasFilter = true
+		term := cleanString(search[0])
 		filter += `
-		(books.title LIKE '%` + search[0] + `%' OR 
-		books.subtitle LIKE '%` + search[0] + `%' OR 
-		books.description LIKE '%` + search[0] + `%') `
+		(books.title LIKE '%` + term + `%' OR 
+		books.subtitle LIKE '%` + term + `%' OR 
+		books.description LIKE '%` + term + `%') `
 	}
 
 	advFilter := []string{}
@@ -341,7 +349,7 @@ func buildSearchQuery(filters map[string][]string) string {
 				// Field is attached via joining table
 
 				joinList[cat] = true
-				advFilter = append(advFilter, string(cat)+".name IN ('"+strings.ReplaceAll(terms[0], ",", "','")+"')")
+				advFilter = append(advFilter, string(cat)+".name IN ('"+cleanString(terms[0])+"')")
 			}
 		}
 	}

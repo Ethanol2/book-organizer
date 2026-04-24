@@ -5,7 +5,9 @@ import (
 	"fmt"
 	"image"
 	"image/jpeg"
+	_ "image/png" // Registers PNG decoder
 	"io"
+	"log"
 	"net/http"
 	"os"
 
@@ -35,6 +37,7 @@ func DownloadTempFile(url string) (*os.File, error) {
 
 	img, _, err := image.Decode(resp.Body)
 	if err != nil {
+		log.Println("Failed to decode")
 		return nil, err
 	}
 
@@ -45,6 +48,7 @@ func DownloadTempFile(url string) (*os.File, error) {
 
 	err = jpeg.Encode(tmp, img, &jpeg.Options{Quality: 90})
 	if err != nil {
+		log.Println("Failed to encode")
 		return nil, err
 	}
 

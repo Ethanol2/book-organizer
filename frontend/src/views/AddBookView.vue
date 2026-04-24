@@ -2,10 +2,11 @@
 import { ref, computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useNotificationsStore } from '@/stores/notifications'
-import type { BookParams } from '@/types/book'
+import type { Book, BookParams } from '@/types/book'
 import AddBookModal from '../components/AddBookModal.vue'
 import ResultItem from '../components/ResultItem.vue'
 import { MetadataType, searchMetadataSource, getMetadataDetails } from '@/types/metadata'
+import { postBook } from '@/types/book'
 
 // Router utilities for URL parameter management
 const route = useRoute()
@@ -57,6 +58,11 @@ function resetSearch() {
   count.value = 0
 }
 
+async function addBook(book: BookParams) {
+  const ok = await postBook(book)
+  if (ok != null) closeModal()
+}
+
 async function searchBooks() {
   loading.value = true
 
@@ -73,7 +79,7 @@ async function searchBooks() {
     pageLimit: limit,
   })
 
-  console.log(searchResults)
+  //console.log(searchResults)
 
   results.value = searchResults?.items ?? []
   totalCount.value = searchResults?.total_count ?? 0
@@ -115,30 +121,6 @@ async function openModal(item: BookParams) {
 function closeModal() {
   showModal.value = false
   selectedItem.value = null
-}
-
-// Post book data to backend API
-async function addBook(bookData: BookParams) {
-  try {
-    const resp = await fetch('/api/books', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(bookData),
-    })
-
-    if (!resp.ok) {
-      const body = await resp.text()
-      throw new Error(`${resp.status} ${resp.statusText}: ${body}`)
-    }
-
-    notifications.notifySuccess('Book added successfully!')
-    closeModal()
-  } catch (err) {
-    console.error('Add book error', err)
-    notifications.notifyError('Failed to add book: ' + (err instanceof Error ? err.message : String(err)))
-  }
 }
 
 </script>

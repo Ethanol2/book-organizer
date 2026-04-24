@@ -65,6 +65,7 @@ func (files *BookFiles) ReplaceDirectory(dir string) {
 	}
 
 	files.applyModifier(replace)
+	files.Root = &dir
 }
 
 func (files *BookFiles) applyModifier(mod func([]string) *[]string) {

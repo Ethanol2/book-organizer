@@ -3,9 +3,9 @@ import { ref, computed, onMounted, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import { useNotificationsStore } from '@/stores/notifications';
 import type { Download } from '@/types/download';
-import type { BookSummary } from '@/types/book';
+import { postBook, type BookSummary, type BookParams, getCategoriesString } from '@/types/book';
 import { getDownloadName } from '@/types/download';
-import { MetadataType } from '@/types/metadata';
+import { getMetadataDetails, MetadataType, searchMetadataSource } from '@/types/metadata';
 
 const router = useRouter();
 const notificationsStore = useNotificationsStore();
@@ -13,6 +13,7 @@ const notificationsStore = useNotificationsStore();
 const props = defineProps<{
   download: Download;
   modelShow: boolean;
+  refreshFunc: () => void
 }>();
 
 const emit = defineEmits<{
@@ -20,15 +21,37 @@ const emit = defineEmits<{
 }>();
 
 const searchQuery = ref('');
-const searchResults = ref<BookSummary[]>([]);
+const searchResults = ref<BookSummary[] | BookParams[]>([]);
 const isLoading = ref(false);
-const replaceCover = ref(true);
+const useDownloadedCover = ref(true);
 const source = ref<MetadataType | string>('Library');
 
 const downloadName = computed(() => getDownloadName(props.download));
 const isAssociating = ref(false);
 
-const associateDownload = async (book: BookSummary) => {
+const metadataSearchBufferTime = 500;
+let waitingForInputStop = true;
+
+const associateDownload = async (book: BookSummary | BookParams, isSummary: boolean) => {
+  
+  if (isAssociating.value) {
+    return;
+  }
+
+  let id;
+
+  if (isSummary) 
+  {
+    id = (book as BookSummary).id;
+  } 
+  else
+  {
+    const bookDetails = await getMetadataDetails(book as BookParams);
+    const fullBook = await postBook(bookDetails ?? book);
+    if (fullBook == null) return;
+    id = fullBook.id;
+  }
+  
   isAssociating.value = true;
   try {
     const response = await fetch(`/api/downloads/${props.download.id}/associate`, {
@@ -37,8 +60,8 @@ const associateDownload = async (book: BookSummary) => {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        book_id: book.id,
-        replace_book_cover: replaceCover.value,
+        book_id: id,
+        use_downloaded_cover: useDownloadedCover.value,
       }),
     });
 
@@ -47,26 +70,68 @@ const associateDownload = async (book: BookSummary) => {
       throw new Error(errorData.error || 'Failed to associate download with book');
     }
 
-    const result = await response.json();
     notificationsStore.notifySuccess(`Successfully associated "${book.title}" with the download`);
     closeModal();
-    await router.push({ name: 'book-details', params: { id: book.id } });
+    await router.push({ name: 'book-details', params: { id: id } });
+
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Failed to associate download';
     notificationsStore.notifyError(message);
     closeModal();
+
   } finally {
     isAssociating.value = false;
   }
 };
 
 const closeModal = () => {
+  props.refreshFunc();
   emit('update:modelValue', false);
 };
 
 const performSearch = async () => {
 
+  waitingForInputStop = true;
+  if (isLoading.value) return
+
   isLoading.value = true;
+  
+  // A timeout to prevent spamming endpoints
+  while (waitingForInputStop) {
+    waitingForInputStop = false;
+    await Promise.resolve().then(() => {
+      return new Promise((resolve) => setTimeout(resolve, metadataSearchBufferTime));
+    });
+  }
+
+  if (source.value !== "Library")
+  {
+    if (searchQuery.value.trim() === "") {
+      searchResults.value = [];
+      isLoading.value = false;
+      return;
+    }
+
+    const metadataResults = await searchMetadataSource({
+      source: source.value as MetadataType,
+      title: searchQuery.value,
+      page: 1,
+      pageLimit: 10,
+    })
+
+    if (metadataResults == null) {
+      searchResults.value = [];
+    } 
+    else
+    {
+      searchResults.value = metadataResults.items;
+    }
+
+    isLoading.value = false;
+
+    return;
+  }
+
   try {
     const params = new URLSearchParams();
     params.append('view', 'summary');
@@ -89,10 +154,20 @@ const performSearch = async () => {
   }
 };
 
+function getCover(book: BookSummary | BookParams, isSummary: boolean): string {
+
+  if (isSummary) {
+    const summary = book as BookSummary; 
+    return '/media/metadata/' + summary.id + '.jpg'
+  }
+
+  return book.cover ?? '';
+}
+
 watch(() => props.modelShow, (newVal) => {
   if (newVal) {
     searchQuery.value = getDownloadName(props.download);
-    replaceCover.value = props.download.files.cover != null;
+    useDownloadedCover.value = props.download.files.cover == null || props.download.files.cover === '' ? false : useDownloadedCover.value;
     performSearch();
   }
 });
@@ -106,9 +181,9 @@ watch(() => props.modelShow, (newVal) => {
     <div class="modal" @click.stop>
       <h3>Import Download - <strong>{{ downloadName }}</strong></h3>
 
-      <div v-if="download.files.cover != null">
+      <div v-if="download.files.cover != null && download.files.cover !== ''">
         <label>
-          <input type="checkbox" v-model="replaceCover" />
+          <input type="checkbox" v-model="useDownloadedCover" />
           Use this cover
         </label>
         <img :src="download.files.cover" alt="no cover found" class="download-cover">
@@ -134,26 +209,50 @@ watch(() => props.modelShow, (newVal) => {
         No books found matching "{{ searchQuery }}"
       </div>
       <div v-else class="results-list">
+        <div v-if="source === 'Library'">
         <button
-          v-for="book in searchResults"
-          :key="book.id"
-          @click="associateDownload(book)"
-          :disabled="isAssociating"
-          class="result-item result-button"
-        >
-          <img
-            :src="'/media/metadata/' + book.id + '.jpg'"
-            alt=""
-            class="book-cover"
-          />
-          <div class="book-info">
-            <h4>{{ book.title }}</h4>
-            <p v-if="book.subtitle">{{ book.subtitle }}</p>
-            <p v-if="book.authors.length > 0">
-              By: {{ book.authors.map(a => a.name).join(', ') }}
-            </p>
-          </div>
-        </button>
+            v-for="book in searchResults as BookSummary[]"
+            :key="book.id"
+            @click="associateDownload(book, true)"
+            :disabled="isAssociating"
+            class="result-item result-button"
+          >
+            <img
+              :src="getCover(book, true)"
+              alt=""
+              class="book-cover"
+            />
+            <div class="book-info">
+              <h4>{{ book.title }}</h4>
+              <p v-if="book.subtitle">{{ book.subtitle }}</p>
+              <p v-if="book.authors.length > 0">
+                By: {{ book.authors.map(a => a.name).join(', ') }}
+              </p>
+            </div>
+          </button>
+        </div>
+        <div v-else>
+          <button
+            v-for="(book, index) in searchResults as BookParams[]"
+            :key="index"
+            @click="associateDownload(book, false)"
+            :disabled="isAssociating"
+            class="result-item result-button"
+          >
+            <img
+              :src="getCover(book, false)"
+              alt=""
+              class="book-cover"
+            />
+            <div class="book-info">
+              <h4>{{ book.title }}</h4>
+              <p v-if="book.subtitle">{{ book.subtitle }}</p>
+              <p>
+                By: {{ getCategoriesString(book.authors ?? []) }}
+              </p>
+            </div>
+          </button>
+        </div>
       </div>
 
       <!-- Action buttons -->
@@ -162,11 +261,14 @@ watch(() => props.modelShow, (newVal) => {
         <label class="search-field">
             <select class="search-select" v-model="source" @change="performSearch">
                 <option value='Library'>Library</option>
-                <option v-for="(type, value) in MetadataType" :key="value" :value="value">
+                <option v-for="(type, value) in MetadataType" :key="value" :value="type">
                   {{ type }}
                 </option>
             </select>
         </label>
+
+        <span v-if="source !== 'Library'">Use the Add Book page for more control</span>
+        <span v-else>Results don't include books with files</span>
 
         <button type="button" @click="closeModal">Cancel</button>
       </div>

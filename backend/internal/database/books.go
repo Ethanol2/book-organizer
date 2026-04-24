@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log"
 	"path"
 	"slices"
@@ -83,6 +84,13 @@ func (c Client) AddBook(params BookParams) (Book, error) {
 	tagsJson, err := json.Marshal(params.Tags)
 	if err != nil {
 		return Book{}, err
+	}
+
+	if params.ISBN != nil && *params.ISBN == "" {
+		params.ISBN = nil
+	}
+	if params.ASIN != nil && *params.ASIN == "" {
+		params.ASIN = nil
 	}
 
 	query := `
@@ -315,7 +323,7 @@ func (c Client) GetBooksSummary(filters map[string][]string) ([]BookOverview, er
 	return books, nil
 }
 
-func (c Client) AssociateBookAndDownload(bookId, downloadId uuid.UUID, author, series string) (Book, error) {
+func (c Client) AssociateBookAndDownload(bookId, downloadId uuid.UUID, author, series, title string) (Book, error) {
 
 	tx, err := c.db.Begin()
 	if err != nil {
@@ -343,12 +351,6 @@ func (c Client) AssociateBookAndDownload(bookId, downloadId uuid.UUID, author, s
 		return Book{}, err
 	}
 
-	var title string
-	err = tx.QueryRow("SELECT title FROM books WHERE id = ?", bookId).Scan(&title)
-	if err != nil {
-		return Book{}, err
-	}
-
 	files.ReplaceDirectory(title)
 
 	files.Prepend(path.Join(author, series))
@@ -365,7 +367,7 @@ func (c Client) AssociateBookAndDownload(bookId, downloadId uuid.UUID, author, s
 		audio_files = ?,
 		text_files = ?,
 		cover = ?
-	WHERE id = ?`, title, audio, text, files.Cover, bookId)
+	WHERE id = ?`, files.Root, audio, text, files.Cover, bookId)
 	if err != nil {
 		return Book{}, err
 	}
@@ -522,10 +524,16 @@ func (c Client) UpdateBook(id uuid.UUID, update BookParams) (Book, error) {
 
 func (c Client) UpdateBookCover(id uuid.UUID, ext string) (string, string, error) {
 
+	err := c.Begin()
+	if err != nil {
+		return "", "", err
+	}
+	defer c.Rollback()
+
 	var dir *string
 	var cover *string
 
-	err := c.tx.QueryRow("SELECT directory, cover FROM books WHERE id = ?", id).Scan(&dir, &cover)
+	err = c.tx.QueryRow("SELECT directory, cover FROM books WHERE id = ?", id).Scan(&dir, &cover)
 	if err != nil {
 		return "", "", err
 	}
@@ -533,9 +541,18 @@ func (c Client) UpdateBookCover(id uuid.UUID, ext string) (string, string, error
 	if dir == nil {
 		return "", "", nil
 	}
+	if cover == nil {
+		tmp := ""
+		cover = &tmp
+	}
 
 	newCover := path.Join(*dir, "cover."+ext)
 	_, err = c.tx.Exec("UPDATE books SET cover = ? WHERE id = ?", newCover, id)
+	if err != nil {
+		return "", "", err
+	}
+
+	err = c.Commit()
 	if err != nil {
 		return "", "", err
 	}
@@ -555,12 +572,16 @@ func (c Client) GetPathComponents(id uuid.UUID) (string, string, string, error) 
 	}
 
 	seriesDir := ""
+	indexStr := ""
 	series, err := c.GetCategoryTypesAssociatedWithBook(id.String(), Series)
 	if err != nil {
 		return "", "", "", err
 	}
 	if len(series) > 0 {
 		seriesDir = series[0].Name
+		if series[0].Index != nil {
+			indexStr = fmt.Sprintf("%s - ", *series[0].Index)
+		}
 	}
 
 	title := ""
@@ -568,6 +589,7 @@ func (c Client) GetPathComponents(id uuid.UUID) (string, string, string, error) 
 	if err != nil {
 		return "", "", "", err
 	}
+	title = indexStr + title
 
 	return authorDir, seriesDir, title, nil
 }

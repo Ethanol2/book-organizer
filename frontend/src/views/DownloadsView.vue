@@ -84,7 +84,7 @@ onUnmounted(() => {
         </div>
     </section>
     <div>
-        <ImportDownloadModal v-model="showImportModal" :download="selectedDownload" :modelShow="showImportModal" />
+        <ImportDownloadModal v-model="showImportModal" :download="selectedDownload" :modelShow="showImportModal" :refreshFunc="fetchDownloads" />
     </div>
 </template>
 

@@ -6,6 +6,7 @@ import (
 	"errors"
 	"log"
 	"net/http"
+	"os"
 	"path"
 
 	"github.com/Ethanol2/book-organizer/internal/fileManagement"
@@ -54,8 +55,8 @@ func (cfg *apiConfig) handlerAssociateDownloadToBook(downloadId uuid.UUID, w htt
 	}
 
 	var bookIdStruct struct {
-		BookId           uuid.UUID `json:"book_id"`
-		ReplaceBookCover bool      `json:"replace_book_cover"`
+		BookId             uuid.UUID `json:"book_id"`
+		UseDownloadedCover bool      `json:"use_downloaded_cover"`
 	}
 	err = json.NewDecoder(r.Body).Decode(&bookIdStruct)
 	if err != nil {
@@ -81,11 +82,15 @@ func (cfg *apiConfig) handlerAssociateDownloadToBook(downloadId uuid.UUID, w htt
 
 	oldPath, newPath, err := fileManagement.MoveFiles(downloadDir, cfg.downloadsPath, bookDir, cfg.libraryPath, authorDir, seriesDir)
 	if err != nil {
+		if os.IsExist(err) {
+			respondWithError(w, http.StatusConflict, "The library already has files at the book's location", err)
+			return
+		}
 		respondWithError(w, http.StatusInternalServerError, "Something went wrong moving files", err)
 		return
 	}
 
-	book, err := cfg.db.AssociateBookAndDownload(bookIdStruct.BookId, downloadId, authorDir, seriesDir)
+	book, err := cfg.db.AssociateBookAndDownload(bookIdStruct.BookId, downloadId, authorDir, seriesDir, bookDir)
 	if err != nil {
 		log.Println(err)
 		err = fileManagement.MoveFilesWithPaths(newPath, oldPath)
@@ -95,6 +100,43 @@ func (cfg *apiConfig) handlerAssociateDownloadToBook(downloadId uuid.UUID, w htt
 		}
 		respondWithError(w, http.StatusInternalServerError, "Failed to associate the book and files. Files have been returned to downloads", err)
 		return
+	}
+
+	if !bookIdStruct.UseDownloadedCover {
+
+		handleCoverReplacement := func() {
+			log.Println("=== Replacing the downloaded cover with the metadata cover")
+
+			newCoverPath := path.Join(newPath, "cover.jpg")
+			if _, err := os.Stat(newCoverPath); err == nil {
+				err = os.Rename(newCoverPath, path.Join(newPath, "old-cover.jpg"))
+				if err != nil {
+					log.Println("Failed to rename existing cover")
+					return
+				}
+			}
+
+			metadataCoverPath := path.Join(cfg.metadataPath, bookIdStruct.BookId.String()+".jpg")
+
+			if _, err := os.Stat(metadataCoverPath); err != nil {
+				log.Println("Couldn't use the metadata cover because it doesn't exist")
+				return
+			}
+
+			_, _, err = cfg.db.UpdateBookCover(bookIdStruct.BookId, "jpg")
+			if err != nil {
+				log.Println(err)
+				return
+			}
+
+			err = fileManagement.MoveFilesWithPaths(metadataCoverPath, newCoverPath)
+			if err != nil {
+				log.Println("Failed to move metadata cover to the library")
+			}
+
+		}
+
+		handleCoverReplacement()
 	}
 
 	err = fileManagement.CreateMetadataFile(metadata.MetadataFileFromBook(book), path.Join(newPath, "metadata.json"))

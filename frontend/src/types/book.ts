@@ -1,3 +1,5 @@
+import { useNotificationsStore } from "@/stores/notifications";
+
 export type Book = {
     id: string
     title: string
@@ -129,4 +131,32 @@ export function getSeriesArray(series: string): Series[] {
         seriesArray.push({ id: null, name, index })
     })
     return seriesArray
+}
+
+// Post book data to backend API
+export async function postBook(book: BookParams): Promise<Book | null> {
+  try {
+    const resp = await fetch('/api/books', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(book),
+    })
+
+    if (!resp.ok) {
+      const body = await resp.text()
+      throw new Error(`${resp.status} ${resp.statusText}: ${body}`)
+    }
+
+    useNotificationsStore().notifySuccess('Book added successfully!')
+
+    const bookObj = (await resp.json()) as Book
+    return bookObj
+
+  } catch (err) {
+    console.error('Add book error', err)
+    useNotificationsStore().notifyError('Failed to add book: ' + (err instanceof Error ? err.message : String(err)))
+    return null
+  }
 }

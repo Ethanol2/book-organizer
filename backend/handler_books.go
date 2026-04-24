@@ -96,7 +96,8 @@ func (cfg *apiConfig) handlerPostBook(w http.ResponseWriter, r *http.Request) {
 	if bookParams.Cover != nil {
 		coverFile, err = fileManagement.DownloadTempFile(*bookParams.Cover)
 		if err != nil {
-			respondWithError(w, http.StatusBadRequest, "failed to fetch cover from url", err)
+			respondWithError(w, http.StatusBadRequest, "Failed to fetch cover from url. Only png and jpg are currently supported", err)
+			log.Println("Image:", *bookParams.Cover)
 			return
 		}
 		defer coverFile.Close()
@@ -154,9 +155,6 @@ func (cfg *apiConfig) handlerUpdateBookCover(id uuid.UUID, w http.ResponseWriter
 	}
 	defer tmp.Close()
 
-	cfg.db.Begin()
-	defer cfg.db.Rollback()
-
 	oldPath, newPath, err := cfg.db.UpdateBookCover(id, path.Ext(tmp.Name()))
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, "Database error", err)
@@ -182,12 +180,6 @@ func (cfg *apiConfig) handlerUpdateBookCover(id uuid.UUID, w http.ResponseWriter
 	if err != nil {
 		log.Println("Failed to move new cover to path")
 		respondWithError(w, http.StatusInternalServerError, "File error", err)
-		return
-	}
-
-	err = cfg.db.Commit()
-	if err != nil {
-		respondWithError(w, http.StatusInternalServerError, "Database error", err)
 		return
 	}
 

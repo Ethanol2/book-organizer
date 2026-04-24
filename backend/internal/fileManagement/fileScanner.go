@@ -217,29 +217,32 @@ func getFiles(root, folder string) (database.BookFiles, error) {
 		}
 	}
 
-	cover := ""
+	var cover *string
 
 	if len(images) > 1 {
-
+		coverStr := ""
 		for _, img := range images {
 			if strings.Contains(strings.ToLower(img), "cover") {
-				cover = img
+				coverStr = img
 				break
 			}
 		}
 
-		if cover == "" {
-			cover = images[0]
+		if coverStr == "" {
+			coverStr = images[0]
 		}
+		cover = &coverStr
 
 	} else if len(images) == 1 {
-		cover = images[0]
+		cover = &images[0]
+	} else {
+		cover = nil
 	}
 
 	return database.BookFiles{
 		Root:       &folder,
 		AudioFiles: &audio,
 		TextFiles:  &text,
-		Cover:      &cover,
+		Cover:      cover,
 	}, nil
 }
