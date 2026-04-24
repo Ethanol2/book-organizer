@@ -456,6 +456,7 @@ func (c Client) UpdateBook(id uuid.UUID, update BookParams) (Book, error) {
 			if err != nil {
 				return err
 			}
+
 		}
 
 		for i, cat := range new {
@@ -510,6 +511,11 @@ func (c Client) UpdateBook(id uuid.UUID, update BookParams) (Book, error) {
 		if err != nil {
 			return Book{}, err
 		}
+	}
+
+	err = c.CleanupCategories()
+	if err != nil {
+		return Book{}, err
 	}
 
 	err = c.Commit()
@@ -604,12 +610,28 @@ func (c Client) DeleteBook(id uuid.UUID) error {
 		return err
 	}
 
+	err = c.CleanupCategories()
+	if err != nil {
+		return err
+	}
+
 	err = c.Commit()
 	if err != nil {
 		return err
 	}
 
+	log.Println("Removed the book with the id \"", id, "\" from the database")
+
 	return nil
+}
+
+func (c Client) GetBookDirectory(id uuid.UUID) (*string, error) {
+	var dir *string
+	err := c.db.QueryRow("SELECT directory FROM books WHERE id = ?", id).Scan(&dir)
+	if err != nil {
+		return nil, err
+	}
+	return dir, nil
 }
 
 // #region Book Methods

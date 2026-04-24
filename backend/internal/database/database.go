@@ -16,7 +16,7 @@ type Client struct {
 }
 
 func NewClient(dbPath string) (Client, error) {
-	db, err := sql.Open("sqlite3", dbPath)
+	db, err := sql.Open("sqlite3", dbPath+"?_foreign_keys=on")
 	if err != nil {
 		return Client{}, err
 	}

@@ -239,9 +239,31 @@ func (cfg *apiConfig) handlerDeleteBook(id uuid.UUID, w http.ResponseWriter, r *
 		return
 	}
 
+	deleteFiles := r.URL.Query().Get("delete files")
+	if deleteFiles == "true" {
+		log.Println("Deleting files for \"", id, "\"")
+		dir, err := cfg.db.GetBookDirectory(id)
+		if err != nil {
+			respondWithError(w, http.StatusInternalServerError, "Couldn't delete book files", err)
+			return
+		}
+		if dir != nil {
+			err = fileManagement.DeleteFiles(path.Join(cfg.libraryPath, *dir))
+			if err != nil {
+				respondWithError(w, http.StatusInternalServerError, "Couldn't delete book files", err)
+			}
+		}
+	}
+
+	// Delete metedata cover
+	err = fileManagement.DeleteFiles(path.Join(cfg.metadataPath, id.String()+".jpg"))
+	if err != nil {
+		log.Println(err)
+	}
+
 	err = cfg.db.DeleteBook(id)
 	if err != nil {
-		respondWithError(w, http.StatusInternalServerError, "Failed to delete book from database", err)
+		respondWithError(w, http.StatusInternalServerError, "Failed to delete book from the database", err)
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)

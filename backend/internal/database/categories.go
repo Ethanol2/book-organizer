@@ -333,3 +333,63 @@ func stringToCategoryType(str string) CategoryType {
 		return NoType
 	}
 }
+
+func (c Client) CleanupCategories() error {
+	indyTx := c.tx == nil
+	if indyTx {
+		err := c.Commit()
+		if err != nil {
+			return err
+		}
+		defer c.Rollback()
+	}
+
+	cleanup := func(catType CategoryType) error {
+
+		query := fmt.Sprintf(
+			"DELETE FROM %s WHERE NOT EXISTS (SELECT 1 FROM books_%s WHERE %s.id = books_%s.%s_id)",
+			catType, catType, catType, catType, categorySingular[catType])
+
+		//log.Println(query)
+
+		results, err := c.tx.Exec(query)
+		if err != nil {
+			return err
+		}
+
+		count, err := results.RowsAffected()
+		if err != nil {
+			log.Println("Failed to retrieve deleted rows from the category cleanup")
+			return nil
+		}
+
+		log.Println("Deleted", count, "rows from", catType)
+		return nil
+	}
+
+	err := cleanup(Authors)
+	if err != nil {
+		return err
+	}
+	err = cleanup(Genres)
+	if err != nil {
+		return err
+	}
+	err = cleanup(Series)
+	if err != nil {
+		return err
+	}
+	err = cleanup(Narrators)
+	if err != nil {
+		return err
+	}
+
+	if indyTx {
+		err = c.Commit()
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}

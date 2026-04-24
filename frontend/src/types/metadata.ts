@@ -72,7 +72,7 @@ export async function searchMetadataSource(params: MetadataSearchParams): Promis
     const resp = await fetch(`${endpoint}?${queryParams.toString()}`, {
       method: 'GET',
       headers: {
-        'Content-Type': 'application/json',
+        'Content-Type': 'application/x-www-form-urlencoded',
       },
     })
 
@@ -102,7 +102,7 @@ export async function getMetadataDetails(item: BookParams | null): Promise<BookP
       const resp = await fetch(item.key, {
         method: 'GET',
         headers: {
-          'Content-Type': 'application/json',
+          'Content-Type': 'application/x-www-form-urlencoded',
         },
       })
   

@@ -95,12 +95,11 @@ async function deleteBook(payload: { deleteFiles: boolean }) {
   deleting.value = true;
 
   try {
-    const resp = await fetch(`/api/books/${book.value.id}`, {
+    const resp = await fetch(`/api/books/${book.value.id}?${(new URLSearchParams({"delete files": payload.deleteFiles.toString()}))}`, {
       method: 'DELETE',
       headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ deleteFiles: payload.deleteFiles }),
+        'Content-Type': 'application/x-www-form-urlencoded',
+      }
     });
 
     if (!resp.ok) {
