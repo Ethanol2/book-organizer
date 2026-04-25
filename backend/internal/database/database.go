@@ -169,7 +169,10 @@ func (c Client) generateJoiningTable(type1, type1Table, type2, type2Table string
 
 func (c Client) InsertTestData(metadataPath string, downloadTempFile func(string) (*os.File, error), moveFiles func(string, string) error) error {
 
-	c.Begin()
+	err := c.Begin()
+	if err != nil {
+		return err
+	}
 	defer c.Rollback()
 
 	fmt.Print("\n======= Inserting Test Data =======\n\n")
@@ -201,7 +204,7 @@ func (c Client) InsertTestData(metadataPath string, downloadTempFile func(string
 		return nil
 	}
 
-	err := createCategories(Genres, genres)
+	err = createCategories(Genres, genres)
 	if err != nil {
 		return err
 	}

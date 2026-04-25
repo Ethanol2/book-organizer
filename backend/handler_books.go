@@ -136,9 +136,55 @@ func (cfg *apiConfig) handlerUpdateBook(id uuid.UUID, w http.ResponseWriter, r *
 		return
 	}
 
-	book, err := cfg.db.UpdateBook(id, bookParams)
+	// Begining db transaction here in case the file moving doesn't work
+	err = cfg.db.Begin()
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Database start transaction error", err)
+		return
+	}
+	defer cfg.db.Rollback()
+
+	oldPath, err := cfg.db.GetBookDirectory(id)
+
+	book, needsFileUpdate, err := cfg.db.UpdateBook(id, bookParams)
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, "Failed to update database", err)
+		return
+	}
+
+	if needsFileUpdate {
+		authorDir, seriesDir, bookDir, err := cfg.db.GetPathComponents(id)
+		if err != nil {
+			respondWithError(w, http.StatusInternalServerError, "Error moving files", err)
+			return
+		}
+
+		err = fileManagement.CreateDirectory(path.Join(cfg.libraryPath, authorDir))
+		if err != nil {
+			respondWithError(w, http.StatusInternalServerError, "Error moving files", err)
+			return
+		}
+
+		err = fileManagement.CreateDirectory(path.Join(cfg.libraryPath, authorDir, seriesDir))
+		if err != nil {
+			respondWithError(w, http.StatusInternalServerError, "Error moving files", err)
+			return
+		}
+
+		newPath := path.Join(authorDir, seriesDir, bookDir)
+
+		if book.Files.Root != &newPath {
+			err = fileManagement.MoveFilesWithPaths(path.Join(cfg.libraryPath, *oldPath), path.Join(cfg.libraryPath, newPath))
+			if err != nil {
+				respondWithError(w, http.StatusInternalServerError, "Error moving files", err)
+				return
+			}
+		}
+	}
+
+	err = cfg.db.Commit()
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Database commit transaction error", err)
 		return
 	}
 

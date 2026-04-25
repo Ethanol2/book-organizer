@@ -76,7 +76,10 @@ func (c Client) CheckBookExists(id uuid.UUID) (bool, error) {
 
 func (c Client) AddBook(params BookParams) (Book, error) {
 
-	c.Begin()
+	err := c.Begin()
+	if err != nil {
+		return Book{}, err
+	}
 	defer c.Rollback()
 
 	id := uuid.New()
@@ -217,7 +220,10 @@ func (c Client) GetBook(id uuid.UUID) (Book, error) {
 
 func (c Client) GetBooks(filters map[string][]string) ([]Book, error) {
 
-	c.Begin()
+	err := c.Begin()
+	if err != nil {
+		return []Book{}, err
+	}
 	defer c.Rollback()
 
 	books := []Book{}
@@ -323,19 +329,19 @@ func (c Client) GetBooksSummary(filters map[string][]string) ([]BookOverview, er
 	return books, nil
 }
 
-func (c Client) AssociateBookAndDownload(bookId, downloadId uuid.UUID, author, series, title string) (Book, error) {
+func (c Client) AssociateBookAndDownload(bookId, downloadId uuid.UUID, author, series, bookDir string) (Book, error) {
 
-	tx, err := c.db.Begin()
+	err := c.Begin()
 	if err != nil {
 		return Book{}, err
 	}
-	defer tx.Rollback()
+	defer c.Rollback()
 
 	var files BookFiles
 	var Audio *string
 	var Text *string
 
-	err = tx.QueryRow(`
+	err = c.tx.QueryRow(`
 	SELECT dir_name, audio_files, text_files, cover FROM downloads WHERE id = ?
 	`, downloadId).Scan(&files.Root, &Audio, &Text, &files.Cover)
 	if err != nil {
@@ -351,28 +357,14 @@ func (c Client) AssociateBookAndDownload(bookId, downloadId uuid.UUID, author, s
 		return Book{}, err
 	}
 
-	files.ReplaceDirectory(title)
-
-	files.Prepend(path.Join(author, series))
-	audio, text, err := files.FileListsToJson()
+	files.UpdateDirectory(path.Join(author, series, bookDir))
+	tmpBook := Book{Id: &bookId, Files: files}
+	err = tmpBook.updateBookFiles(c.tx)
 	if err != nil {
 		return Book{}, err
 	}
 
-	_, err = tx.Exec(`
-	UPDATE books 
-	SET 
-		updated_at = CURRENT_TIMESTAMP,
-		directory = ?,
-		audio_files = ?,
-		text_files = ?,
-		cover = ?
-	WHERE id = ?`, files.Root, audio, text, files.Cover, bookId)
-	if err != nil {
-		return Book{}, err
-	}
-
-	err = tx.Commit()
+	err = c.Commit()
 	if err != nil {
 		return Book{}, err
 	}
@@ -380,16 +372,21 @@ func (c Client) AssociateBookAndDownload(bookId, downloadId uuid.UUID, author, s
 	return c.GetBook(bookId)
 }
 
-func (c Client) UpdateBook(id uuid.UUID, update BookParams) (Book, error) {
+// Returns the updated book and a bool that says whether the file path has updated
+func (c Client) UpdateBook(id uuid.UUID, update BookParams) (Book, bool, error) {
 
-	err := c.Begin()
-	if err != nil {
-		return Book{}, err
+	indyTx := c.tx == nil
+	if indyTx {
+		err := c.Begin()
+		if err != nil {
+			return Book{}, false, err
+		}
+		defer c.Rollback()
 	}
-	defer c.Rollback()
 
 	setParts := []string{"updated_at = CURRENT_TIMESTAMP"}
 	args := []interface{}{}
+	needsFileUpdate := false
 
 	add := func(part string, arg interface{}) {
 		setParts = append(setParts, part+" = ?")
@@ -398,6 +395,7 @@ func (c Client) UpdateBook(id uuid.UUID, update BookParams) (Book, error) {
 
 	if update.Title != nil {
 		add("title", update.Title)
+		needsFileUpdate = true
 	}
 	if update.Year != nil {
 		add("publish_year", update.Year)
@@ -408,7 +406,7 @@ func (c Client) UpdateBook(id uuid.UUID, update BookParams) (Book, error) {
 	if update.Tags != nil {
 		tagsJson, err := json.Marshal(update.Tags)
 		if err != nil {
-			return Book{}, err
+			return Book{}, false, err
 		}
 		add("tags", string(tagsJson))
 	}
@@ -427,7 +425,7 @@ func (c Client) UpdateBook(id uuid.UUID, update BookParams) (Book, error) {
 		args = append(args, id)
 		_, err := c.tx.Exec(query, args...)
 		if err != nil {
-			return Book{}, err
+			return Book{}, false, err
 		}
 	}
 
@@ -472,60 +470,86 @@ func (c Client) UpdateBook(id uuid.UUID, update BookParams) (Book, error) {
 	if update.Authors != nil {
 		old, err := c.GetCategoryTypesAssociatedWithBook(id.String(), Authors)
 		if err != nil {
-			return Book{}, err
+			return Book{}, false, err
 		}
 		err = handleCategories("DELETE FROM books_authors WHERE book_id = ? AND author_id = ?", *update.Authors, old, Authors)
 		if err != nil {
-			return Book{}, err
+			return Book{}, false, err
 		}
+
+		needsFileUpdate = true
 	}
 
 	if update.Genres != nil {
 		old, err := c.GetCategoryTypesAssociatedWithBook(id.String(), Genres)
 		if err != nil {
-			return Book{}, err
+			return Book{}, false, err
 		}
 		err = handleCategories("DELETE FROM books_genres WHERE book_id = ? AND genre_id = ?", *update.Genres, old, Genres)
 		if err != nil {
-			return Book{}, err
+			return Book{}, false, err
 		}
 	}
 
 	if update.Series != nil {
 		old, err := c.GetCategoryTypesAssociatedWithBook(id.String(), Series)
 		if err != nil {
-			return Book{}, err
+			return Book{}, false, err
 		}
 		err = handleCategories("DELETE FROM books_series WHERE book_id = ? AND series_id = ?", *update.Series, old, Series)
 		if err != nil {
-			return Book{}, err
+			return Book{}, false, err
 		}
+
+		needsFileUpdate = true
 	}
 
 	if update.Narrators != nil {
 		old, err := c.GetCategoryTypesAssociatedWithBook(id.String(), Narrators)
 		if err != nil {
-			return Book{}, err
+			return Book{}, false, err
 		}
 		err = handleCategories("DELETE FROM books_narrators WHERE book_id = ? AND narrator_id = ?", *update.Narrators, old, Narrators)
 		if err != nil {
-			return Book{}, err
+			return Book{}, false, err
 		}
 	}
 
-	err = c.CleanupCategories()
+	err := c.CleanupCategories()
 	if err != nil {
-		return Book{}, err
+		return Book{}, false, err
 	}
 
-	err = c.Commit()
+	book, err := c.GetBook(id)
 	if err != nil {
-		return Book{}, err
+		return Book{}, false, err
+	}
+
+	needsFileUpdate = needsFileUpdate && book.Files.Root != nil
+
+	if needsFileUpdate {
+		authorDir, seriesDir, bookDir, err := c.GetPathComponents(id)
+		if err != nil {
+			return Book{}, false, err
+		}
+
+		book.Files.UpdateDirectory(path.Join(authorDir, seriesDir, bookDir))
+		err = book.updateBookFiles(c.tx)
+		if err != nil {
+			return Book{}, false, err
+		}
+	}
+
+	if indyTx {
+		err = c.Commit()
+		if err != nil {
+			return Book{}, false, err
+		}
 	}
 
 	log.Println("Updated book", id)
 
-	return c.GetBook(id)
+	return book, needsFileUpdate, nil
 }
 
 func (c Client) UpdateBookCover(id uuid.UUID, ext string) (string, string, error) {
@@ -568,6 +592,16 @@ func (c Client) UpdateBookCover(id uuid.UUID, ext string) (string, string, error
 
 // Author -> Series -> Book Title
 func (c Client) GetPathComponents(id uuid.UUID) (string, string, string, error) {
+
+	indyTx := c.tx == nil
+	if indyTx {
+		err := c.Begin()
+		if err != nil {
+			return "", "", "", err
+		}
+		defer c.Rollback()
+	}
+
 	authorDir := "Unknown"
 	authors, err := c.GetCategoryTypesAssociatedWithBook(id.String(), Authors)
 	if err != nil {
@@ -591,21 +625,31 @@ func (c Client) GetPathComponents(id uuid.UUID) (string, string, string, error) 
 	}
 
 	title := ""
-	err = c.db.QueryRow("SELECT title FROM books WHERE id = ?", id).Scan(&title)
+	err = c.tx.QueryRow("SELECT title FROM books WHERE id = ?", id).Scan(&title)
 	if err != nil {
 		return "", "", "", err
 	}
 	title = indexStr + title
+
+	if indyTx {
+		err := c.Commit()
+		if err != nil {
+			return "", "", "", err
+		}
+	}
 
 	return authorDir, seriesDir, title, nil
 }
 
 func (c Client) DeleteBook(id uuid.UUID) error {
 
-	c.Begin()
+	err := c.Begin()
+	if err != nil {
+		return err
+	}
 	defer c.Rollback()
 
-	_, err := c.tx.Exec("DELETE FROM books WHERE id = ?", id)
+	_, err = c.tx.Exec("DELETE FROM books WHERE id = ?", id)
 	if err != nil {
 		return err
 	}
@@ -626,12 +670,56 @@ func (c Client) DeleteBook(id uuid.UUID) error {
 }
 
 func (c Client) GetBookDirectory(id uuid.UUID) (*string, error) {
+
+	indyTx := c.tx == nil
+	if indyTx {
+		err := c.Begin()
+		if err != nil {
+			return nil, err
+		}
+		defer c.Rollback()
+	}
+
 	var dir *string
-	err := c.db.QueryRow("SELECT directory FROM books WHERE id = ?", id).Scan(&dir)
+	err := c.tx.QueryRow("SELECT directory FROM books WHERE id = ?", id).Scan(&dir)
 	if err != nil {
 		return nil, err
 	}
+
+	if indyTx {
+		err := c.Commit()
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	return dir, nil
+}
+
+func (c Client) DeleteBookFilesFromDatabase(id uuid.UUID) error {
+
+	indyTx := c.tx == nil
+	if indyTx {
+		err := c.Begin()
+		if err != nil {
+			return err
+		}
+		defer c.Rollback()
+	}
+
+	_, err := c.tx.Exec("UPDATE books SET directory = NULL, audio_files = NULL, text_files = NULL, cover = NULL WHERE id = ? ", id)
+	if err != nil {
+		return err
+	}
+
+	if indyTx {
+		err = c.Commit()
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 // #region Book Methods
@@ -656,6 +744,33 @@ func (book *Book) getBookCategories(c Client) error {
 	}
 
 	book.Narrators, err = c.GetCategoryTypesAssociatedWithBook(book.Id.String(), Narrators)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (book *Book) updateBookFiles(tx *sql.Tx) error {
+
+	if tx == nil {
+		return fmt.Errorf("updateBookFiles requires an active tx")
+	}
+
+	audio, text, err := book.Files.FileListsToJson()
+	if err != nil {
+		return err
+	}
+
+	_, err = tx.Exec(`
+	UPDATE books 
+	SET 
+		updated_at = CURRENT_TIMESTAMP,
+		directory = ?,
+		audio_files = ?,
+		text_files = ?,
+		cover = ?
+	WHERE id = ?`, book.Files.Root, audio, text, book.Files.Cover, book.Id)
 	if err != nil {
 		return err
 	}

@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -98,6 +99,13 @@ func (cfg *apiConfig) handlerAssociateDownloadToBook(downloadId uuid.UUID, w htt
 			respondWithError(w, http.StatusInternalServerError, "Failed to associate the book and files, and failed to move files back from the library to downloads", err)
 			return
 		}
+
+		err := cfg.db.DeleteBookFilesFromDatabase(bookIdStruct.BookId)
+		if err != nil {
+			respondWithError(w, http.StatusInternalServerError, "Failed to associate the book and files. Files have been returned to downloads. Failed to remove file paths from book", err)
+			return
+		}
+
 		respondWithError(w, http.StatusInternalServerError, "Failed to associate the book and files. Files have been returned to downloads", err)
 		return
 	}
@@ -105,7 +113,8 @@ func (cfg *apiConfig) handlerAssociateDownloadToBook(downloadId uuid.UUID, w htt
 	if !bookIdStruct.UseDownloadedCover {
 
 		handleCoverReplacement := func() {
-			log.Println("=== Replacing the downloaded cover with the metadata cover")
+			fmt.Println()
+			log.Println("Replacing the downloaded cover with the metadata cover")
 
 			newCoverPath := path.Join(newPath, "cover.jpg")
 			if _, err := os.Stat(newCoverPath); err == nil {
@@ -137,6 +146,7 @@ func (cfg *apiConfig) handlerAssociateDownloadToBook(downloadId uuid.UUID, w htt
 		}
 
 		handleCoverReplacement()
+		fmt.Println()
 	}
 
 	err = fileManagement.CreateMetadataFile(metadata.MetadataFileFromBook(book), path.Join(newPath, "metadata.json"))

@@ -54,7 +54,7 @@ func (files *BookFiles) Prepend(p string) {
 	files.applyModifier(prepend)
 }
 
-func (files *BookFiles) ReplaceDirectory(dir string) {
+func (files *BookFiles) UpdateDirectory(dir string) {
 
 	replace := func(items []string) *[]string {
 		for i := range items {

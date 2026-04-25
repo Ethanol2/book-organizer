@@ -363,7 +363,9 @@ func (c Client) CleanupCategories() error {
 			return nil
 		}
 
-		log.Println("Deleted", count, "rows from", catType)
+		if count > 0 {
+			log.Println("Deleted", count, "rows from", catType)
+		}
 		return nil
 	}
 
