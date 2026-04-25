@@ -15,8 +15,8 @@ import Notifications from '@/components/Notifications.vue'
     <section class="body">
       <aside class="sidebar">
         <nav>
-          <RouterLink to="/add-book">Add Book</RouterLink>
           <RouterLink to="/">Library</RouterLink>
+          <RouterLink to="/add-book">Add Book</RouterLink>
           <RouterLink to="/downloads">Downloads</RouterLink>
           <RouterLink to="/about">About</RouterLink>
         </nav>
@@ -39,9 +39,11 @@ import Notifications from '@/components/Notifications.vue'
 
 .header {
   display: flex;
-  height: 100px;
-  border-bottom: 1px solid grey;
+  height: 80px;
+  background-color: var(--vt-c-nav);
   padding: 1rem;
+  font-family: "Libre Baskerville", serif;
+  box-shadow: 5px 5px 5px rgba(0, 0, 0, 0.4);
 }
 
 .body {
@@ -53,8 +55,9 @@ import Notifications from '@/components/Notifications.vue'
 
 .sidebar {
   width: 120px;
-  border-right: 1px solid grey;
+  background-color: var(--vt-c-nav);
   padding: 1rem;
+  box-shadow: 5px 5px 5px rgba(0, 0, 0, 0.4);
 }
 
 .content {
@@ -74,11 +77,11 @@ import Notifications from '@/components/Notifications.vue'
 nav {
   display: flex;
   flex-direction: column;
-  margin-top: 2rem;
+  margin-top: 1rem;
 }
 
 nav a {
-  padding: 0.5rem 0;
+  padding: 1rem 0;
   text-decoration: none;
   color: var(--color-text)
 }

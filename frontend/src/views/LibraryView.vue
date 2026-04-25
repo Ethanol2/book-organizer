@@ -155,6 +155,8 @@ onMounted(async () => {
 </script>
 
 <template>
+    <h2>Library</h2>
+    
     <section>
         <div class="library-controls">
             <div class="search-panel">
@@ -276,7 +278,7 @@ onMounted(async () => {
 }
 
 .search-field span {
-    color: #444;
+    color: var(--color-text);
     font-size: 0.82rem;
 }
 

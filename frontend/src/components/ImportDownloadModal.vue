@@ -289,8 +289,8 @@ watch(() => props.modelShow, (newVal) => {
             </select>
         </label>
 
-        <span v-if="source !== 'Library'">Use the Add Book page for more control</span>
-        <span v-else>Results don't include books with files</span>
+        <span v-if="source !== 'Library'" style="color: var(--vt-c-text-subtle);">Use the Add Book page for more control</span>
+        <span v-else style="color: var(--vt-c-text-subtle);">Results don't include books with files</span>
 
         <button type="button" @click="closeModal">Cancel</button>
       </div>
@@ -375,7 +375,7 @@ watch(() => props.modelShow, (newVal) => {
   align-items: center;
   justify-content: center;
   text-align: center;
-  color: var(--color-gray-900);
+  color: var(--vt-c-text-subtle);
   border: 1px solid var(--color-gray-300);
   border-radius: 4px;
   margin-bottom: 1rem;

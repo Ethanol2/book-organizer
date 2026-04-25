@@ -336,7 +336,7 @@ function closeModal() {
 /* Empty state message */
 .empty-state {
   margin-top: 0.8rem;
-  color: #666;
+  color: var(--vt-c-text-subtle);
 }
 
 /* Responsive design for landscape orientation */

@@ -21,7 +21,6 @@
 }
 
 .search-field span {
-  color: #444;
   font-size: 0.82rem;
 }
 
@@ -33,19 +32,26 @@
   padding: 0.75rem 1rem;
   border-radius: 6px;
   font-size: 0.95rem;
-  border: 1px solid #ccc;
+  border: 1px solid var(--vt-c-divider-light-1);
   box-sizing: border-box;
+  background: var(--vt-c-white);
+  color: var(--vt-c-text-light-1);
 }
 
 .search-select {
-  background: white;
+  background: var(--vt-c-white);
+  color: var(--vt-c-text-light-1);
 }
 
 .search-button {
-  background: #304ffe;
-  color: white;
+  background: var(--color-primary-blue);
+  color: var(--vt-c-text-light-1);
   border: none;
   cursor: pointer;
+}
+
+.search-button:hover {
+  background: var(--color-primary-blue-dark);
 }
 
 .search-button:disabled {
@@ -54,14 +60,14 @@
 }
 
 .toggle-button {
-  background: #e0e7ff;
-  color: #1b3a90;
-  border: 1px solid #c7d2fe;
+  background: var(--vt-c-white);
+  color: var(--vt-c-text-light-1);
+  border: 1px solid var(--vt-c-divider-light-1);
   cursor: pointer;
 }
 
 .toggle-button:hover {
-  background: #d4dbff;
+  background: var(--vt-c-white-soft);
 }
 
 .advanced-panel {
@@ -106,16 +112,15 @@ body {
   overflow: hidden;
 }
 
-a,
-.green {
+a {
   text-decoration: none;
-  color: hsla(160, 100%, 37%, 1);
+  color: var(--vt-c-text-light-1);
   transition: 0.4s;
   padding: 3px;
 }
 
 @media (hover: hover) {
   a:hover {
-    background-color: hsla(160, 100%, 37%, 0.2);
+    background-color: var(--vt-c-nav-hover-bg);
   }
 }

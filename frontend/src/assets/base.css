@@ -1,28 +1,36 @@
-/* color palette from <https://github.com/vuejs/theme> */
 :root {
-  --vt-c-white: #ffffff;
-  --vt-c-white-soft: #f8f8f8;
-  --vt-c-white-mute: #f2f2f2;
+  /* Base neutrals (paper-like) */
+  --vt-c-white: #f4efe6;
+  --vt-c-white-soft: #e7dccb;
+  --vt-c-white-mute: #ddd2c0;
 
-  --vt-c-black: #181818;
-  --vt-c-black-soft: #222222;
-  --vt-c-black-mute: #282828;
+  --vt-c-black: #2f2a26;
+  --vt-c-black-soft: #3a342f;
+  --vt-c-black-mute: #4a433d;
 
-  --vt-c-indigo: #2c3e50;
+  /* Nav bar */
+  --vt-c-nav: #cfc2ad;
+  --vt-c-nav-hover-bg: #e7dccb;
 
-  --vt-c-divider-light-1: rgba(60, 60, 60, 0.29);
-  --vt-c-divider-light-2: rgba(60, 60, 60, 0.12);
-  --vt-c-divider-dark-1: rgba(84, 84, 84, 0.65);
-  --vt-c-divider-dark-2: rgba(84, 84, 84, 0.48);
+  /* Main accent (sage/ink blend) */
+  --vt-c-indigo: #5a6b5c;
 
-  --vt-c-text-light-1: var(--vt-c-indigo);
-  --vt-c-text-light-2: rgba(60, 60, 60, 0.66);
-  --vt-c-text-dark-1: var(--vt-c-white);
-  --vt-c-text-dark-2: rgba(235, 235, 235, 0.64);
+  /* Dividers (soft, vintage feel) */
+  --vt-c-divider-light-1: rgba(90, 62, 43, 0.35);
+  --vt-c-divider-light-2: rgba(90, 62, 43, 0.15);
+  --vt-c-divider-dark-1: rgba(200, 170, 140, 0.6);
+  --vt-c-divider-dark-2: rgba(200, 170, 140, 0.4);
+
+  /* Text */
+  --vt-c-text-light-1: #2f2a26;
+  --vt-c-text-light-2: rgba(47, 42, 38, 0.7);
+  --vt-c-text-dark-1: #f4efe6;
+  --vt-c-text-dark-2: rgba(244, 239, 230, 0.7);
+  --vt-c-text-subtle: #8f8577;
 }
 
-/* semantic color variables for this project */
-:root {
+/* semantic color variables */
+:root.light {
   --color-background: var(--vt-c-white);
   --color-background-soft: var(--vt-c-white-soft);
   --color-background-mute: var(--vt-c-white-mute);
@@ -33,35 +41,106 @@
   --color-heading: var(--vt-c-text-light-1);
   --color-text: var(--vt-c-text-light-1);
 
-  /* Additional UI colors */
-  --color-primary-blue: #007bff;
-  --color-primary-blue-dark: #0056b3;
-  --color-primary-green: #4CAF50;
-  --color-primary-green-dark: #45a049;
-  --color-success: #16a34a;
-  --color-error: #dc2626;
-  --color-error-background: #d9534f;
-  --color-error-background-dark: #c9302c;
-  --color-error-border: #d43f3a;
-  --color-info: #2563eb;
-  --color-warning-background: #fff4f5;
-  --color-warning-border: #f5c2c7;
-  --color-warning-text: #842029;
+  /* Primary UI colors (adapted to palette) */
+  --color-primary-blue: #7e8f7a;         /* sage green */
+  --color-primary-blue-dark: #5a6b5c;
 
-  /* Neutral grays */
-  --color-gray-100: #f9f9f9;
-  --color-gray-150: #f5f5f5;
-  --color-gray-200: #f2f2f2;
-  --color-gray-300: #eee;
-  --color-gray-400: #e9e9e9;
-  --color-gray-500: #ddd;
-  --color-gray-600: #ccc;
-  --color-gray-700: #999;
-  --color-gray-800: #888;
-  --color-gray-900: #666;
-  --color-gray-950: #555;
+  --color-primary-green: #a8b29a;
+  --color-primary-green-dark: #7e8f7a;
+
+  --color-success: #7e9c6b;
+
+  --color-error: #c97a5a;
+  --color-error-background: #d6a5a0;
+  --color-error-background-dark: #b96a4c;
+  --color-error-border: #b96a4c;
+
+  --color-info: #8fa8a3;
+
+  --color-warning-background: #f3e3d3;
+  --color-warning-border: #d8bfa3;
+  --color-warning-text: #8b5e3c;
+
+  /* Neutral grays (warm toned) */
+  --color-gray-100: #f7f3ec;
+  --color-gray-150: #efe7dc;
+  --color-gray-200: #e7dccb;
+  --color-gray-300: #ddd2c0;
+  --color-gray-400: #cfc2ad;
+  --color-gray-500: #b8a995;
+  --color-gray-600: #a08f7c;
+  --color-gray-700: #7a6b5c;
+  --color-gray-800: #5a4e43;
+  --color-gray-900: #3f372f;
+  --color-gray-950: #2f2a26;
 
   --section-gap: 160px;
+}
+:root {
+  --vt-c-white: #2b2623;
+  --vt-c-white-soft: #332d29;
+  --vt-c-white-mute: #3b342f;
+
+  --vt-c-nav: #3b342f;
+  --vt-c-nav-hover-bg: #4a433d;;
+
+  --vt-c-black: #f4efe6;
+  --vt-c-black-soft: #e7dccb;
+  --vt-c-black-mute: #d8ccb8;
+
+  --vt-c-indigo: #a8b29a;
+
+  --vt-c-divider-light-1: rgba(215, 195, 170, 0.35);
+  --vt-c-divider-light-2: rgba(215, 195, 170, 0.15);
+  --vt-c-divider-dark-1: rgba(0, 0, 0, 0.6);
+  --vt-c-divider-dark-2: rgba(0, 0, 0, 0.4);
+
+  --vt-c-text-light-1: #f4efe6;
+  --vt-c-text-light-2: rgba(244, 239, 230, 0.7);
+  --vt-c-text-dark-1: #2f2a26;
+  --vt-c-text-dark-2: rgba(47, 42, 38, 0.7);
+  --vt-c-text-subtle: #b8a995;
+
+  --color-background: #2b2623;
+  --color-background-soft: #332d29;
+  --color-background-mute: #3b342f;
+
+  --color-border: rgba(215, 195, 170, 0.15);
+  --color-border-hover: rgba(215, 195, 170, 0.35);
+
+  --color-heading: #f4efe6;
+  --color-text: #e7dccb;
+
+  --color-primary-blue: #7e8f7a;
+  --color-primary-blue-dark: #a8b29a;
+
+  --color-primary-green: #8fa87f;
+  --color-primary-green-dark: #a8b29a;
+
+  --color-success: #8fa87f;
+
+  --color-error: #d08770;
+  --color-error-background: #6b3e34;
+  --color-error-background-dark: #5a332b;
+  --color-error-border: #d08770;
+
+  --color-info: #8fa8a3;
+
+  --color-warning-background: #4a3a2a;
+  --color-warning-border: #8b6a4f;
+  --color-warning-text: #f3e3d3;
+
+  --color-gray-100: #332d29;
+  --color-gray-150: #3b342f;
+  --color-gray-200: #4a433d;
+  --color-gray-300: #5a4e43;
+  --color-gray-400: #6b5c4f;
+  --color-gray-500: #7a6b5c;
+  --color-gray-600: #a08f7c;
+  --color-gray-700: #b8a995;
+  --color-gray-800: #cfc2ad;
+  --color-gray-900: #e7dccb;
+  --color-gray-950: #f4efe6;
 }
 
 @media (prefers-color-scheme: dark) {
