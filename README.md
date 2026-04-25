@@ -52,8 +52,20 @@ Clone or download the repo to your local machine. I'm not sure if it works using
   - Frontend
     ```bash
     cd frontend
+    npm install
     npm run dev
     ```
+    The frontend will be available at the local development server (typically `http://localhost:5173`)
+
+### Frontend Development
+
+Build and production:
+```bash
+npm run build      # Build for production
+npm run preview    # Preview production build locally
+npm run type-check # Type check TypeScript code
+npm run lint       # Lint and format code
+```
 ---
 
 ## Contributing
@@ -62,40 +74,72 @@ If you'd like to contribute, please fork the repository and open a pull request 
  
 ## Technologies
 
-- **Language**: Go
-- **Frontend**: Vue *(in development)*
+- **Language**: Go (backend)
+- **Frontend**: Vue 3 with TypeScript, Vite bundler, Pinia state management
 - **Database**: SQLite
 - **Runtime**: Docker *(planned)*
+
+### Frontend Stack
+- Vue 3 (Composition API)
+- TypeScript for type safety
+- Vite for fast development and optimized builds
+- Vue Router for navigation
+- Pinia for state management
+- ESLint + Prettier for code quality
+
+### Backend Stack
+- Go standard library with custom middleware
+- SQLite3 driver
+- RESTful API design
 
 ## Features
 
 ### New File Scanning
 
-The app periodically scans a configurable downloads folder for new book directories.
+The app periodically scans a configurable downloads folder for new book directories. It detects:
 
 - The folder name
-- Detected file types (audio files, ebook files, cover art, etc.)
+- File types (audio files, ebook files, cover art, etc.)
 
-From the UI, are able to view and will be able to manage this pending list.
+From the UI, users can view and manage this pending list, associating downloads with library entries.
 
 ### Book Library
 
-Books are stored in a `books` table in SQLite. Once a pending download is associated with a book, the app will move its files into the library folder using a fixed structure, for example:
+Books are stored in a SQLite database. Once a pending download is associated with a book, the app moves its files into the library folder using a fixed structure:
 
 `Author/Series/Book Title/`
 
-Currently the backend can make queries to Google Books and OpenLibrary.
+The system can fetch metadata from Google Books and OpenLibrary.
 
-### Frontend and Backend
+### Frontend
 
-- **Backend**: Go, exposing a RESTful HTTP API.
-- **Frontend**: A Vue single-page application that interacts with the API to:
-  - List pending downloads
-  - Search and select metadata
-  - Create and edit book entries
-  - Trigger imports/moves
+A responsive Vue 3 single-page application with the following pages:
+
+- **Library** — Browse all books in your collection with filtering and advanced search
+- **Downloads** — View pending imports and associate them with books
+- **Add Book** — Search metadata sources and create new book entries
+- **Book Details** — View and edit book information, metadata, and associated files
+- **About** — Application information
+
+### Backend
+
+Go-based RESTful API handling all data management, metadata search, file organization, and database operations.
 
 ## Planned Features
+
+### Audible
+
+In my experience, Audible is a vastly better source of metadata than OpenLibrary and Google Books. The complication is that the endpoints aren't officially accessible, so no official documentation (as far as I know).
+
+### Login
+
+Add a login system to protect libraries that are publically accessible
+
+### Library Scanning
+
+Add a scanning system for adding books already in a library
+
+
 
 ### qBittorrent Integration (Nice-to-have)
 
@@ -201,26 +245,34 @@ Below are the current HTTP endpoints and the JSON structures they expect and ret
   - **Request:** Raw binary image in the request body with `Content-Type: image/jpeg|png|webp|gif`
   - **Response:** 200 OK — updated `Book` object
 
+- **DELETE /api/books/{id}**
+  - **Description:** Delete a book from the library
+  - **Response:** 200 OK — confirmation message
+
 ---
 
 ### Metadata 🔎
 
 - **GET /api/metadata/**
-  - **Description:** Search OpenLibrary for metadata matching the provided query parameters
-  - **Metadata Source:**
-    Current sources are Open Library or Google Books (requires api key)
-    ```
-    ?source=google+books
-    ```
-  - **Search Params:** (all fields are optional)
-    - title
-    - author
-    - year
-    - publisher
-    - isbn
-    - genre(s) `?genre=scifi&genre=fantasy`
-    - languages(s) `?language=eng&language=fr`
-  - **Response:** 200 OK — `SearchResults`
+  - **Description:** Search for metadata from OpenLibrary or Google Books
+  - **Query Params:** (all fields are optional)
+    - `source` — metadata source to search (`openlibrary` or `googlebooks`; defaults to `openlibrary`)
+    - `title` — book title
+    - `author` — author name
+    - `year` — publication year
+    - `publisher` — publisher name
+    - `isbn` — ISBN
+    - `genre` — genre(s) (repeatable: `?genre=scifi&genre=fantasy`)
+    - `language` — language code(s) (repeatable: `?language=eng&language=fr`)
+  - **Response:** 200 OK — `SearchResults` object
+
+- **GET /api/metadata/{id}**
+  - **Description:** Get detailed metadata for a specific result from a metadata source
+  - **URL Params:**
+    - `id` — metadata provider ID (OpenLibrary work ID or Google Books volume ID)
+  - **Query Params:**
+    - `source` — metadata source (`openlibrary` or `googlebooks`)
+  - **Response:** 200 OK — full `Book` object with metadata populated
 
 ---
 
@@ -278,13 +330,9 @@ These are served directly from the configured folders:
     --data-binary @cover.jpg | jq .
   ```
 
-### Categories
-
-- Add a category value:
+- Delete a book:
   ```bash
-  curl -X POST http://localhost:8080/api/categories/series \
-    -H "Content-Type: application/json" \
-    -d '{"value":"My Series"}' | jq .
+  curl -X DELETE http://localhost:8080/api/books/<BOOK_ID> | jq .
   ```
 
 ### Metadata
