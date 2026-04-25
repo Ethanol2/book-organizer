@@ -1,4 +1,4 @@
-# book-organizer
+# <img src="frontend/src/assets/book-organizer-logo.png" width="50"> book-organizer
 
 An app written in Go and designed to run in Docker that helps organize a book library.
 
