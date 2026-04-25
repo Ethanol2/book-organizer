@@ -27,18 +27,20 @@ const useDownloadedCover = ref(true);
 const source = ref<MetadataType | string>('Library');
 
 const downloadName = computed(() => getDownloadName(props.download));
-const isAssociating = ref(false);
+const isImporting = ref(false);
 
 const metadataSearchBufferTime = 500;
 let waitingForInputStop = true;
 
 const associateDownload = async (book: BookSummary | BookParams, isSummary: boolean) => {
   
-  if (isAssociating.value) {
+  if (isImporting.value) {
     return;
   }
+  isImporting.value = true;
 
   let id;
+  var notifId;
 
   if (isSummary) 
   {
@@ -46,13 +48,32 @@ const associateDownload = async (book: BookSummary | BookParams, isSummary: bool
   } 
   else
   {
-    const bookDetails = await getMetadataDetails(book as BookParams);
+    notifId = notificationsStore.notifyInfo(`Fetching book details from ${source.value}...`);
+    const bookDetails = await getMetadataDetails(book as BookParams);    
+    notificationsStore.removeNotification(notifId);
+    if (bookDetails == null) {
+      notificationsStore.notifyError(`Failed to fetch book details from ${source.value}`);
+    }
+    else {
+      notificationsStore.notifySuccess(`Successfully fetched book details from ${source.value}`);
+    }
+
+    notifId = notificationsStore.notifyInfo('Adding book...');
     const fullBook = await postBook(bookDetails ?? book);
-    if (fullBook == null) return;
+    notificationsStore.removeNotification(notifId);
+
+    if (fullBook == null) {
+      notificationsStore.notifyError('Failed to add book');
+      isImporting.value = false;
+      return
+    }
+
+    notificationsStore.notifySuccess('Successfully added book');
     id = fullBook.id;
   }
+
+  notifId = notificationsStore.notifyInfo(`Associating "${book.title}" with the download...`);
   
-  isAssociating.value = true;
   try {
     const response = await fetch(`/api/downloads/${props.download.id}/associate`, {
       method: 'POST',
@@ -73,14 +94,15 @@ const associateDownload = async (book: BookSummary | BookParams, isSummary: bool
     notificationsStore.notifySuccess(`Successfully associated "${book.title}" with the download`);
     closeModal();
     await router.push({ name: 'book-details', params: { id: id } });
-
+    
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Failed to associate download';
     notificationsStore.notifyError(message);
     closeModal();
-
+    
   } finally {
-    isAssociating.value = false;
+    notificationsStore.removeNotification(notifId);
+    isImporting.value = false;
   }
 };
 
@@ -214,7 +236,7 @@ watch(() => props.modelShow, (newVal) => {
             v-for="book in searchResults as BookSummary[]"
             :key="book.id"
             @click="associateDownload(book, true)"
-            :disabled="isAssociating"
+            :disabled="isImporting"
             class="result-item result-button"
           >
             <img
@@ -236,7 +258,7 @@ watch(() => props.modelShow, (newVal) => {
             v-for="(book, index) in searchResults as BookParams[]"
             :key="index"
             @click="associateDownload(book, false)"
-            :disabled="isAssociating"
+            :disabled="isImporting"
             class="result-item result-button"
           >
             <img
@@ -272,6 +294,14 @@ watch(() => props.modelShow, (newVal) => {
 
         <button type="button" @click="closeModal">Cancel</button>
       </div>
+
+      <!-- Loading overlay -->
+      <div v-if="isImporting" class="import-loading-overlay">
+        <div class="loading-content">
+          <div class="spinner"></div>
+          <p>Importing...</p>
+        </div>
+      </div>
     </div>
   </div>
 </template>
@@ -301,6 +331,7 @@ watch(() => props.modelShow, (newVal) => {
   height: 800px;
   display: flex;
   flex-direction: column;
+  position: relative;
 }
 
 .modal h3 {
@@ -448,5 +479,41 @@ watch(() => props.modelShow, (newVal) => {
   display: flex;
   align-items: center;
   justify-content: center;
+}
+
+/* Loading overlay */
+.import-loading-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(255, 255, 255, 0.9);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  z-index: 2000;
+}
+
+.loading-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+}
+
+.spinner {
+  border: 4px solid #f3f3f3;
+  border-top: 4px solid #007bff;
+  border-radius: 50%;
+  width: 40px;
+  height: 40px;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
 }
 </style>

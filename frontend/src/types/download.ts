@@ -7,7 +7,7 @@ export type Download = {
 }
 
 export function getDownloadName(download: Download): string {
-    console.log(download)
+    //console.log(download)
     if (download == null || download.files.root == null) {
         return "Error: No root found";
     }
