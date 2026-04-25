@@ -323,7 +323,7 @@ watch(() => props.modelShow, (newVal) => {
 
 /* Modal dialog container */
 .modal {
-  background: white;
+  background: var(--color-background);
   padding: 2rem;
   border-radius: 8px;
   max-width: 600px;
@@ -361,7 +361,7 @@ watch(() => props.modelShow, (newVal) => {
 .search-section input {
   width: 100%;
   padding: 0.5rem;
-  border: 1px solid #ccc;
+  border: 1px solid var(--color-gray-600);
   border-radius: 4px;
   box-sizing: border-box;
   font-family: inherit;
@@ -375,8 +375,8 @@ watch(() => props.modelShow, (newVal) => {
   align-items: center;
   justify-content: center;
   text-align: center;
-  color: #666;
-  border: 1px solid #eee;
+  color: var(--color-gray-900);
+  border: 1px solid var(--color-gray-300);
   border-radius: 4px;
   margin-bottom: 1rem;
 }
@@ -389,7 +389,7 @@ watch(() => props.modelShow, (newVal) => {
 .results-list {
   flex: 1;
   overflow-y: auto;
-  border: 1px solid #eee;
+  border: 1px solid var(--color-gray-300);
   border-radius: 4px;
   margin-bottom: 1rem;
 }
@@ -398,7 +398,7 @@ watch(() => props.modelShow, (newVal) => {
   display: flex;
   align-items: center;
   padding: 1rem;
-  border-bottom: 1px solid #eee;
+  border-bottom: 1px solid var(--color-gray-300);
   gap: 1rem;
 }
 
@@ -412,7 +412,7 @@ watch(() => props.modelShow, (newVal) => {
 }
 
 .result-button:hover:not(:disabled) {
-  background-color: #f5f5f5;
+  background-color: var(--color-gray-150);
 }
 
 .result-button:disabled {
@@ -421,7 +421,7 @@ watch(() => props.modelShow, (newVal) => {
 }
 
 .result-button:focus {
-  outline: 2px solid #007bff;
+  outline: 2px solid var(--color-primary-blue);
   outline-offset: -2px;
 }
 
@@ -437,7 +437,7 @@ watch(() => props.modelShow, (newVal) => {
 
 .book-info p {
   margin: 0.25rem 0;
-  color: #666;
+  color: var(--color-gray-900);
   font-size: 0.9rem;
 }
 
@@ -460,16 +460,16 @@ watch(() => props.modelShow, (newVal) => {
 
 .modal-buttons button {
   padding: 0.5rem 1rem;
-  border: 1px solid #ccc;
+  border: 1px solid var(--color-gray-600);
   border-radius: 4px;
-  background: #f9f9f9;
+  background: var(--color-gray-100);
   cursor: pointer;
   font-size: 0.95rem;
   transition: background-color 0.2s;
 }
 
 .modal-buttons button:hover {
-  background: #e9e9e9;
+  background: var(--color-gray-400);
 }
 
 .download-cover {
@@ -504,8 +504,8 @@ watch(() => props.modelShow, (newVal) => {
 }
 
 .spinner {
-  border: 4px solid #f3f3f3;
-  border-top: 4px solid #007bff;
+  border: 4px solid var(--color-gray-200);
+  border-top: 4px solid var(--color-primary-blue);
   border-radius: 50%;
   width: 40px;
   height: 40px;

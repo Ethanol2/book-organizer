@@ -59,8 +59,8 @@ const cover = props.book.cover == null ? "" : props.book.cover
 .cover {
     width: 160px;
     max-height: 256px;
-    border: 1px solid grey;
-    box-shadow: 0 0 5px black;
+    border: 1px solid var(--color-gray-700);
+    box-shadow: 0 0 5px var(--vt-c-black);
 }
 
 .no-cover {
@@ -70,8 +70,8 @@ const cover = props.book.cover == null ? "" : props.book.cover
     max-height: 256px;
     align-items: center;
     justify-content: center;
-    border: 1px solid grey;
-    box-shadow: 0 0 5px black;
+    border: 1px solid var(--color-gray-700);
+    box-shadow: 0 0 5px var(--vt-c-black);
 }
 
 .info {

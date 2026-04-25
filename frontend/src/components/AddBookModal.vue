@@ -184,7 +184,7 @@ watch(
 
 /* Modal dialog container */
 .modal {
-  background: white;
+  background: var(--color-background);
   padding: 2rem;
   border-radius: 8px;
   max-width: 600px;
@@ -209,7 +209,7 @@ watch(
 .modal textarea {
   width: 100%;
   padding: 0.5rem;
-  border: 1px solid #ccc;
+  border: 1px solid var(--color-gray-600);
   border-radius: 4px;
   margin-bottom: 1rem;
   box-sizing: border-box;
@@ -232,40 +232,40 @@ watch(
 
 .modal-buttons button {
   padding: 0.5rem 1rem;
-  border: 1px solid #ccc;
+  border: 1px solid var(--color-gray-600);
   border-radius: 4px;
-  background: #f9f9f9;
+  background: var(--color-gray-100);
   cursor: pointer;
   font-size: 0.95rem;
   transition: background-color 0.2s;
 }
 
 .modal-buttons button:hover {
-  background: #e9e9e9;
+  background: var(--color-gray-400);
 }
 
 /* Submit button styling */
 .modal-buttons button[type="submit"] {
-  background: #4CAF50;
+  background: var(--color-primary-green);
   color: white;
-  border-color: #45a049;
+  border-color: var(--color-primary-green-dark);
 }
 
 .modal-buttons button[type="submit"]:hover {
-  background: #45a049;
+  background: var(--color-primary-green-dark);
 }
 
 .modal-delete-wrap {
   margin-top: 1rem;
-  border-top: 1px solid #ddd;
+  border-top: 1px solid var(--color-gray-500);
   padding-top: 1rem;
 }
 
 .delete-book-button {
   padding: 0.5rem 1rem;
-  border: 1px solid #d43f3a;
+  border: 1px solid var(--color-error-border);
   border-radius: 4px;
-  background: #d9534f;
+  background: var(--color-error-background);
   color: white;
   cursor: pointer;
   font-size: 0.95rem;
@@ -273,14 +273,14 @@ watch(
 }
 
 .delete-book-button:hover {
-  background: #c9302c;
+  background: var(--color-error-background-dark);
 }
 
 .delete-confirmation {
   margin-top: 1rem;
   padding: 1rem;
-  background: #fff4f5;
-  border: 1px solid #f5c2c7;
+  background: var(--color-warning-background);
+  border: 1px solid var(--color-warning-border);
   border-radius: 6px;
 }
 
@@ -293,7 +293,7 @@ watch(
 
 .delete-confirmation-copy {
   margin: 0;
-  color: #842029;
+  color: var(--color-warning-text);
   font-weight: 600;
   text-align: left;
   flex: 1;

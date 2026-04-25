@@ -46,7 +46,7 @@ const formattedAuthors = (item: BookParams) => {
 <style scoped>
 /* Individual result item - clickable card */
 .result-item {
-  border: 1px solid #ccc;
+  border: 1px solid var(--color-gray-600);
   border-radius: 8px;
   padding: 0.8rem;
   display: grid;
@@ -57,15 +57,15 @@ const formattedAuthors = (item: BookParams) => {
 }
 
 .result-item:hover {
-  background: #f9f9f9;
+  background: var(--color-gray-100);
 }
 
 /* Cover image or placeholder */
 .cover-placeholder {
   width: 100%;
   height: 250px;
-  background: #eee;
-  border: 1px solid #ccc;
+  background: var(--color-gray-300);
+  border: 1px solid var(--color-gray-600);
   border-radius: 4px;
   flex-shrink: 0;
 }
@@ -85,7 +85,7 @@ const formattedAuthors = (item: BookParams) => {
 
 .result-details .subtitle {
   margin: 0.2rem 0;
-  color: #333;
+  color: var(--color-gray-950);
   font-size: 0.9rem;
 }
 
@@ -93,14 +93,14 @@ const formattedAuthors = (item: BookParams) => {
 .result-details .publisher {
   margin: 0.2rem 0;
   font-size: 0.9rem;
-  color: #555;
+  color: var(--color-gray-950);
 }
 
 /* Truncated description - max 3 lines */
 .description {
   margin-top: 0.45rem;
   line-height: 1.35;
-  color: #444;
+  color: var(--color-gray-900);
   font-size: 0.85rem;
   overflow: hidden;
   display: -webkit-box;

@@ -35,7 +35,7 @@ const props = defineProps<{
 .card {
   height: 140px;
   width: 100%;
-  border: 1px solid grey;
+  border: 1px solid var(--color-gray-700);
   border-radius: 6px;
   padding: 6px;
   margin-bottom: 1rem;
@@ -57,7 +57,7 @@ const props = defineProps<{
   height: 100%;
   display: flex;
   text-align: center;
-  border: 1px solid grey;
+  border: 1px solid var(--color-gray-700);
 }
 
 .cover {
@@ -81,7 +81,7 @@ h3 {
   bottom: 0;
   right: 0;
   padding: 0.5rem 1rem;
-  background-color: #007bff;
+  background-color: var(--color-primary-blue);
   color: white;
   border: none;
   border-radius: 4px;
@@ -89,6 +89,6 @@ h3 {
 }
 
 .import-button:hover {
-  background-color: #0056b3;
+  background-color: var(--color-primary-blue-dark);
 }
 </style>

@@ -47,15 +47,15 @@ function closeNotification(id: string) {
 }
 
 .notification.success {
-  background: #16a34a;
+  background: var(--color-success);
 }
 
 .notification.error {
-  background: #dc2626;
+  background: var(--color-error);
 }
 
 .notification.info {
-  background: #2563eb;
+  background: var(--color-info);
 }
 
 .notification-content {
