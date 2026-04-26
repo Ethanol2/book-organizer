@@ -4,7 +4,7 @@ import { computed, onMounted, ref } from 'vue';
 import { RouterLink, useRoute, useRouter } from 'vue-router';
 import AddBookModal from '@/components/AddBookModal.vue';
 import { useNotificationsStore } from '@/stores/notifications';
-import {basename} from '@/types/download';
+import { basename } from '@/types/download';
 
 const route = useRoute();
 const router = useRouter();
@@ -51,7 +51,7 @@ async function submitEdit(newData: BookParams) {
   if (!book.value) {
     return;
   }
-  
+
   newData.title = newData.title == book.value.title ? undefined : newData.title;
   newData.subtitle = newData.subtitle == book.value.subtitle ? undefined : newData.subtitle;
   newData.description = newData.description == book.value.description ? undefined : newData.description;
@@ -95,7 +95,7 @@ async function deleteBook(payload: { deleteFiles: boolean }) {
   deleting.value = true;
 
   try {
-    const resp = await fetch(`/api/books/${book.value.id}?${(new URLSearchParams({"delete files": payload.deleteFiles.toString()}))}`, {
+    const resp = await fetch(`/api/books/${book.value.id}?${(new URLSearchParams({ "delete files": payload.deleteFiles.toString() }))}`, {
       method: 'DELETE',
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
@@ -136,8 +136,8 @@ const formattedGenres = computed(() => {
 });
 
 const formattedSeries = computed(() => {
-    var series = getSeriesString(book.value?.series ?? []);
-    return series.length == 0 ? '' : series;
+  var series = getSeriesString(book.value?.series ?? []);
+  return series.length == 0 ? '' : series;
 });
 
 const formattedNarrators = computed(() => {
@@ -299,14 +299,8 @@ onMounted(async () => {
     </div>
     <div v-else class="status-message">Book not found.</div>
 
-    <AddBookModal
-      :show="showEditModal"
-      :params="editParams"
-      :showDeleteButton="true"
-      @close="closeEditModal"
-      @add-book="submitEdit"
-      @delete-book="deleteBook"
-    />
+    <AddBookModal :show="showEditModal" :params="editParams" :showDeleteButton="true" @close="closeEditModal"
+      @add-book="submitEdit" @delete-book="deleteBook" />
   </div>
 </template>
 
@@ -327,8 +321,8 @@ onMounted(async () => {
 }
 
 .status-error {
-  border: 1px solid rgba(220, 38, 38, 0.2);
-  color: rgb(220, 38, 38);
+  border: 1px solid var(--color-error-border);
+  color: var(--color-error);
 }
 
 .details-shell {
@@ -369,7 +363,7 @@ onMounted(async () => {
 
 .back-button:hover {
   transform: translateX(-1px);
-  background: rgba(54, 140, 211, 0.1);
+  background: var(--color-border-hover);
 }
 
 .edit-button {
@@ -385,7 +379,7 @@ onMounted(async () => {
 
 .edit-button:hover {
   transform: translateY(-1px);
-  background: rgba(54, 140, 211, 0.1);
+  background: var(--color-border-hover);
 }
 
 .details-hero {
@@ -394,8 +388,7 @@ onMounted(async () => {
   gap: 1.5rem;
   padding: 1.5rem;
   border-radius: 6px;
-  background: radial-gradient(circle at top left, rgba(31, 96, 103, 0.12), transparent 40%),
-    var(--color-background-soft);
+  background: var(--color-background-soft);
   border: 1px solid var(--color-border);
 }
 
@@ -429,13 +422,7 @@ onMounted(async () => {
 .hero-subtitle {
   margin: 0.5rem 0 0;
   font-size: 1rem;
-  color: rgba(60, 60, 60, 0.8);
-  max-width: 72ch;
-}
-
-.hero-subtitle {
-  font-size: 1rem;
-  color: rgba(60, 60, 60, 0.8);
+  color: var(--color-text-subtle);
   max-width: 72ch;
 }
 
@@ -454,7 +441,7 @@ onMounted(async () => {
 
 .stat-label {
   display: block;
-  color: rgba(60, 60, 60, 0.7);
+  color: var(--color-text-subtle);
   font-size: 0.85rem;
   margin-bottom: 0.35rem;
 }
@@ -465,7 +452,7 @@ onMounted(async () => {
   grid-template-columns: 1fr;
 }
 
-.hero-info-grid > div {
+.hero-info-grid>div {
   display: grid;
   grid-template-columns: minmax(100px, 140px) minmax(0, 1fr);
   gap: 0.8rem;
@@ -473,14 +460,14 @@ onMounted(async () => {
 
 .hero-info-grid dt {
   font-size: 0.85rem;
-  color: rgba(60, 60, 60, 0.7);
+  color: var(--color-text-subtle);
   font-weight: 600;
 }
 
 .hero-info-grid dd {
   margin: 0;
   font-size: 0.9rem;
-  color: rgba(20, 20, 20, 0.95);
+  color: var(--color-text);
 }
 
 @media (min-width: 1200px) {
@@ -488,7 +475,7 @@ onMounted(async () => {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .hero-info-grid > div {
+  .hero-info-grid>div {
     display: flex;
     flex-direction: column;
     gap: 0.3rem;
@@ -513,7 +500,7 @@ onMounted(async () => {
   display: inline-flex;
   padding: 0.45rem 0.8rem;
   border-radius: 999px;
-  background: rgba(54, 140, 211, 0.1);
+  background: var(--color-background);
   color: var(--color-text);
   font-size: 0.85rem;
 }
@@ -546,12 +533,12 @@ onMounted(async () => {
 
 .description {
   margin: 0;
-  color: rgba(60, 60, 60, 0.85);
+  color: var(--color-text);
   line-height: 1.75;
 }
 
 .muted {
-  color: rgba(60, 60, 60, 0.55);
+  color: var(--color-text-subtle);
 }
 
 .info-grid {
@@ -562,13 +549,13 @@ onMounted(async () => {
 
 .info-grid dt {
   font-size: 0.85rem;
-  color: rgba(60, 60, 60, 0.7);
+  color: var(--color-text-subtle);
 }
 
 .info-grid dd {
   margin: 0;
   font-size: 0.95rem;
-  color: rgba(20, 20, 20, 0.95);
+  color: var(--color-text);
 }
 
 .file-overview {
@@ -582,18 +569,19 @@ onMounted(async () => {
   gap: 1rem;
   padding: 0.95rem 1rem;
   border-radius: 6px;
-  background: rgba(54, 140, 211, 0.08);
+  background: var(--color-background);
+  border: 1px solid var(--color-border);
 }
 
 .file-metric .metric-label {
-  color: rgba(60, 60, 60, 0.75);
+  color: var(--color-text-subtle);
   font-size: 0.9rem;
 }
 
 .file-list-group h3 {
   margin: 1rem 0 0.6rem;
   font-size: 0.95rem;
-  color: rgba(60, 60, 60, 0.8);
+  color: var(--color-text-subtle);
 }
 
 .file-list {
@@ -611,10 +599,11 @@ onMounted(async () => {
   border-radius: 6px;
   background: var(--color-background);
   border: 1px solid var(--color-border);
-  color: rgba(30, 30, 30, 0.9);
+  color: var(--color-text);
 }
 
 @media (max-width: 960px) {
+
   .details-hero,
   .details-grid {
     grid-template-columns: 1fr;

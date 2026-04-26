@@ -57,7 +57,7 @@ function resetFormFields() {
   narratorsInput.value = getCategoriesString(params?.narrators ?? [])
   seriesInput.value = getSeriesString(params?.series ?? [])
   genresInput.value = getCategoriesString(params?.genres ?? [])
-  tagsInput.value =  params?.tags ? params.tags.join(', ') : ''
+  tagsInput.value = params?.tags ? params.tags.join(', ') : ''
   resetConfirmState()
 }
 
@@ -143,7 +143,7 @@ watch(
 
         <!-- Action buttons -->
         <div class="modal-buttons">
-          <button type="button" @click="handleOverlayClick">Cancel</button>
+          <button type="cancel" @click="handleOverlayClick">Cancel</button>
           <button type="submit">{{ submitLabel }}</button>
         </div>
 
@@ -208,13 +208,13 @@ watch(
 .modal input,
 .modal textarea {
   width: 100%;
-  padding: 0.5rem;
-  border: 1px solid var(--color-gray-600);
-  border-radius: 4px;
-  margin-bottom: 1rem;
-  box-sizing: border-box;
-  font-family: inherit;
+  padding: 0.75rem 1rem;
+  border-radius: 6px;
   font-size: 0.95rem;
+  border: 1px solid var(--vt-c-divider-light-1);
+  box-sizing: border-box;
+  background: var(--vt-c-white);
+  color: var(--vt-c-text-light-1);
 }
 
 .modal textarea {
@@ -247,12 +247,24 @@ watch(
 /* Submit button styling */
 .modal-buttons button[type="submit"] {
   background: var(--color-primary-green);
-  color: white;
+  color: var(--vt-c-text-light-1);
   border-color: var(--color-primary-green-dark);
 }
 
 .modal-buttons button[type="submit"]:hover {
   background: var(--color-primary-green-dark);
+}
+
+/* Cancel button styling */
+
+.modal-buttons button[type="cancel"] {
+  background: var(--color-warning-background);
+  color: var(--vt-c-text-light-1);
+  border-color: var(--color-warning-border);
+}
+
+.modal-buttons button[type="cancel"]:hover {
+  background: var(--color-warning-border);
 }
 
 .modal-delete-wrap {
