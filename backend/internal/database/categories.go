@@ -307,16 +307,12 @@ func (c Client) GetCategoryTypesAssociatedWithBook(bookId string, categoryType C
 }
 
 func CategoryToStrSlice(items []Category) []string {
-	strings := []string{}
+	names := []string{}
 	for i := range items {
-		indexStr := ""
-		if items[i].Index != nil {
-			indexStr = fmt.Sprint(items[i])
-		}
-		strings = append(strings, fmt.Sprintf("%s %s", items[i].Name, indexStr))
+		names = append(names, items[i].Name)
 	}
 
-	return strings
+	return names
 }
 
 func stringToCategoryType(str string) CategoryType {

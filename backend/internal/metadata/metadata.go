@@ -29,6 +29,11 @@ type SearchResults struct {
 	Items      []database.BookParams `json:"items"`
 }
 
+type MetadataFileSeries struct {
+	Series   string `json:"series"`
+	Sequence string `json:"sequence,omitempty"`
+}
+
 // Matches AudioBookshelf's metadata format
 type MetadataFile struct {
 	Tags     []string `json:"tags"`
@@ -37,22 +42,22 @@ type MetadataFile struct {
 		Start int     `json:"start"`
 		End   float64 `json:"end"`
 		Title string  `json:"title"`
-	} `json:"chapters"`
-	Title         string   `json:"title"`
-	Subtitle      *string  `json:"subtitle,omitempty"`
-	Authors       []string `json:"authors"`
-	Narrators     []string `json:"narrators"`
-	Series        []string `json:"series"`
-	Genres        []string `json:"genres"`
-	PublishedYear string   `json:"publishedYear"`
-	PublishedDate *string  `json:"publishedDate"`
-	Publisher     string   `json:"publisher"`
-	Description   string   `json:"description"`
-	Isbn          string   `json:"isbn"`
-	Asin          string   `json:"asin"`
-	Language      string   `json:"language"`
-	Explicit      bool     `json:"explicit"`
-	Abridged      bool     `json:"abridged"`
+	} `json:"chapters,omitempty"`
+	Title         string               `json:"title"`
+	Subtitle      *string              `json:"subtitle,omitempty"`
+	Authors       []string             `json:"authors"`
+	Narrators     []string             `json:"narrators"`
+	Series        []MetadataFileSeries `json:"series"`
+	Genres        []string             `json:"genres"`
+	PublishedYear string               `json:"publishedYear"`
+	PublishedDate *string              `json:"publishedDate"`
+	Publisher     string               `json:"publisher"`
+	Description   string               `json:"description"`
+	Isbn          string               `json:"isbn"`
+	Asin          string               `json:"asin"`
+	Language      string               `json:"language"`
+	Explicit      bool                 `json:"explicit,omitempty"`
+	Abridged      bool                 `json:"abridged,omitempty"`
 }
 
 func MetadataFileFromBook(book database.Book) MetadataFile {
@@ -78,17 +83,32 @@ func MetadataFileFromBook(book database.Book) MetadataFile {
 		asin = *book.ASIN
 	}
 
+	year := ""
+	if book.Year != nil {
+		year = fmt.Sprint(*book.Year)
+	}
+
+	series := []MetadataFileSeries{}
+	for _, item := range book.Series {
+		sequence := ""
+		if item.Index != nil {
+			sequence = fmt.Sprint(*item.Index)
+		}
+		series = append(series, MetadataFileSeries{Series: item.Name, Sequence: sequence})
+	}
+
 	md.Title = book.Title
 	md.Subtitle = book.Subtitle
 	md.Authors = database.CategoryToStrSlice(book.Authors)
 	md.Narrators = database.CategoryToStrSlice(book.Narrators)
-	md.Series = database.CategoryToStrSlice(book.Series)
+	md.Series = series
 	md.Genres = database.CategoryToStrSlice(book.Genres)
-	md.PublishedYear = fmt.Sprint(*book.Year)
+	md.PublishedYear = year
 	md.Publisher = pub
 	md.Description = desc
 	md.Isbn = isbn
 	md.Asin = asin
+	md.Tags = book.Tags
 
 	return md
 }

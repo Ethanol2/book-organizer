@@ -10,6 +10,7 @@ import (
 
 	"github.com/Ethanol2/book-organizer/internal/database"
 	"github.com/Ethanol2/book-organizer/internal/fileManagement"
+	"github.com/Ethanol2/book-organizer/internal/metadata"
 	"github.com/google/uuid"
 	"github.com/mattn/go-sqlite3"
 )
@@ -192,6 +193,10 @@ func (cfg *apiConfig) handlerUpdateBook(id uuid.UUID, w http.ResponseWriter, r *
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, "Failed to retrieve the updated book from the database", err)
 		return
+	}
+
+	if book.Files.Root != nil {
+		fileManagement.CreateMetadataFile(metadata.MetadataFileFromBook(book), path.Join(path.Join(cfg.libraryPath, *book.Files.Root), "metadata.json"))
 	}
 
 	book.Files.Prepend(cfg.libraryName)

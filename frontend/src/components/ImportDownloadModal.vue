@@ -427,6 +427,7 @@ watch(() => props.modelShow, (newVal) => {
 
 .book-info {
   flex: 1;
+  color: var(--color-text);
 }
 
 .book-info h4 {
@@ -437,7 +438,6 @@ watch(() => props.modelShow, (newVal) => {
 
 .book-info p {
   margin: 0.25rem 0;
-  color: var(--color-gray-900);
   font-size: 0.9rem;
 }
 
