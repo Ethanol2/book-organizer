@@ -15,6 +15,14 @@ export function getDownloadName(download: Download): string {
     return items[items.length - 1] ?? "";
 }
 
+export function getBaseName(path: string | undefined): string {
+    if (path == null) {
+        return "";
+    }
+    var items = path.split("/");
+    return items[items.length - 1] ?? "";
+}
+
 export function getTimeAdded(download: Download): string {
     if (download == null) {
         return "";
