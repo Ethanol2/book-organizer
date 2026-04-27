@@ -188,6 +188,12 @@ func (cfg *apiConfig) handlerUpdateBook(id uuid.UUID, w http.ResponseWriter, r *
 		return
 	}
 
+	book, err = cfg.db.GetBook(id)
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Failed to retrieve the updated book from the database", err)
+		return
+	}
+
 	book.Files.Prepend(cfg.libraryName)
 	respondWithJson(w, http.StatusOK, book)
 }

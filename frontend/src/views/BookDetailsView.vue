@@ -1,10 +1,15 @@
 <script setup lang="ts">
-import { getSeriesString, type Book, type BookParams } from '@/types/book';
+import { getSeriesString, type Book, type BookParams, type Category, type Series } from '@/types/book';
 import { computed, onMounted, ref } from 'vue';
 import { RouterLink, useRoute, useRouter } from 'vue-router';
 import AddBookModal from '@/components/AddBookModal.vue';
 import { useNotificationsStore } from '@/stores/notifications';
 import { basename } from '@/types/download';
+
+type CategoryList = {
+  showAll: boolean;
+  shortList: Category[];
+}
 
 const route = useRoute();
 const router = useRouter();
@@ -15,6 +20,32 @@ const showEditModal = ref(false);
 const editParams = ref<BookParams | null>(null);
 const deleting = ref(false);
 const notifications = useNotificationsStore();
+
+const coverSrc = computed(() => {
+  if (!book.value) {
+    return '';
+  }
+  return book.value.files?.cover || `/media/metadata/${book.value.id}.jpg`;
+});
+
+const formattedTags = computed(() => {
+  const tags = book.value?.tags ?? [];
+  return tags.length ? tags.join(', ') : '';
+});
+
+const audioFiles = computed(() => book.value?.files?.audio_files ?? []);
+const textFiles = computed(() => book.value?.files?.text_files ?? []);
+
+const showAllAuthors = ref<CategoryList>();
+const showAllGenres = ref<CategoryList>();
+const showAllTags = ref<{showAll: boolean; shortList: string[]}>();
+const showAllNarrators = ref<CategoryList>();
+const showAllSeries = ref<CategoryList>();
+
+function getExpandCollapseString(list: CategoryList | undefined, fullListLength: number, limit: number): string {
+  if (!list) return '';
+  return list?.showAll ? '(hide...)' : `(show ${fullListLength - limit} more...)`;
+}
 
 function buildEditParams(book: Book): BookParams {
   return {
@@ -47,6 +78,17 @@ function closeEditModal() {
   editParams.value = null;
 }
 
+function isIdentical(newData: Category[] | null | undefined, oldData: Category[] | null | undefined): boolean {
+  if (!newData) return !oldData
+  if (!oldData) return !newData
+  if (newData.length != oldData.length) return false
+
+  for (let i = 0; i < newData.length; i++) {
+    if (newData[i]?.name !== oldData[i]?.name) return false
+  }
+  return true
+}
+
 async function submitEdit(newData: BookParams) {
   if (!book.value) {
     return;
@@ -58,11 +100,12 @@ async function submitEdit(newData: BookParams) {
   newData.year = newData.year == book.value.year ? undefined : newData.year;
   newData.isbn = newData.isbn == book.value.isbn ? undefined : newData.isbn;
   newData.publisher = newData.publisher == book.value.publisher ? undefined : newData.publisher;
-  newData.series = JSON.stringify(newData.series) === JSON.stringify(book.value.series) ? undefined : newData.series;
-  newData.authors = JSON.stringify(newData.authors) === JSON.stringify(book.value.authors) ? undefined : newData.authors;
-  newData.genres = JSON.stringify(newData.genres) === JSON.stringify(book.value.genres) ? undefined : newData.genres;
-  newData.narrators = JSON.stringify(newData.narrators) === JSON.stringify(book.value.narrators) ? undefined : newData.narrators;
-  newData.cover = newData.cover == book.value.files?.cover ? undefined : newData.cover;
+  newData.series = isIdentical(newData?.series, book.value.series) ? undefined : newData.series;
+  newData.authors = isIdentical(newData?.authors, book.value.authors) ? undefined : newData.authors;
+  newData.genres = isIdentical(newData?.genres, book.value.genres) ? undefined : newData.genres;
+  newData.narrators = isIdentical(newData?.narrators, book.value.narrators) ? undefined : newData.narrators;
+  newData.tags = newData?.tags === book.value.tags ? undefined : newData.tags;
+  newData.cover = newData?.cover == book.value.files?.cover ? undefined : newData.cover;
 
   try {
     const resp = await fetch(`/api/books/${book.value.id}`, {
@@ -118,40 +161,12 @@ async function deleteBook(payload: { deleteFiles: boolean }) {
   }
 }
 
-const coverSrc = computed(() => {
-  if (!book.value) {
-    return '';
-  }
-  return book.value.files?.cover || `/media/metadata/${book.value.id}.jpg`;
-});
-
-const formattedAuthors = computed(() => {
-  const authors = book.value?.authors ?? [];
-  return authors.length ? authors.map(a => a.name).join(', ') : '';
-});
-
-const formattedGenres = computed(() => {
-  const genres = book.value?.genres ?? [];
-  return genres.length ? genres.map(g => g.name).join(', ') : '';
-});
-
-const formattedSeries = computed(() => {
-  var series = getSeriesString(book.value?.series ?? []);
-  return series.length == 0 ? '' : series;
-});
-
-const formattedNarrators = computed(() => {
-  const narrators = book.value?.narrators ?? [];
-  return narrators.length ? narrators.map(n => n.name).join(', ') : '';
-});
-
-const formattedTags = computed(() => {
-  const tags = book.value?.tags ?? [];
-  return tags.length ? tags.join(', ') : '';
-});
-
-const audioFiles = computed(() => book.value?.files?.audio_files ?? []);
-const textFiles = computed(() => book.value?.files?.text_files ?? []);
+function openLibrarySearch(query: {}) {
+  router.push({
+    name: 'home',
+    query: query
+  });
+}
 
 function formatDate(value: string | undefined | null) {
   if (!value) {
@@ -175,9 +190,27 @@ onMounted(async () => {
     }
 
     book.value = await resp.json();
+
+    if (book.value)
+    {
+      showAllAuthors.value = {showAll: book.value?.authors.length <= 3, shortList: book.value?.authors.slice(0, 3)};
+      showAllNarrators.value = {showAll: book.value?.narrators.length <= 3, shortList: book.value?.narrators.slice(0, 3)};
+      showAllSeries.value = {showAll: book.value?.series.length <= 3, shortList: book.value?.series.slice(0, 3)};
+      showAllGenres.value = {showAll: book.value?.genres.length <= 5, shortList: book.value?.genres.slice(0, 5)};
+      
+      if (book.value.tags) {
+        showAllTags.value = {showAll: book.value.tags.length <= 5, shortList: book.value.tags.slice(0, 5)};
+      }
+      else {
+        showAllTags.value = {showAll: true, shortList: []};
+        book.value.tags = [];
+      }
+    }
+
   } catch (err) {
     console.error('Error fetching book details:', err);
-    error.value = 'Unable to load book details.';
+    error.value = 'Unable to load book details.';  
+
   } finally {
     loading.value = false;
   }
@@ -211,11 +244,11 @@ onMounted(async () => {
           <dl class="hero-info-grid">
             <div>
               <dt>Year</dt>
-              <dd>{{ book.year || '' }}</dd>
+              <dd v-if="book.year" ><a class="hero-info-button" @click="openLibrarySearch({year: book.year})">{{book.year}}</a></dd>
             </div>
             <div>
               <dt>Publisher</dt>
-              <dd>{{ book.publisher || '' }}</dd>
+              <dd v-if="book.publisher"><a class="hero-info-button" @click="openLibrarySearch({publisher: book.publisher})">{{ book.publisher }}</a></dd>
             </div>
             <div>
               <dt>ISBN</dt>
@@ -225,25 +258,99 @@ onMounted(async () => {
               <dt>ASIN</dt>
               <dd>{{ book.asin || '' }}</dd>
             </div>
+
             <div>
-              <dt>Authors</dt>
-              <dd>{{ formattedAuthors || '' }}</dd>
+              <dt>
+                Authors 
+              </dt>                  
+              <div v-if="showAllAuthors?.showAll" class="hero-info-button">
+                <dd v-for="(author, index) in book.authors">
+                  <a @click="openLibrarySearch({authors: author.name})">{{ author.name }}{{ index < book.authors.length - 1 ? ', ' : '' }}</a>
+                </dd>
+                <dd>
+                  <a class="expand-category-button" v-if="book.authors.length > 3" @click="() =>{ if (showAllAuthors) showAllAuthors.showAll = !showAllAuthors.showAll}">{{ showAllAuthors?.showAll ? '(Collapse)' : '(Expand)'}}</a>
+                </dd>
+              </div>
+              <div v-else-if="showAllAuthors?.shortList" class="hero-info-button">
+                <dd v-for="(author, index) in showAllAuthors?.shortList">
+                  <a @click="openLibrarySearch({authors: author.name})">{{ author.name }}{{ index < showAllAuthors?.shortList.length - 1 ? ', ' : '' }}</a>
+                </dd>
+                <dd>
+                  ({{ book.authors.length - 3 }} more...)
+                </dd>
+              </div>
+            </div>
+
+            <div>
+              <dt>
+                Genres 
+              </dt>              
+              <div v-if="showAllGenres?.showAll" class="hero-info-button">
+                <dd v-for="(genre, index) in book.genres">
+                  <a @click="openLibrarySearch({genres: genre.name})">{{ genre.name }}{{ index < book.genres.length - 1 ? ', ' : '' }}</a>
+                </dd>
+              </div>
+              <div v-else-if="showAllGenres?.shortList" class="hero-info-button">
+                <dd v-for="(genre, index) in showAllGenres?.shortList">
+                  <a @click="openLibrarySearch({genres: genre.name})">{{ genre.name }}{{ index < showAllGenres?.shortList.length - 1 ? ', ' : '' }}</a>
+                </dd>
+                <a class="expand-category-button" v-if="book.genres.length > 5" @click="() =>{ if (showAllGenres) showAllGenres.showAll = !showAllGenres.showAll}">{{ getExpandCollapseString(showAllGenres, book.genres.length, 5) }}</a>
+              </div>
+            </div>
+            
+            <div>
+              <dt>
+                Series 
+                <a class="expand-category-button" v-if="book.series.length > 5" @click="() =>{ if (showAllSeries) showAllSeries.showAll = !showAllSeries.showAll}">{{ showAllSeries?.showAll ? '(Collapse)' : '(Expand)'}}</a>
+              </dt>
+                  
+              <div v-if="showAllSeries?.showAll" class="hero-info-button">
+                <dd v-for="(series, index) in book.series as Series[]">
+                  <a @click="openLibrarySearch({series:series.name})">{{ series.name }} #{{ series.index }}{{ index < book.series.length - 1 ? ', ' : '' }}</a>
+                </dd>
+              </div>
+              <div v-else-if="showAllSeries?.shortList" class="hero-info-button">
+                <dd v-for="(series, index) in showAllSeries?.shortList as Series[]">
+                  <a @click="openLibrarySearch({series:series.name})">{{ series.name }} #{{ series.index }}{{ index < showAllSeries?.shortList.length - 1 ? ', ' : '' }}</a>
+                </dd>
+                
+              </div>
             </div>
             <div>
-              <dt>Genres</dt>
-              <dd>{{ formattedGenres || '' }}</dd>
+              <dt>
+                Narrators 
+                <a class="expand-category-button" v-if="book.narrators.length > 5" @click="() =>{ if (showAllNarrators) showAllNarrators.showAll = !showAllNarrators.showAll}">{{ showAllNarrators?.showAll ? '(Collapse)' : '(Expand)'}}</a>
+              </dt>
+              
+              <div v-if="showAllGenres?.showAll" class="hero-info-button">
+                <dd v-for="(narrator, index) in book.narrators">
+                  <a @click="openLibrarySearch({narrators:narrator.name})">{{ narrator.name }}{{ index < book.narrators.length - 1 ? ', ' : '' }}</a>
+                </dd>
+              </div>
+              <div v-else-if="showAllNarrators?.shortList" class="hero-info-button">
+                <dd v-for="(narrator, index) in showAllNarrators?.shortList">
+                  <a @click="openLibrarySearch({narrators:narrator.name})">{{ narrator.name }}{{ index < showAllNarrators?.shortList.length - 1 ? ', ' : '' }}</a>
+                </dd>
+                
+              </div>
             </div>
             <div>
-              <dt>Series</dt>
-              <dd>{{ formattedSeries || '' }}</dd>
-            </div>
-            <div>
-              <dt>Narrators</dt>
-              <dd>{{ formattedNarrators || '' }}</dd>
-            </div>
-            <div>
-              <dt>Tags</dt>
-              <dd>{{ formattedTags || '' }}</dd>
+              <dt>
+                Tags
+                <a class="expand-category-button" v-if="book.tags.length > 5" @click="() =>{ if (showAllTags) showAllTags.showAll = !showAllTags.showAll}">{{ showAllTags?.showAll ? '(Collapse)' : '(Expand)'}}</a>
+              </dt>
+              <div v-if="showAllTags?.showAll" class="hero-info-button">
+                <dd v-for="(tag, index) in book.tags">
+                  <a @click="openLibrarySearch({tags: tag})">{{ tag }}{{ index < book.tags.length - 1 ? ', ' : '' }}</a>
+                </dd>
+              </div>
+              <div v-else-if="showAllTags?.shortList" class="hero-info-button">
+                <dd v-for="(tag, index) in showAllTags?.shortList">
+                  <a @click="openLibrarySearch({tags: tag})">{{ tag }}{{ index < showAllTags?.shortList.length - 1 ? ', ' : '' }}</a>
+                </dd>
+                ({{ book.tags.length - 5 }} more...)
+                
+              </div>
             </div>
             <div>
               <dt>Created</dt>
@@ -468,6 +575,19 @@ onMounted(async () => {
   margin: 0;
   font-size: 0.9rem;
   color: var(--color-text);
+}
+
+.hero-info-button {
+  color: var(--color-text);
+  cursor: pointer;
+  display: flex;
+  flex-wrap: wrap;
+}
+
+.expand-category-button {
+  color: var(--color-text);
+  font-style: italic;
+  cursor: pointer;
 }
 
 @media (min-width: 1200px) {

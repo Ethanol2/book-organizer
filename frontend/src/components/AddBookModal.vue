@@ -143,7 +143,7 @@ watch(
 
         <!-- Action buttons -->
         <div class="modal-buttons">
-          <button type="cancel" @click="handleOverlayClick">Cancel</button>
+          <button type="button" @click="handleOverlayClick">Cancel</button>
           <button type="submit">{{ submitLabel }}</button>
         </div>
 
@@ -257,13 +257,13 @@ watch(
 
 /* Cancel button styling */
 
-.modal-buttons button[type="cancel"] {
+.modal-buttons button {
   background: var(--color-warning-background);
   color: var(--vt-c-text-light-1);
   border-color: var(--color-warning-border);
 }
 
-.modal-buttons button[type="cancel"]:hover {
+.modal-buttons button:hover {
   background: var(--color-warning-border);
 }
 
