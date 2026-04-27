@@ -42,6 +42,7 @@ type BookOverview struct {
 	Subtitle *string    `json:"subtitle"`
 	Authors  []Category `json:"authors"`
 	Cover    *string    `json:"cover"`
+	HasFiles bool       `json:"has_files"`
 }
 
 type BookParams struct {
@@ -302,7 +303,7 @@ func (c Client) GetBooksSummary(filters map[string][]string) ([]BookOverview, er
 	}
 	defer c.Rollback()
 
-	query := "SELECT books.id, books.title, books.subtitle, books.cover FROM books " + buildSearchQuery(filters)
+	query := "SELECT books.id, books.title, books.subtitle, books.cover, books.directory FROM books " + buildSearchQuery(filters)
 
 	rows, err := c.tx.Query(query)
 	if err != nil {
@@ -313,7 +314,8 @@ func (c Client) GetBooksSummary(filters map[string][]string) ([]BookOverview, er
 	var books []BookOverview
 	for rows.Next() {
 		var book BookOverview
-		err = rows.Scan(&book.Id, &book.Title, &book.Subtitle, &book.Cover)
+		var dir *string
+		err = rows.Scan(&book.Id, &book.Title, &book.Subtitle, &book.Cover, &dir)
 		if err != nil {
 			return []BookOverview{}, err
 		}
@@ -322,6 +324,8 @@ func (c Client) GetBooksSummary(filters map[string][]string) ([]BookOverview, er
 		if err != nil {
 			return []BookOverview{}, err
 		}
+
+		book.HasFiles = dir != nil
 
 		books = append(books, book)
 	}

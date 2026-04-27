@@ -43,6 +43,7 @@ export type BookSummary = {
     subtitle: string
     cover?: string | null
     authors: Author[]
+    has_files: boolean
 }
 
 export type BookFiles = {

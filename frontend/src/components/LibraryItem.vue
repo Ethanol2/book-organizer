@@ -12,8 +12,8 @@ const cover = props.book.cover == null ? "" : props.book.cover
 <template>
     <RouterLink :to="`/books/${book.id}`" class="book">
         <div class="cover-wrapper">
-            <img v-if="cover != ''" :src="cover" :alt="book.title" class="cover">
-            <img v-else :src="'/media/metadata/' + book.id + '.jpg'" :alt="book.title" class="no-cover">
+            <img v-if="cover != ''" :src="cover" :alt="book.title" :class="book.has_files ? 'cover has-files' : 'cover no-files'">
+            <img v-else :src="'/media/metadata/' + book.id + '.jpg'" :alt="book.title" :class="book.has_files ? 'no-cover has-files' : 'no-cover no-files'">
         </div>
         <div class="info">
             <h3>
@@ -72,6 +72,18 @@ const cover = props.book.cover == null ? "" : props.book.cover
     justify-content: center;
     border: 1px solid #00000080;
     box-shadow: 0 0 5px #00000080;
+}
+
+.no-cover.has-files,
+.cover.has-files {
+    border: 2px solid var(--color-primary-green);
+    box-shadow: 0 0 5px var(--color-primary-green);
+}
+
+.no-cover.no-files,
+.cover.no-files {
+    border: 2px solid var(--color-error-border);
+    box-shadow: 0 0 5px var(--color-error-border);
 }
 
 .info {
