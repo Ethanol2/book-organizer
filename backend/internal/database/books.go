@@ -49,7 +49,7 @@ type BookSearchResults[T []BookOverview | []Book] struct {
 	ResultsCount int `json:"results_count"`
 	Count        int `json:"count"`
 	Page         int `json:"page"`
-	Items        T   `json:"items,omitempty"`
+	Items        T   `json:"items"`
 }
 
 type BookParams struct {

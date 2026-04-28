@@ -25,6 +25,8 @@ const searchResults = ref<BookSummary[] | BookParams[]>([]);
 const isLoading = ref(false);
 const useDownloadedCover = ref(true);
 const source = ref<MetadataType | string>('Library');
+const libraryPage = ref(1);
+const libraryPageSize = 10;
 
 const downloadName = computed(() => getDownloadName(props.download));
 const isImporting = ref(false);
@@ -158,6 +160,8 @@ const performSearch = async () => {
     const params = new URLSearchParams();
     params.append('view', 'summary');
     params.append('files', 'without_files');
+    params.append('page', libraryPage.value.toString());
+    params.append('count', libraryPageSize.toString());
     if (searchQuery.value.trim()) {
       params.append('search', searchQuery.value.trim());
     }
@@ -167,7 +171,8 @@ const performSearch = async () => {
       throw new Error(`HTTP error! status: ${response.status}`);
     }
 
-    searchResults.value = await response.json();
+    const data = await response.json();
+    searchResults.value = data.items;
   } catch (error) {
     console.error('Error searching books:', error);
     searchResults.value = [];
@@ -188,6 +193,7 @@ function getCover(book: BookSummary | BookParams, isSummary: boolean): string {
 
 watch(() => props.modelShow, (newVal) => {
   if (newVal) {
+    libraryPage.value = 1;
     searchQuery.value = getDownloadName(props.download);
     useDownloadedCover.value = props.download.files.cover == null || props.download.files.cover === '' ? false : useDownloadedCover.value;
     performSearch();

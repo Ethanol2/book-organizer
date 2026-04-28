@@ -134,7 +134,12 @@ async function fetchBooks(append = false) {
         if (append) {
             books.value.push(...data.items);
         } else {
-            books.value = data.items;
+            if (data.items == null || data.items.length === 0) {
+                books.value = [];
+            }
+            else {
+                books.value = data.items;
+            }
         }
         
         totalResults.value = data.results_count;
