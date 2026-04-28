@@ -25,6 +25,13 @@ const narrators = ref('');
 const files = ref(null);
 const showAdvanced = ref(false);
 
+// Pagination state
+const currentPage = ref(1);
+const itemsPerPage = ref(20);
+const totalResults = ref(0);
+const isLoading = ref(false);
+const hasLoadedAll = ref(false);
+
 function normalizeQueryValue(value: LocationQueryValue | LocationQueryValue[] | undefined): string {
     if (Array.isArray(value)) {
         return String(value[0] ?? '');
@@ -63,10 +70,13 @@ function resetFiltersFromRoute() {
     );
 }
 
-function buildQueryString() {
+function buildQueryString(page?: number) {
     const params = new URLSearchParams();
 
     params.append('view', 'summary');
+    const pageNum = page ?? currentPage.value;
+    params.append('page', pageNum.toString());
+    params.append('count', itemsPerPage.value.toString());
     if (search.value.trim()) params.append('search', search.value.trim());
     if (sortBy.value) params.append('sortBy', sortBy.value);
     if (sortOrder.value) params.append('sortOrder', sortOrder.value);
@@ -108,8 +118,10 @@ function syncRouteQuery() {
     });
 }
 
-async function fetchBooks() {
-    books.value = [];
+async function fetchBooks(append = false) {
+    if (isLoading.value || hasLoadedAll.value) return;
+    
+    isLoading.value = true;
     try {
         const queryString = buildQueryString();
         const resp = await fetch(`api/books${queryString}`);
@@ -117,16 +129,44 @@ async function fetchBooks() {
             throw new Error(`HTTP error with status: ${resp.status}`);
         }
 
-        books.value = await resp.json();
+        const data = await resp.json();
+        
+        if (append) {
+            books.value.push(...data.items);
+        } else {
+            books.value = data.items;
+        }
+        
+        totalResults.value = data.results_count;
+        currentPage.value = data.page;
+        
+        // Check if we've loaded all items
+        const loadedCount = append 
+            ? books.value.length 
+            : data.items.length;
+        
+        if (loadedCount >= data.results_count) {
+            hasLoadedAll.value = true;
+        }
 
     } catch (error) {
         console.error('Error fetching books list:', error);
+    } finally {
+        isLoading.value = false;
     }
 }
 
 async function searchBooks() {
+    currentPage.value = 1;
+    hasLoadedAll.value = false;
     syncRouteQuery();
-    await fetchBooks();
+    await fetchBooks(false);
+}
+
+async function loadMore() {
+    if (isLoading.value || hasLoadedAll.value) return;
+    currentPage.value++;
+    await fetchBooks(true);
 }
 
 function resetFilters() {
@@ -143,13 +183,31 @@ function resetFilters() {
     authors.value = '';
     narrators.value = '';
     showAdvanced.value = false;
+    currentPage.value = 1;
+    hasLoadedAll.value = false;
     syncRouteQuery();
-    fetchBooks();
+    fetchBooks(false);
 }
 
 onMounted(async () => {
     resetFiltersFromRoute();
-    await fetchBooks();
+    await fetchBooks(false);
+    
+    // Set up intersection observer for infinite scroll
+    const observer = new IntersectionObserver(
+        (entries) => {
+            if (entries[0]?.isIntersecting) {
+                loadMore();
+            }
+        },
+        { threshold: 0.1 }
+    );
+    
+    // Get the sentinel element (will be the last child that loads more when visible)
+    const sentinel = document.querySelector('.library-sentinel');
+    if (sentinel) {
+        observer.observe(sentinel);
+    }
 });
 
 </script>
@@ -251,6 +309,10 @@ onMounted(async () => {
 
         <div class="library">
             <BookItem v-for="book in books" :key="book.id" :book="book"></BookItem>
+            <div v-if="isLoading" class="library-loading">
+                <div class="spinner"></div>
+            </div>
+            <div v-if="!hasLoadedAll && books.length > 0" class="library-sentinel"></div>
         </div>
     </section>
 </template>
@@ -261,6 +323,33 @@ onMounted(async () => {
     grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
     gap: 16px;
     padding-bottom: 10rem;
+}
+
+.library-loading {
+    grid-column: 1 / -1;
+    display: flex;
+    justify-content: center;
+    padding: 2rem;
+}
+
+.spinner {
+    width: 40px;
+    height: 40px;
+    border: 4px solid var(--color-border);
+    border-top-color: var(--color-text);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+.library-sentinel {
+    grid-column: 1 / -1;
+    height: 1px;
 }
 
 .library-controls {

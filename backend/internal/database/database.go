@@ -7,6 +7,7 @@ import (
 	"log"
 	"os"
 	"path"
+	"strconv"
 	"strings"
 )
 
@@ -235,6 +236,16 @@ func (c Client) InsertTestData(metadataPath string, downloadTempFile func(string
 		return err
 	}
 
+	// Create a folder to store the test data covers, to avoid having to download the covers each time
+	testCoversPath := path.Join(metadataPath, "Test-Covers")
+	if _, err := os.Stat(testCoversPath); err != nil {
+		err = os.Mkdir(testCoversPath, 0755)
+		if err != nil {
+			log.Println("Erorr while creating the test covers folder \"", testCoversPath, "\" =>", err)
+			return err
+		}
+	}
+
 	for _, bookParams := range testBooks {
 		book, err := c.AddBook(bookParams)
 		if err != nil {
@@ -242,32 +253,72 @@ func (c Client) InsertTestData(metadataPath string, downloadTempFile func(string
 		}
 
 		cover := ""
-		hasCover := false
-		if bookParams.Cover != nil {
-			hasCover = true
-			cover = *bookParams.Cover
-		} else if bookParams.ISBN != nil {
-			hasCover = true
-			cover = fmt.Sprintf("https://covers.openlibrary.org/b/isbn/%s-L.jpg", *bookParams.ISBN)
+		hasCoverURL := false
+		testCoverPath := ""
+
+		if bookParams.ISBN != nil {
+			testCoverPath = path.Join(testCoversPath, *bookParams.ISBN+".jpg")
+			if _, err := os.Stat(testCoverPath); err == nil {
+				data, err := os.ReadFile(testCoverPath)
+				if err != nil {
+					log.Println("Error trying to read the test cover in the test covers folder \"", testCoverPath, "\" =>", testCoverPath)
+					continue
+				}
+				err = os.WriteFile(path.Join(metadataPath, book.Id.String()+".jpg"), data, 0644)
+				if err != nil {
+					log.Println("Error trying to copy the test cover to the metadata folder =>", err)
+					continue
+				}
+
+				log.Println("Using the saved test cover")
+				fmt.Println()
+				continue
+			}
+
+			if bookParams.Cover != nil {
+				hasCoverURL = true
+				cover = *bookParams.Cover
+			} else {
+				hasCoverURL = true
+				cover = fmt.Sprintf("https://covers.openlibrary.org/b/isbn/%s-L.jpg", *bookParams.ISBN)
+			}
 		}
 
-		if hasCover {
+		if hasCoverURL {
 			var coverFile *os.File
 			coverFile, err = downloadTempFile(cover)
 			if err != nil {
 				log.Println(err)
 				log.Print("\nFailed to get cover for \"", book.Title, "\" => ", cover, "\n\n")
+				fmt.Println()
 				continue
 			}
 
-			err = moveFiles(coverFile.Name(), path.Join(metadataPath, book.Id.String()+path.Ext(coverFile.Name())))
+			coverPath := path.Join(metadataPath, book.Id.String()+path.Ext(coverFile.Name()))
+			err = moveFiles(coverFile.Name(), coverPath)
 			if err != nil {
 				log.Println(err)
-				log.Print("\nFailed to save cover for \"", book.Title, "\"\n\n")
+				log.Println("Failed to save cover for \"", book.Title, "\"")
+				fmt.Println()
+				continue
 			}
-
 			coverFile.Close()
+
+			if bookParams.ISBN != nil {
+
+				coverFileContent, err := os.ReadFile(coverPath)
+				if err != nil {
+					log.Println("Error trying to read the new metadata cover at \"", coverPath, "\" =>", err)
+					continue
+				}
+
+				err = os.WriteFile(testCoverPath, coverFileContent, 0644)
+				if err != nil {
+					log.Println("Error trying to write new cover to the test covers at \"", testCoverPath, "\" =>", err)
+				}
+			}
 		}
+		fmt.Println()
 	}
 
 	fmt.Print("\n======= Finished Inserting Test Data =======\n\n")
@@ -416,4 +467,36 @@ func buildSearchQuery(filters map[string][]string) string {
 	//fmt.Println(join + filter + strings.Join(advFilter, " AND ") + sort)
 
 	return join + filter + strings.Join(advFilter, " AND ") + sort
+}
+func buildPageQuery(filters map[string][]string) (int, int, string) {
+
+	countStr, hasCount := filters["count"]
+	pageStr, hasPage := filters["page"]
+
+	if !hasCount && !hasPage {
+		return 20, 1, ""
+	}
+
+	var err error
+
+	page := 1
+	if hasPage {
+		page, err = strconv.Atoi(pageStr[0])
+		if err != nil {
+			log.Println("Failed to convert page number to int =>", err)
+			page = 1
+		}
+	}
+
+	count := 20
+	if hasCount {
+		count, err = strconv.Atoi(countStr[0])
+		if err != nil {
+			log.Println("Failed to convert page count to int =>", err)
+			count = 20
+		}
+	}
+
+	return count, page, fmt.Sprintf(" LIMIT %d OFFSET %d", count, (page-1)*count)
+
 }

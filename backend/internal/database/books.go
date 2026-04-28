@@ -45,6 +45,13 @@ type BookOverview struct {
 	HasFiles bool       `json:"has_files"`
 }
 
+type BookSearchResults[T []BookOverview | []Book] struct {
+	ResultsCount int `json:"results_count"`
+	Count        int `json:"count"`
+	Page         int `json:"page"`
+	Items        T   `json:"items,omitempty"`
+}
+
 type BookParams struct {
 	Title       *string   `json:"title"`
 	Subtitle    *string   `json:"subtitle"`
@@ -219,23 +226,27 @@ func (c Client) GetBook(id uuid.UUID) (Book, error) {
 	return book, nil
 }
 
-func (c Client) GetBooks(filters map[string][]string) ([]Book, error) {
+func (c Client) GetBooks(filters map[string][]string) (BookSearchResults[[]Book], error) {
 
 	err := c.Begin()
 	if err != nil {
-		return []Book{}, err
+		return BookSearchResults[[]Book]{}, err
 	}
 	defer c.Rollback()
 
 	books := []Book{}
 
-	query := "SELECT * FROM books " + buildSearchQuery(filters)
+	count, page, pageQuery := buildPageQuery(filters)
+
+	query := "SELECT *, (SELECT COUNT(*) FROM books) AS total_count FROM books " + buildSearchQuery(filters) + pageQuery
 	rows, err := c.tx.Query(query)
 	if err != nil {
 		log.Println("Query:\n", query)
-		return []Book{}, err
+		return BookSearchResults[[]Book]{}, err
 	}
+	defer rows.Close()
 
+	totalCount := 0
 	for rows.Next() {
 		var book Book
 		var tagsStr *string
@@ -258,6 +269,7 @@ func (c Client) GetBooks(filters map[string][]string) ([]Book, error) {
 			&book.Files.Cover,
 			&book.CreatedAt,
 			&book.UpdatedAt,
+			&totalCount,
 		)
 		if err != nil {
 			log.Println(err)
@@ -267,14 +279,14 @@ func (c Client) GetBooks(filters map[string][]string) ([]Book, error) {
 		if audioStr != nil {
 			err = book.Files.ParseAudioJson(*audioStr)
 			if err != nil {
-				return []Book{}, err
+				return BookSearchResults[[]Book]{}, err
 			}
 		}
 
 		if textStr != nil {
 			err = book.Files.ParseTextJson(*textStr)
 			if err != nil {
-				return []Book{}, err
+				return BookSearchResults[[]Book]{}, err
 			}
 		}
 
@@ -289,40 +301,48 @@ func (c Client) GetBooks(filters map[string][]string) ([]Book, error) {
 
 	err = c.Commit()
 	if err != nil {
-		return []Book{}, err
+		return BookSearchResults[[]Book]{}, err
 	}
 
-	return books, nil
+	return BookSearchResults[[]Book]{
+		ResultsCount: totalCount,
+		Count:        count,
+		Page:         page,
+		Items:        books,
+	}, nil
 }
 
-func (c Client) GetBooksSummary(filters map[string][]string) ([]BookOverview, error) {
+func (c Client) GetBooksSummary(filters map[string][]string) (BookSearchResults[[]BookOverview], error) {
 
 	err := c.Begin()
 	if err != nil {
-		return []BookOverview{}, err
+		return BookSearchResults[[]BookOverview]{}, err
 	}
 	defer c.Rollback()
 
-	query := "SELECT books.id, books.title, books.subtitle, books.cover, books.directory FROM books " + buildSearchQuery(filters)
+	countLimit, page, pageQuery := buildPageQuery(filters)
+	query := "SELECT books.id, books.title, books.subtitle, books.cover, books.directory, (SELECT COUNT(*) FROM books) AS total_count  FROM books " + buildSearchQuery(filters) + pageQuery
 
 	rows, err := c.tx.Query(query)
 	if err != nil {
 		log.Println("Query:\n", query)
-		return []BookOverview{}, err
+		return BookSearchResults[[]BookOverview]{}, err
 	}
+	defer rows.Close()
 
+	totalCount := 0
 	var books []BookOverview
 	for rows.Next() {
 		var book BookOverview
 		var dir *string
-		err = rows.Scan(&book.Id, &book.Title, &book.Subtitle, &book.Cover, &dir)
+		err = rows.Scan(&book.Id, &book.Title, &book.Subtitle, &book.Cover, &dir, &totalCount)
 		if err != nil {
-			return []BookOverview{}, err
+			return BookSearchResults[[]BookOverview]{}, err
 		}
 
 		book.Authors, err = c.GetCategoryTypesAssociatedWithBook(book.Id.String(), Authors)
 		if err != nil {
-			return []BookOverview{}, err
+			return BookSearchResults[[]BookOverview]{}, err
 		}
 
 		book.HasFiles = dir != nil
@@ -330,7 +350,12 @@ func (c Client) GetBooksSummary(filters map[string][]string) ([]BookOverview, er
 		books = append(books, book)
 	}
 
-	return books, nil
+	return BookSearchResults[[]BookOverview]{
+		ResultsCount: totalCount,
+		Count:        countLimit,
+		Page:         page,
+		Items:        books,
+	}, nil
 }
 
 func (c Client) AssociateBookAndDownload(bookId, downloadId uuid.UUID, author, series, bookDir string) (Book, error) {

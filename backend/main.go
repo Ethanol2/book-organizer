@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"path"
 	"time"
 
 	"github.com/Ethanol2/book-organizer/internal/cache"
@@ -119,10 +120,38 @@ func initConfig(dbReset, insertTestData bool) (*apiConfig, error) {
 		return nil, fmt.Errorf("DB_PATH must be set")
 	}
 
+	metadataPath := "./data/metadata"
+
 	if dbReset {
+
+		// Remove the database file
 		err := os.Remove(dbPath)
 		if err != nil {
 			log.Println(err)
+		}
+
+		// Clear the metadata folder
+		if _, err := os.Stat(metadataPath); err == nil {
+			files, err := os.ReadDir(metadataPath)
+			if err == nil {
+				for _, file := range files {
+					if file.IsDir() {
+						continue
+					}
+					err = os.Remove(path.Join(metadataPath, file.Name()))
+					if err != nil {
+						log.Println("Error while trying to delete the file \"", file.Name(), "\" => ", err)
+					}
+				}
+			} else {
+				log.Println("Error when trying to read the contents of \"", metadataPath, "\" =>", err)
+			}
+		} else {
+			err = os.Mkdir(metadataPath, 0644)
+			if err != nil {
+				log.Println("Error while creating the metadata directory")
+				return nil, err
+			}
 		}
 	}
 
@@ -155,8 +184,6 @@ func initConfig(dbReset, insertTestData bool) (*apiConfig, error) {
 	if gbApiKey == "" {
 		log.Println("no google books api key in env variables. Google books search won't work")
 	}
-
-	metadataPath := "./data/metadata"
 
 	if insertTestData {
 		err = db.InsertTestData(metadataPath, fileManagement.DownloadTempFile, fileManagement.MoveFilesWithPaths)

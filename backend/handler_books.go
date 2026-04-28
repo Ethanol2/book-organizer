@@ -41,39 +41,39 @@ func (cfg *apiConfig) handlerGetBooks(w http.ResponseWriter, r *http.Request) {
 
 	switch getFullResults {
 	case "full":
-		books, err := cfg.db.GetBooks(r.URL.Query())
+		results, err := cfg.db.GetBooks(r.URL.Query())
 		if err != nil {
 			respondWithError(w, http.StatusInternalServerError, "Database error", err)
 			return
 		}
 
-		for i := range books {
-			books[i].Files.Prepend(cfg.libraryName)
+		for i := range results.Items {
+			results.Items[i].Files.Prepend(cfg.libraryName)
 		}
 
 		log.Println("Fetching book details")
 
-		respondWithJson(w, http.StatusOK, books)
+		respondWithJson(w, http.StatusOK, results)
 
 	case "":
 	case "summary":
-		books, err := cfg.db.GetBooksSummary(r.URL.Query())
+		results, err := cfg.db.GetBooksSummary(r.URL.Query())
 		if err != nil {
 			respondWithError(w, http.StatusInternalServerError, "Database error", err)
 			return
 		}
 
-		for i := range books {
-			if books[i].Cover != nil {
-				cover := *books[i].Cover
+		for i := range results.Items {
+			if results.Items[i].Cover != nil {
+				cover := *results.Items[i].Cover
 				cover = path.Join(cfg.libraryName, cover)
-				books[i].Cover = &cover
+				results.Items[i].Cover = &cover
 			}
 		}
 
 		log.Println("Fetching book summaries")
 
-		respondWithJson(w, http.StatusOK, books)
+		respondWithJson(w, http.StatusOK, results)
 
 	default:
 		respondWithError(
