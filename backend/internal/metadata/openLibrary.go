@@ -41,6 +41,14 @@ type OpenLibrarySearchResults struct {
 	} `json:"docs"`
 }
 
+type Description string
+type OpenLibraryItem struct {
+	Description Description `json:"description"`
+	Title       string      `json:"title"`
+	Subtitle    string      `json:"subtitle"`
+	Subjects    []string    `json:"subjects"`
+}
+
 func SearchOpenLibrary(params SearchParams, cache *cache.Cache) (SearchResults, error) {
 
 	u := url.URL{
@@ -108,14 +116,6 @@ func SearchOpenLibrary(params SearchParams, cache *cache.Cache) (SearchResults, 
 	return results.parse(params.Genres), nil
 }
 
-type Description string
-type OLItem struct {
-	Description Description `json:"description"`
-	Title       string      `json:"title"`
-	Subtitle    string      `json:"subtitle"`
-	Subjects    []string    `json:"subjects"`
-}
-
 func GetFromOpenLibrary(id string, cache *cache.Cache) (database.BookParams, error) {
 	u := url.URL{
 		Scheme: "https",
@@ -130,7 +130,7 @@ func GetFromOpenLibrary(id string, cache *cache.Cache) (database.BookParams, err
 		return database.BookParams{}, err
 	}
 
-	var olItem OLItem
+	var olItem OpenLibraryItem
 
 	err = json.Unmarshal(body, &olItem)
 	if err != nil {

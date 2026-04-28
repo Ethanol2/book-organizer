@@ -16,6 +16,7 @@ type SearchParams struct {
 	Genres    *[]string `json:"genres"`
 	Languages *[]string `json:"languages"`
 	ISBN      *string   `json:"isbn"`
+	ASIN      *string   `json:"asin"`
 
 	Page  *int    `json:"page"`
 	Limit *int    `json:"limit"`
