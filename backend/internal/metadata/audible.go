@@ -62,7 +62,18 @@ type AudibleBookDetails struct {
 	} `json:"seriesSecondary,omitempty"`
 }
 
-var audibleRegions = [...]string{"au", "ca", "de", "es", "fr", "in", "it", "jp", "us", "uk"}
+type AudibleError struct {
+	Error struct {
+		Code    string `json:"code"`
+		Message string `json:"message"`
+		Details struct {
+			Asin string `json:"asin"`
+			Code string `json:"code"`
+		} `json:"details"`
+	} `json:"error"`
+}
+
+var audibleRegions = map[string]string{"co.au": "au", "ca": "ca", "de": "de", "es": "es", "fr": "fr", "co.in": "in", "it": "it", "co.jp": "jp", "com": "us", "co.uk": "uk"}
 
 func SearchAudible(params SearchParams, region string, cache *cache.Cache) (SearchResults, error) {
 
@@ -119,6 +130,8 @@ func SearchAudible(params SearchParams, region string, cache *cache.Cache) (Sear
 		q.Add("num_results", fmt.Sprint(*params.Limit))
 	}
 
+	u.RawQuery = q.Encode()
+
 	log.Println("Querying Audible =>", u.String())
 
 	body, err := cache.HttpGet(u.String())
@@ -145,7 +158,8 @@ func SearchAudible(params SearchParams, region string, cache *cache.Cache) (Sear
 	for _, result := range results.Products {
 		params, err := GetFromAudible(result.Asin, region, cache)
 		if err != nil {
-			return SearchResults{}, err
+			log.Println(err)
+			continue
 		}
 		fullResults = append(fullResults, params)
 	}
@@ -153,6 +167,7 @@ func SearchAudible(params SearchParams, region string, cache *cache.Cache) (Sear
 	return SearchResults{
 		TotalCount: results.TotalResults,
 		Count:      len(fullResults),
+		Items:      fullResults,
 	}, nil
 }
 
@@ -163,12 +178,31 @@ func GetFromAudible(asin, region string, cache *cache.Cache) (database.BookParam
 		Host:   "api.audnex.us",
 		Path:   fmt.Sprintf("books/%s", asin),
 	}
-	u.Query().Add("region", region)
+	q := u.Query()
+	q.Add("region", audibleRegions[region])
+	u.RawQuery = q.Encode()
 
 	log.Println("Querying Audible =>", u.String())
 
+	key := fmt.Sprintf("api/metadata/%s?source=audible&region=%s", asin, region)
+
 	body, err := cache.HttpGet(u.String())
 	if err != nil {
+		if len(body) > 0 {
+			log.Println(err)
+			var auErr AudibleError
+			err := json.Unmarshal(body, &auErr)
+			if err != nil {
+				return database.BookParams{}, err
+			}
+			title := "Error retrieving details"
+			return database.BookParams{
+				Title:       &title,
+				ASIN:        &asin,
+				Description: &auErr.Error.Message,
+				Key:         &key,
+			}, nil
+		}
 		return database.BookParams{}, err
 	}
 
@@ -216,12 +250,11 @@ func GetFromAudible(asin, region string, cache *cache.Cache) (database.BookParam
 		})
 	}
 
-	key := fmt.Sprintf("api/metadata/%s?source=audible&region=%s", item.Asin, region)
-
 	return database.BookParams{
 		Title:       &item.Title,
 		Description: &item.Description,
 		Year:        &year,
+		Publisher:   &item.PublisherName,
 		ISBN:        &item.Isbn,
 		ASIN:        &item.Asin,
 		Genres:      &genres,
@@ -234,8 +267,8 @@ func GetFromAudible(asin, region string, cache *cache.Cache) (database.BookParam
 }
 
 func IsValidAudibleRegion(region string) bool {
-	for i := range audibleRegions {
-		if region == audibleRegions[i] {
+	for key := range audibleRegions {
+		if region == key {
 			return true
 		}
 	}

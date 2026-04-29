@@ -5,7 +5,7 @@ import { useNotificationsStore } from '@/stores/notifications';
 import type { Download } from '@/types/download';
 import { postBook, type BookSummary, type BookParams, getCategoriesString } from '@/types/book';
 import { getDownloadName } from '@/types/download';
-import { getMetadataDetails, MetadataType, searchMetadataSource } from '@/types/metadata';
+import { AudibleRegion, getMetadataDetails, MetadataType, searchMetadataSource } from '@/types/metadata';
 
 const router = useRouter();
 const notificationsStore = useNotificationsStore();
@@ -25,6 +25,7 @@ const searchResults = ref<BookSummary[] | BookParams[]>([]);
 const isLoading = ref(false);
 const useDownloadedCover = ref(true);
 const source = ref<MetadataType | string>('Library');
+const region = ref<AudibleRegion>(AudibleRegion.US)
 const libraryPage = ref(1);
 const libraryPageSize = 10;
 
@@ -141,6 +142,7 @@ const performSearch = async () => {
       title: searchQuery.value,
       page: 1,
       pageLimit: 10,
+      region: region.value
     })
 
     if (metadataResults == null) {
@@ -293,6 +295,12 @@ watch(() => props.modelShow, (newVal) => {
                   {{ type }}
                 </option>
             </select>
+
+            <select class="search-select region" v-model="region" aria-label="Audible Region" v-show="source == MetadataType.Audible" @change="performSearch">
+            <option v-for="(type, value) in AudibleRegion" :key="value" :value="type">
+              .{{ type }}
+            </option>
+          </select>
         </label>
 
         <span v-if="source !== 'Library'" style="color: var(--vt-c-text-subtle);">Use the Add Book page for more control</span>
@@ -372,6 +380,10 @@ watch(() => props.modelShow, (newVal) => {
   box-sizing: border-box;
   font-family: inherit;
   font-size: 0.95rem;
+}
+
+.search-select.region {
+  width: 100%;
 }
 
 /* Loading and no results */

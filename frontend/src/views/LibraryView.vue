@@ -234,10 +234,12 @@ onMounted(async () => {
                   />
 
                   <button class="search-button" type="button" @click="searchBooks">Search</button>
-                  <button class="toggle-button" type="button" @click="showAdvanced = !showAdvanced">
-                      {{ showAdvanced ? 'Hide Advanced' : 'Advanced Search' }}
-                  </button>
-                  <button class="toggle-button" type="button" @click="resetFilters">Reset</button>
+                  <div class="sort-row">
+                      <button class="toggle-button" type="button" @click="showAdvanced = !showAdvanced">
+                          {{ showAdvanced ? 'Hide' : 'Advanced' }}
+                      </button>
+                      <button class="toggle-button" type="button" @click="resetFilters">Reset</button>
+                  </div>
               </div>
 
               <div v-if="showAdvanced" class="advanced-panel">
@@ -396,7 +398,6 @@ onMounted(async () => {
 
 .sort-row {
   display: flex;
-  flex-wrap: wrap;
   gap: 0.75rem;
   align-items: center;
   justify-content: flex-start;
@@ -409,13 +410,13 @@ onMounted(async () => {
     }
 }
 
-@media (max-width: 600px) {
+@media (max-width: 768px) {
     .advanced-panel {
         grid-template-columns: 1fr;
     }
     .sort-row {
-        flex-direction: column;
-        align-items: flex-start;
+        flex-direction: row;
+        justify-content: center;
     }
 }
 </style>

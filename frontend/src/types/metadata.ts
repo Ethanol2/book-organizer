@@ -6,12 +6,75 @@ const pageLimit = 10
 export enum MetadataType {
   OpenLibrary = "Open Library",
   GoogleBooks = "Google Books",
+  Audible = "Audible"
 }
+
+// "au", "ca", "de", "es", "fr", "in", "it", "jp", "us", "uk"
+export enum AudibleRegion {
+  US = "com",
+  CA = "ca",
+  DE = "de",
+  ES = "es",
+  FR = "fr",
+  IN = "co.in",
+  IT = "it",
+  JP = "co.jp",
+  UK = "co.uk",
+  AU = "com.au"
+}
+
+export type MetadataSearchFields = {
+  title: boolean
+  author: boolean
+  year: boolean
+  publisher: boolean
+  isbn: boolean
+  asin: boolean
+  genres: boolean
+  languages: boolean
+  keywords: boolean
+}
+
+export const metadataSearchFields = new Map<MetadataType, MetadataSearchFields>()
+metadataSearchFields.set(MetadataType.OpenLibrary, {
+  title: true,
+  author: true,
+  year: true,
+  publisher: true,
+  isbn: true,
+  genres: true,
+  languages: true,
+  asin: false,
+  keywords: false,
+})
+metadataSearchFields.set(MetadataType.GoogleBooks, {
+  title: true,
+  author: true,
+  year: true,
+  publisher: true,
+  isbn: true,
+  genres: true,
+  languages: true,
+  asin: false,
+  keywords: false,
+})
+metadataSearchFields.set(MetadataType.Audible, {
+  title: true,
+  author: true,
+  year: false,
+  publisher: true,
+  isbn: false,
+  genres: false,
+  languages: false,
+  asin: true,
+  keywords: true,
+})
 
 export type MetadataSearchParams = {
     source: MetadataType
     pageLimit: number | null
     page: number
+    region: AudibleRegion | null
     
     title?: string
     author?: string
@@ -52,8 +115,13 @@ function buildQueryParams(params: MetadataSearchParams) {
     if (params.asin?.trim()) urlParams.set('asin', params.asin)
     if (params.genres?.trim()) params.genres.split(',').forEach(g => urlParams.append('genre', g.trim()))
     if (params.languages?.trim()) params.languages.split(',').forEach(l => urlParams.append('language', l.trim()))
+    if (params.region && params.source === MetadataType.Audible) urlParams.append('region', params.region)
   
-    if (params.pageLimit) urlParams.append('limit', params.pageLimit?.toString())
+    if (params.pageLimit) 
+      urlParams.append('limit', params.pageLimit?.toString())
+    else
+      urlParams.append('limit', pageLimit.toString())
+
     urlParams.append('page', params.page.toString())
 
     return urlParams
@@ -86,7 +154,7 @@ export async function searchMetadataSource(params: MetadataSearchParams): Promis
 
   } catch (err) {
     console.error(err)
-    useNotificationsStore().notifyError(`Metadata search failed: ${err}`)
+    useNotificationsStore().notifyError(`Something went wrong`)
     return null
   }
 }

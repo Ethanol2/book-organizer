@@ -80,8 +80,9 @@ func (cfg *apiConfig) handlerMetadataSearch(w http.ResponseWriter, r *http.Reque
 
 	case "audible":
 		region := r.URL.Query().Get("region")
-		if region == "" || metadata.IsValidAudibleRegion(region) {
-			respondWithError(w, http.StatusBadRequest, "querying audible requires a valid region. Valid regions are: au, ca, de, es, fr, in, it, jp, us, uk", fmt.Errorf("no valid region provided"))
+		if region == "" || !metadata.IsValidAudibleRegion(region) {
+			respondWithError(w, http.StatusBadRequest, "querying audible requires a valid region. Valid regions are: co.au, ca, de, es, fr, co.in, it, co.jp, com, co.uk", fmt.Errorf("no valid region provided => %s", region))
+			return
 		}
 
 		results, err = metadata.SearchAudible(searchParams, region, &cfg.mdCache)
@@ -135,8 +136,9 @@ func (cfg *apiConfig) handlerGetMetadataBookDetails(w http.ResponseWriter, r *ht
 
 	case "audible":
 		region := r.URL.Query().Get("region")
-		if region == "" || metadata.IsValidAudibleRegion(region) {
+		if region == "" || !metadata.IsValidAudibleRegion(region) {
 			respondWithError(w, http.StatusBadRequest, "querying audible requires a valid region. Valid regions are: au, ca, de, es, fr, in, it, jp, us, uk", fmt.Errorf("no valid region provided"))
+			return
 		}
 
 		result, err = metadata.GetFromAudible(id, region, &cfg.mdCache)
