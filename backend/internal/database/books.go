@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Ethanol2/book-organizer/internal/fileManagement"
 	"github.com/google/uuid"
 )
 
@@ -33,7 +34,7 @@ type Book struct {
 	Genres    []Category `json:"genres"`
 	Narrators []Category `json:"narrators"`
 
-	Files BookFiles `json:"files,omitempty"`
+	Files fileManagement.Files `json:"files,omitempty"`
 }
 
 type BookOverview struct {
@@ -366,7 +367,7 @@ func (c Client) AssociateBookAndDownload(bookId, downloadId uuid.UUID, author, s
 	}
 	defer c.Rollback()
 
-	var files BookFiles
+	var files fileManagement.Files
 	var Audio *string
 	var Text *string
 

@@ -10,11 +10,9 @@ import (
 	"log"
 	"net/http"
 	"os"
-
-	"github.com/Ethanol2/book-organizer/internal/metadata"
 )
 
-func CreateMetadataFile(metadata metadata.MetadataFile, path string) error {
+func CreateMetadataFile(metadata MetadataFile, path string) error {
 
 	jsonBytes, err := json.MarshalIndent(metadata, "", "\t")
 	if err != nil {

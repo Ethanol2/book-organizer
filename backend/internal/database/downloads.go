@@ -6,18 +6,20 @@ import (
 	"log"
 	"time"
 
+	"github.com/Ethanol2/book-organizer/internal/fileManagement"
+
 	"github.com/google/uuid"
 )
 
 type Download struct {
-	Id        uuid.UUID `json:"id"`
-	CreatedAt time.Time `json:"created_at"`
-	Files     BookFiles `json:"files"`
+	Id        uuid.UUID            `json:"id"`
+	CreatedAt time.Time            `json:"created_at"`
+	Files     fileManagement.Files `json:"files"`
 }
 
 //#region Setters
 
-func (c Client) AddDownload(tx *sql.Tx, files BookFiles) (*Download, error) {
+func (c Client) AddDownload(tx *sql.Tx, files fileManagement.Files) (*Download, error) {
 	var err error
 
 	indyTx := tx == nil
@@ -59,7 +61,7 @@ func (c Client) AddDownload(tx *sql.Tx, files BookFiles) (*Download, error) {
 	return c.GetDownload(id)
 }
 
-func (c Client) AddDownloads(downloads []BookFiles) error {
+func (c Client) AddDownloads(downloads []fileManagement.Files) error {
 
 	tx, err := c.db.Begin()
 	if err != nil {
@@ -78,7 +80,7 @@ func (c Client) AddDownloads(downloads []BookFiles) error {
 	return nil
 }
 
-func (c Client) UpdateDownloadFiles(tx *sql.Tx, id uuid.UUID, files BookFiles) error {
+func (c Client) UpdateDownloadFiles(tx *sql.Tx, id uuid.UUID, files fileManagement.Files) error {
 	var err error
 	indyTx := tx == nil
 	if indyTx {
@@ -117,7 +119,7 @@ func (c Client) UpdateDownloadFiles(tx *sql.Tx, id uuid.UUID, files BookFiles) e
 	return nil
 }
 
-func (c Client) UpdateDownloadsFiles(files map[uuid.UUID]BookFiles) error {
+func (c Client) UpdateDownloadsFiles(files map[uuid.UUID]fileManagement.Files) error {
 
 	tx, err := c.db.Begin()
 	if err != nil {

@@ -98,8 +98,17 @@ func main() {
 		Handler: mux,
 	}
 
-	scanner := fileManagement.CreateNew(time.Second*5, cfg.downloadsPath)
-	err = scanner.Start(context.Background(), &cfg.db)
+	//scanner := fileManagement.CreateNew(time.Second*5, cfg.downloadsPath)
+	scanner := fileManagement.Scanner{
+		Frequency: time.Second * 5,
+		Directory: cfg.downloadsPath,
+
+		AddHandler:    cfg.db.AddDownloads,
+		UpdateHandler: cfg.db.UpdateDownloadsFiles,
+		DeleteHandler: cfg.db.DeleteDownload,
+		GetExisting:   cfg.db.GetAllDownloadsIdsAndDirs,
+	}
+	err = scanner.Start(context.Background())
 	if err != nil {
 		log.Fatal(err)
 	}

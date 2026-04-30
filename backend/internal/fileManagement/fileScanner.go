@@ -11,7 +11,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Ethanol2/book-organizer/internal/database"
 	"github.com/google/uuid"
 )
 
@@ -19,6 +18,11 @@ type Scanner struct {
 	Frequency time.Duration
 	Directory string
 	running   bool
+
+	AddHandler    func([]Files) error
+	DeleteHandler func(uuid.UUID) error
+	UpdateHandler func(map[uuid.UUID]Files) error
+	GetExisting   func() ([]uuid.UUID, []string, error)
 }
 
 type FileType int
@@ -30,14 +34,7 @@ const (
 	Other
 )
 
-func CreateNew(scanFrequency time.Duration, dir string) Scanner {
-	return Scanner{
-		Frequency: scanFrequency,
-		Directory: dir,
-	}
-}
-
-func (scan *Scanner) Start(ctx context.Context, db *database.Client) error {
+func (scan *Scanner) Start(ctx context.Context) error {
 
 	if scan.running {
 		return fmt.Errorf("scanner already running")
@@ -54,7 +51,7 @@ func (scan *Scanner) Start(ctx context.Context, db *database.Client) error {
 
 			default:
 
-				err := scan.Scan(db)
+				err := scan.Scan()
 				if err != nil {
 					log.Println(err)
 				}
@@ -68,16 +65,21 @@ func (scan *Scanner) Start(ctx context.Context, db *database.Client) error {
 	return nil
 }
 
-func (scan *Scanner) Scan(db *database.Client) error {
+func (scan *Scanner) Scan() error {
 
 	//log.Println("Scanning...")
 
-	err := scan.ScanExisting(db)
+	ids, dirs, err := scan.GetExisting()
 	if err != nil {
 		return err
 	}
 
-	err = scan.ScanNew(db)
+	err = scan.ScanExisting(ids, dirs)
+	if err != nil {
+		return err
+	}
+
+	err = scan.ScanNew(dirs)
 	if err != nil {
 		return err
 	}
@@ -85,15 +87,10 @@ func (scan *Scanner) Scan(db *database.Client) error {
 	return nil
 }
 
-func (scan *Scanner) ScanNew(db *database.Client) error {
+func (scan *Scanner) ScanNew(toIgnore []string) error {
 
 	if _, err := os.Stat(scan.Directory); os.IsNotExist(err) {
 		return fmt.Errorf("directory does not exist -> %s", scan.Directory)
-	}
-
-	_, knownDirs, err := db.GetAllDownloadsIdsAndDirs()
-	if err != nil {
-		return err
 	}
 
 	dirItems, err := os.ReadDir(scan.Directory)
@@ -101,11 +98,11 @@ func (scan *Scanner) ScanNew(db *database.Client) error {
 		return err
 	}
 
-	downloads := []database.BookFiles{}
+	downloads := []Files{}
 
 	for _, item := range dirItems {
 
-		if !item.Type().IsDir() || slices.Contains(knownDirs, item.Name()) {
+		if !item.Type().IsDir() || slices.Contains(toIgnore, item.Name()) {
 			continue
 		}
 
@@ -118,7 +115,7 @@ func (scan *Scanner) ScanNew(db *database.Client) error {
 		downloads = append(downloads, files)
 	}
 
-	err = db.AddDownloads(downloads)
+	err = scan.AddHandler(downloads)
 	if err != nil {
 		return err
 	}
@@ -126,21 +123,16 @@ func (scan *Scanner) ScanNew(db *database.Client) error {
 	return nil
 }
 
-func (scan *Scanner) ScanExisting(db *database.Client) error {
+func (scan *Scanner) ScanExisting(ids []uuid.UUID, dirs []string) error {
 
-	ids, dirs, err := db.GetAllDownloadsIdsAndDirs()
-	if err != nil {
-		return err
-	}
-
-	files := map[uuid.UUID]database.BookFiles{}
+	files := map[uuid.UUID]Files{}
 
 	for i, dir := range dirs {
 
 		path := path.Join(scan.Directory, dir)
 
 		if _, err := os.Stat(path); os.IsNotExist(err) {
-			err = db.DeleteDownload(ids[i])
+			err = scan.DeleteHandler(ids[i])
 			if err != nil {
 				log.Println(err)
 			}
@@ -157,7 +149,7 @@ func (scan *Scanner) ScanExisting(db *database.Client) error {
 		files[ids[i]] = newFiles
 	}
 
-	err = db.UpdateDownloadsFiles(files)
+	err := scan.UpdateHandler(files)
 	if err != nil {
 		return err
 	}
@@ -185,7 +177,7 @@ func getFileType(filename string) FileType {
 	return Other
 }
 
-func getFiles(root, folder string) (database.BookFiles, error) {
+func getFiles(root, folder string) (Files, error) {
 
 	p := path.Join(root, folder)
 
@@ -196,7 +188,7 @@ func getFiles(root, folder string) (database.BookFiles, error) {
 	bookItems, err := os.ReadDir(p)
 	if err != nil {
 		log.Println(err)
-		return database.BookFiles{}, nil
+		return Files{}, nil
 	}
 
 	for _, item := range bookItems {
@@ -239,7 +231,7 @@ func getFiles(root, folder string) (database.BookFiles, error) {
 		cover = nil
 	}
 
-	return database.BookFiles{
+	return Files{
 		Root:       &folder,
 		AudioFiles: &audio,
 		TextFiles:  &text,

@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/Ethanol2/book-organizer/internal/database"
+	"github.com/Ethanol2/book-organizer/internal/fileManagement"
 )
 
 type SearchParams struct {
@@ -31,34 +32,8 @@ type SearchResults struct {
 	Items      []database.BookParams `json:"items"`
 }
 
-// Matches AudioBookshelf's metadata format
-type MetadataFile struct {
-	Tags     []string `json:"tags"`
-	Chapters []struct {
-		ID    int     `json:"id"`
-		Start int     `json:"start"`
-		End   float64 `json:"end"`
-		Title string  `json:"title"`
-	} `json:"chapters,omitempty"`
-	Title         string   `json:"title"`
-	Subtitle      *string  `json:"subtitle,omitempty"`
-	Authors       []string `json:"authors"`
-	Narrators     []string `json:"narrators"`
-	Series        []string `json:"series"`
-	Genres        []string `json:"genres"`
-	PublishedYear string   `json:"publishedYear"`
-	PublishedDate *string  `json:"publishedDate"`
-	Publisher     string   `json:"publisher"`
-	Description   string   `json:"description"`
-	Isbn          string   `json:"isbn"`
-	Asin          string   `json:"asin"`
-	Language      string   `json:"language"`
-	Explicit      bool     `json:"explicit,omitempty"`
-	Abridged      bool     `json:"abridged,omitempty"`
-}
-
-func BookToMetadata(book database.Book) MetadataFile {
-	md := MetadataFile{}
+func BookToMetadata(book database.Book) fileManagement.MetadataFile {
+	md := fileManagement.MetadataFile{}
 
 	pub := ""
 	if book.Publisher != nil {
@@ -110,7 +85,7 @@ func BookToMetadata(book database.Book) MetadataFile {
 	return md
 }
 
-func MetadataToBook(metadata MetadataFile) database.Book {
+func MetadataToBook(metadata fileManagement.MetadataFile) database.Book {
 
 	genres := database.StrToCategorySlice(metadata.Genres)
 	authors := database.StrToCategorySlice(metadata.Authors)
