@@ -3,6 +3,7 @@ package metadata
 import (
 	"fmt"
 	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/Ethanol2/book-organizer/internal/database"
@@ -30,11 +31,6 @@ type SearchResults struct {
 	Items      []database.BookParams `json:"items"`
 }
 
-type MetadataFileSeries struct {
-	Series   string `json:"series"`
-	Sequence string `json:"sequence,omitempty"`
-}
-
 // Matches AudioBookshelf's metadata format
 type MetadataFile struct {
 	Tags     []string `json:"tags"`
@@ -44,24 +40,24 @@ type MetadataFile struct {
 		End   float64 `json:"end"`
 		Title string  `json:"title"`
 	} `json:"chapters,omitempty"`
-	Title         string               `json:"title"`
-	Subtitle      *string              `json:"subtitle,omitempty"`
-	Authors       []string             `json:"authors"`
-	Narrators     []string             `json:"narrators"`
-	Series        []MetadataFileSeries `json:"series"`
-	Genres        []string             `json:"genres"`
-	PublishedYear string               `json:"publishedYear"`
-	PublishedDate *string              `json:"publishedDate"`
-	Publisher     string               `json:"publisher"`
-	Description   string               `json:"description"`
-	Isbn          string               `json:"isbn"`
-	Asin          string               `json:"asin"`
-	Language      string               `json:"language"`
-	Explicit      bool                 `json:"explicit,omitempty"`
-	Abridged      bool                 `json:"abridged,omitempty"`
+	Title         string   `json:"title"`
+	Subtitle      *string  `json:"subtitle,omitempty"`
+	Authors       []string `json:"authors"`
+	Narrators     []string `json:"narrators"`
+	Series        []string `json:"series"`
+	Genres        []string `json:"genres"`
+	PublishedYear string   `json:"publishedYear"`
+	PublishedDate *string  `json:"publishedDate"`
+	Publisher     string   `json:"publisher"`
+	Description   string   `json:"description"`
+	Isbn          string   `json:"isbn"`
+	Asin          string   `json:"asin"`
+	Language      string   `json:"language"`
+	Explicit      bool     `json:"explicit,omitempty"`
+	Abridged      bool     `json:"abridged,omitempty"`
 }
 
-func MetadataFileFromBook(book database.Book) MetadataFile {
+func BookToMetadata(book database.Book) MetadataFile {
 	md := MetadataFile{}
 
 	pub := ""
@@ -89,13 +85,13 @@ func MetadataFileFromBook(book database.Book) MetadataFile {
 		year = fmt.Sprint(*book.Year)
 	}
 
-	series := []MetadataFileSeries{}
+	series := []string{}
 	for _, item := range book.Series {
-		sequence := ""
+		s := item.Name
 		if item.Index != nil {
-			sequence = fmt.Sprint(*item.Index)
+			s += fmt.Sprintf(" #%s", *item.Index)
 		}
-		series = append(series, MetadataFileSeries{Series: item.Name, Sequence: sequence})
+		series = append(series, s)
 	}
 
 	md.Title = book.Title
@@ -112,6 +108,67 @@ func MetadataFileFromBook(book database.Book) MetadataFile {
 	md.Tags = book.Tags
 
 	return md
+}
+
+func MetadataToBook(metadata MetadataFile) database.Book {
+
+	genres := database.StrToCategorySlice(metadata.Genres)
+	authors := database.StrToCategorySlice(metadata.Authors)
+	narrators := database.StrToCategorySlice(metadata.Narrators)
+
+	series := []database.Category{}
+	for _, s := range metadata.Series {
+		split := strings.SplitN(s, "#", 1)
+		cat := database.Category{
+			Name: strings.TrimSpace(split[0]),
+		}
+		if len(split) > 1 {
+			index := strings.TrimSpace(split[1])
+			cat.Index = &index
+		}
+		series = append(series, cat)
+	}
+
+	var desc *string
+	if len(metadata.Description) > 0 && metadata.Description != "null" {
+		desc = &metadata.Description
+	}
+
+	var year *int
+	if len(metadata.PublishedYear) > 0 && metadata.PublishedYear != "null" {
+		y, err := strconv.Atoi(metadata.PublishedYear)
+		if err == nil {
+			year = &y
+		} else {
+			year = nil
+		}
+	}
+
+	var isbn *string
+	if len(metadata.Isbn) > 0 && metadata.Isbn != "null" {
+		isbn = &metadata.Isbn
+	}
+
+	var asin *string
+	if len(metadata.Isbn) > 0 && metadata.Asin != "null" {
+		asin = &metadata.Asin
+	}
+
+	return database.Book{
+		Title:       metadata.Title,
+		Subtitle:    metadata.Subtitle,
+		Description: desc,
+		Publisher:   &metadata.Publisher,
+		Year:        year,
+		ISBN:        isbn,
+		ASIN:        asin,
+
+		Authors:   authors,
+		Series:    series,
+		Genres:    genres,
+		Narrators: narrators,
+		Tags:      metadata.Tags,
+	}
 }
 
 func stripTags(s string) string {

@@ -174,6 +174,10 @@ async function loadMore() {
     await fetchBooks(true);
 }
 
+async function scanLibrary() {
+
+}
+
 function resetFilters() {
     search.value = '';
     subtitle.value = '';
@@ -218,7 +222,10 @@ onMounted(async () => {
 </script>
 
 <template>
-    <h2>Library</h2>
+    <div class="library-heading">
+        <h2>Library</h2>
+        <button @click="scanLibrary">Scan Library Folder</button>
+    </div>
     
     <section>
         <div class="library-controls">
@@ -337,6 +344,31 @@ onMounted(async () => {
     display: flex;
     justify-content: center;
     padding: 2rem;
+}
+
+.library-heading {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.5rem;
+}
+
+.library-heading button {
+    height: 100%;
+    padding: 0.75rem 1rem;
+    border-radius: 6px;
+    font-size: 0.95rem;
+    border: 1px solid var(--vt-c-divider-light-1);
+    box-sizing: border-box;
+    background: var(--vt-c-white);
+    color: var(--vt-c-text-light-1);
+    cursor: pointer;
+}
+
+.library-heading button:hover {
+    background: var(--vt-c-white-soft);
+    border-color: var(--vt-c-brand);
+    color: var(--vt-c-brand);
 }
 
 .spinner {

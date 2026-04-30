@@ -315,6 +315,16 @@ func CategoryToStrSlice(items []Category) []string {
 	return names
 }
 
+func StrToCategorySlice(items []string) []Category {
+	cats := []Category{}
+	for i := range items {
+		cats = append(cats, Category{
+			Name: items[i],
+		})
+	}
+	return cats
+}
+
 func stringToCategoryType(str string) CategoryType {
 	switch str {
 	case "authors", "author":

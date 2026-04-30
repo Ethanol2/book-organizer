@@ -196,7 +196,7 @@ func (cfg *apiConfig) handlerUpdateBook(id uuid.UUID, w http.ResponseWriter, r *
 	}
 
 	if book.Files.Root != nil {
-		fileManagement.CreateMetadataFile(metadata.MetadataFileFromBook(book), path.Join(path.Join(cfg.libraryPath, *book.Files.Root), "metadata.json"))
+		fileManagement.CreateMetadataFile(metadata.BookToMetadata(book), path.Join(path.Join(cfg.libraryPath, *book.Files.Root), "metadata.json"))
 	}
 
 	book.Files.Prepend(cfg.libraryName)
@@ -324,4 +324,8 @@ func (cfg *apiConfig) handlerDeleteBook(id uuid.UUID, w http.ResponseWriter, r *
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
+}
+
+func (cfg *apiConfig) handlerPostScanLibrary(w http.ResponseWriter, r *http.Request) {
+
 }
