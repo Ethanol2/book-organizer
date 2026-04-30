@@ -21,6 +21,7 @@ func (cfg *apiConfig) handlerGetDownloads(w http.ResponseWriter, r *http.Request
 	downloads, err := cfg.db.GetDownloads()
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, "something went wrong retrieving downloads", err)
+		return
 	}
 
 	for i := range downloads {

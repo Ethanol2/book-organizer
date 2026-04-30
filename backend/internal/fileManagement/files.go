@@ -6,11 +6,13 @@ import (
 )
 
 type Files struct {
-	Root       *string       `json:"root"`
-	AudioFiles *[]string     `json:"audio_files"`
-	TextFiles  *[]string     `json:"text_files"`
-	Cover      *string       `json:"cover"`
-	Metadata   *MetadataFile `json:"metadata,omitempty"`
+	Root        *string   `json:"root"`
+	AudioFiles  *[]string `json:"audio_files"`
+	TextFiles   *[]string `json:"text_files"`
+	Cover       *string   `json:"cover"`
+	HasMetadata bool      `json:"has_metadata"`
+
+	Directories *[]string
 }
 
 // Matches AudioBookshelf's metadata format
@@ -112,4 +114,8 @@ func (files *Files) applyModifier(mod func([]string) *[]string) {
 		root := (*mod(arr))[0]
 		files.Root = &root
 	}
+}
+
+func (files *Files) HasNoFiles() bool {
+	return (files.AudioFiles == nil || len(*files.AudioFiles) == 0) && (files.TextFiles == nil || len(*files.TextFiles) == 0)
 }

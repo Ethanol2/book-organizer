@@ -18,17 +18,23 @@ import (
 )
 
 type apiConfig struct {
+	// System Structs
 	db      database.Client
 	mdCache cache.Cache
 
+	// Folder Paths
 	frontendPath  string
 	downloadsPath string
-	downloadsName string
 	libraryPath   string
-	libraryName   string
 	metadataPath  string
-	port          string
+	testDataPath  string
 
+	// Endpoint Paths
+	downloadsName string
+	libraryName   string
+
+	// Other
+	port              string
 	googleBooksApiKey string
 }
 
@@ -65,6 +71,9 @@ func main() {
 	fHandler := http.FileServer(http.Dir(cfg.frontendPath))
 	mux.Handle("/", fHandler)
 
+	// Library Endpoints
+	mux.HandleFunc("GET /api/library/scan", cfg.handlerPostScanLibrary)
+
 	// Downloads Endpoints
 	mux.HandleFunc("POST /api/downloads/{id}/associate", uuidMiddleware(cfg.handlerAssociateDownloadToBook))
 	mux.HandleFunc("GET /api/downloads", cfg.handlerGetDownloads)
@@ -98,7 +107,6 @@ func main() {
 		Handler: mux,
 	}
 
-	//scanner := fileManagement.CreateNew(time.Second*5, cfg.downloadsPath)
 	scanner := fileManagement.Scanner{
 		Frequency: time.Second * 5,
 		Directory: cfg.downloadsPath,
@@ -184,6 +192,11 @@ func initConfig(dbReset, insertTestData bool) (*apiConfig, error) {
 		return nil, fmt.Errorf("LIBRARY_PATH must be set")
 	}
 
+	tPath := os.Getenv("TEST_DATA_PATH")
+	if tPath == "" {
+		log.Println("TEST_DATA_PATH not set. Needed for the -t insert test data flag")
+	}
+
 	port := os.Getenv("PORT")
 	if port == "" {
 		return nil, fmt.Errorf("PORT must be set")
@@ -194,8 +207,8 @@ func initConfig(dbReset, insertTestData bool) (*apiConfig, error) {
 		log.Println("no google books api key in env variables. Google books search won't work")
 	}
 
-	if insertTestData {
-		err = db.InsertTestData(metadataPath, fileManagement.DownloadTempFile, fileManagement.MoveFilesWithPaths)
+	if insertTestData && tPath != "" {
+		err = db.InsertTestData(metadataPath, tPath, true, true, fileManagement.DownloadTempFile, fileManagement.MoveFilesWithPaths)
 		if err != nil {
 			return nil, err
 		}
@@ -210,6 +223,7 @@ func initConfig(dbReset, insertTestData bool) (*apiConfig, error) {
 		libraryPath:       lPath,
 		libraryName:       "/media/library",
 		metadataPath:      metadataPath,
+		testDataPath:      tPath,
 		port:              port,
 		googleBooksApiKey: gbApiKey,
 	}, nil

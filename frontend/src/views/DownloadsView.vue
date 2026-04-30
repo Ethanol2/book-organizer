@@ -3,6 +3,7 @@ import { ref, onMounted, onUnmounted } from 'vue'
 import type { Download } from '@/types/download';
 import DownloadItem from '@/components/DownloadItem.vue';
 import ImportDownloadModal from '@/components/ImportDownloadModal.vue';
+import { useNotificationsStore } from '@/stores/notifications';
 
 const downloads = ref<Download[]>([]);
 const lastRefresh = ref<string>("Never refreshed");
@@ -21,10 +22,13 @@ const selectedDownload = ref<Download>({
     created_at: ""
 });
 
+const loading = ref(false);
+
 
 async function fetchDownloads() {
     downloads.value = [];
     try {
+        loading.value = true;
         const resp = await fetch("/api/downloads");
 
         if (!resp.ok) {
@@ -37,10 +41,19 @@ async function fetchDownloads() {
 
     } catch (error) {
         console.error("Error fetching downloads list:", error)
+        useNotificationsStore().notifyError('Something went wrong while fetching downloads')
+    }
+    finally {
+        loading.value = false;
+        updateLastRefresh()
     }
 }
 
 function updateLastRefresh() {
+    if (loading.value) {
+        lastRefresh.value = "Loading..."
+        return
+    }
     if (lastRefreshParams.time <= 0) {
         return
     }
@@ -75,7 +88,7 @@ onUnmounted(() => {
             <h2>Downloads</h2>
             <div class="refresh">
                 <small>{{ lastRefresh }}</small>
-                <button @click="fetchDownloads">Refresh</button>
+                <button v-show="!loading" @click="fetchDownloads">Refresh</button>
             </div>
         </header>
 

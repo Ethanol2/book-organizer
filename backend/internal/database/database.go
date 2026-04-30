@@ -37,6 +37,7 @@ func (client *Client) handleMigration() error {
 		audio_files TEXT,
 		text_files TEXT,
 		cover TEXT,
+		has_metadata BOOLEAN NOT NULL,
 		created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 	);	
 	`
@@ -168,76 +169,17 @@ func (c Client) generateJoiningTable(type1, type1Table, type2, type2Table string
 	return err
 }
 
-func (c Client) InsertTestData(metadataPath string, downloadTempFile func(string) (*os.File, error), moveFiles func(string, string) error) error {
-
-	err := c.Begin()
-	if err != nil {
-		return err
-	}
-	defer c.Rollback()
-
-	fmt.Print("\n======= Inserting Test Data =======\n\n")
-
-	genres := []string{
-		"Romance", "Comedy", "Drama",
-	}
-
-	authors := []string{
-		"John Scalzi", "Andy Weir", "Shakespear", "Zogarth", "James S.A. Corey",
-	}
-
-	narrators := []string{
-		"Wil Wheaton", "Heath Miller", "Eric Mock",
-	}
-
-	series := []string{
-		"The Expanse", "Old Man's War", "The Primal Hunter",
-	}
-
-	createCategories := func(categoryType CategoryType, values []string) error {
-
-		for _, value := range values {
-			_, err := c.AddCategory(categoryType, value)
-			if err != nil {
-				return err
-			}
-		}
-		return nil
-	}
-
-	err = createCategories(Genres, genres)
-	if err != nil {
-		return err
-	}
-
-	err = createCategories(Authors, authors)
-	if err != nil {
-		return err
-	}
-
-	err = createCategories(Narrators, narrators)
-	if err != nil {
-		return err
-	}
-
-	err = createCategories(Series, series)
-	if err != nil {
-		return err
-	}
-
-	err = c.tx.Commit()
-	if err != nil {
-		return err
-	}
+func (c Client) InsertTestData(metadataPath, testDataPath string, buildTestDownloads, buildTestLibrary bool, downloadTempFile func(string) (*os.File, error), moveFiles func(string, string) error) error {
 
 	var testBooks []BookParams
-	err = json.Unmarshal([]byte(testData), &testBooks)
+	err := json.Unmarshal([]byte(testData), &testBooks)
 	if err != nil {
 		return err
 	}
 
+	testCoversPath := path.Join(testDataPath, "covers")
+
 	// Create a folder to store the test data covers, to avoid having to download the covers each time
-	testCoversPath := path.Join(metadataPath, "Test-Covers")
 	if _, err := os.Stat(testCoversPath); err != nil {
 		err = os.Mkdir(testCoversPath, 0755)
 		if err != nil {
@@ -246,6 +188,7 @@ func (c Client) InsertTestData(metadataPath string, downloadTempFile func(string
 		}
 	}
 
+	hasTestCover := []Book{}
 	for _, bookParams := range testBooks {
 		book, err := c.AddBook(bookParams)
 		if err != nil {
@@ -270,6 +213,7 @@ func (c Client) InsertTestData(metadataPath string, downloadTempFile func(string
 					continue
 				}
 
+				hasTestCover = append(hasTestCover, book)
 				log.Println("Using the saved test cover")
 				fmt.Println()
 				continue
@@ -322,6 +266,31 @@ func (c Client) InsertTestData(metadataPath string, downloadTempFile func(string
 	}
 
 	fmt.Print("\n======= Finished Inserting Test Data =======\n\n")
+	fmt.Println()
+
+	fmt.Print("\n======= Building Test Downloads and Library Folders =======\n\n")
+	fmt.Println()
+
+	// 	Test Downloads:
+	//     3 with just audio
+	//     3 with just text
+	//     3 with aduio and cover
+	//     3 with text, audio and cover
+	//     3 with metadata
+	//     3 with metadata and cover
+
+	// 	Test Library:
+	//     10 with no cover
+	//     10 with cover
+
+	for i := range hasTestCover {
+
+		// Insert Download
+
+	}
+
+	fmt.Print("\n======= Finished Building Test Downloads and Library Folders =======\n\n")
+	fmt.Println()
 
 	return nil
 }

@@ -31,6 +31,7 @@ const (
 	Audio FileType = iota
 	Text
 	Image
+	Metadata
 	Other
 )
 
@@ -53,7 +54,7 @@ func (scan *Scanner) Start(ctx context.Context) error {
 
 				err := scan.Scan()
 				if err != nil {
-					log.Println(err)
+					log.Println("Scan error =>", err)
 				}
 
 				time.Sleep(scan.Frequency)
@@ -98,7 +99,7 @@ func (scan *Scanner) ScanNew(toIgnore []string) error {
 		return err
 	}
 
-	downloads := []Files{}
+	filesList := []Files{}
 
 	for _, item := range dirItems {
 
@@ -106,16 +107,16 @@ func (scan *Scanner) ScanNew(toIgnore []string) error {
 			continue
 		}
 
-		files, err := getFiles(scan.Directory, item.Name())
+		files, err := getFolderContents(scan.Directory, item.Name())
 		if err != nil {
 			log.Println(err)
 			continue
 		}
 
-		downloads = append(downloads, files)
+		filesList = append(filesList, files)
 	}
 
-	err = scan.AddHandler(downloads)
+	err = scan.AddHandler(filesList)
 	if err != nil {
 		return err
 	}
@@ -140,7 +141,7 @@ func (scan *Scanner) ScanExisting(ids []uuid.UUID, dirs []string) error {
 			continue
 		}
 
-		newFiles, err := getFiles(scan.Directory, dir)
+		newFiles, err := getFolderContents(scan.Directory, dir)
 		if err != nil {
 			log.Println(err)
 			continue
@@ -172,18 +173,25 @@ func getFileType(filename string) FileType {
 
 	case ".epub", ".pdf", ".azw3", ".kfx", ".azw", ".mobi", ".iba", ".lrf", ".lrx", ".fb2", ".djvu", ".lit", ".prc", ".pdb", ".cbz", ".cbr", ".txt", ".rtf", ".html", ".docx":
 		return Text
+
+	case ".json":
+		if filename == "metadata.json" {
+			return Metadata
+		}
 	}
 
 	return Other
 }
 
-func getFiles(root, folder string) (Files, error) {
+func getFolderContents(root, folder string) (Files, error) {
 
 	p := path.Join(root, folder)
 
 	var audio []string
 	var text []string
 	var images []string
+	hasMD := false
+	var dirs []string
 
 	bookItems, err := os.ReadDir(p)
 	if err != nil {
@@ -192,6 +200,11 @@ func getFiles(root, folder string) (Files, error) {
 	}
 
 	for _, item := range bookItems {
+
+		if item.Type().IsDir() {
+			dirs = append(dirs, item.Name())
+			continue
+		}
 
 		fileType := getFileType(item.Name())
 		//log.Println(item.Name(), "->", fileType)
@@ -206,7 +219,11 @@ func getFiles(root, folder string) (Files, error) {
 
 		case Audio:
 			audio = append(audio, path.Join(folder, item.Name()))
+
+		case Metadata:
+			hasMD = true
 		}
+
 	}
 
 	var cover *string
@@ -232,9 +249,12 @@ func getFiles(root, folder string) (Files, error) {
 	}
 
 	return Files{
-		Root:       &folder,
-		AudioFiles: &audio,
-		TextFiles:  &text,
-		Cover:      cover,
+		Root:        &folder,
+		AudioFiles:  &audio,
+		TextFiles:   &text,
+		Cover:       cover,
+		HasMetadata: hasMD,
+
+		Directories: &dirs,
 	}, nil
 }

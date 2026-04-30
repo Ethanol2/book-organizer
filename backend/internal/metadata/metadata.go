@@ -85,7 +85,7 @@ func BookToMetadata(book database.Book) fileManagement.MetadataFile {
 	return md
 }
 
-func MetadataToBook(metadata fileManagement.MetadataFile) database.Book {
+func MetadataToBookParams(metadata fileManagement.MetadataFile) database.BookParams {
 
 	genres := database.StrToCategorySlice(metadata.Genres)
 	authors := database.StrToCategorySlice(metadata.Authors)
@@ -129,8 +129,8 @@ func MetadataToBook(metadata fileManagement.MetadataFile) database.Book {
 		asin = &metadata.Asin
 	}
 
-	return database.Book{
-		Title:       metadata.Title,
+	return database.BookParams{
+		Title:       &metadata.Title,
 		Subtitle:    metadata.Subtitle,
 		Description: desc,
 		Publisher:   &metadata.Publisher,
@@ -138,11 +138,11 @@ func MetadataToBook(metadata fileManagement.MetadataFile) database.Book {
 		ISBN:        isbn,
 		ASIN:        asin,
 
-		Authors:   authors,
-		Series:    series,
-		Genres:    genres,
-		Narrators: narrators,
-		Tags:      metadata.Tags,
+		Authors:   &authors,
+		Series:    &series,
+		Genres:    &genres,
+		Narrators: &narrators,
+		Tags:      &metadata.Tags,
 	}
 }
 

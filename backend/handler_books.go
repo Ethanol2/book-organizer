@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"path"
+	"strings"
 
 	"github.com/Ethanol2/book-organizer/internal/database"
 	"github.com/Ethanol2/book-organizer/internal/fileManagement"
@@ -327,5 +328,120 @@ func (cfg *apiConfig) handlerDeleteBook(id uuid.UUID, w http.ResponseWriter, r *
 }
 
 func (cfg *apiConfig) handlerPostScanLibrary(w http.ResponseWriter, r *http.Request) {
+
+	libraryParams := map[database.BookParams]fileManagement.Files{}
+
+	// Might need to create a new slice from dirs that's just the base names
+	_, dirs, err := cfg.db.GetAllBooksDirectories()
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Something went wrong while preparing for the scan", err)
+		return
+	}
+
+	var folderScan func(string, ...string) error
+	folderScan = func(scanDir string, dirNames ...string) error {
+
+		var author *string
+		if len(dirNames) > 0 {
+			author = &dirNames[0]
+		}
+		var series *string
+		if len(dirNames) > 1 {
+			series = &dirNames[1]
+		}
+
+		dirItems := []fileManagement.Files{}
+		adder := func(files []fileManagement.Files) error {
+			dirItems = append(dirItems, files...)
+			return nil
+		}
+
+		scanner := fileManagement.Scanner{
+			Directory:  scanDir,
+			AddHandler: adder,
+		}
+		err := scanner.ScanNew(dirs)
+		if err != nil {
+			return err
+		}
+
+		for _, item := range dirItems {
+
+			// If the item has no audio or text files then scan nested folders
+			if item.HasNoFiles() {
+				if item.Directories != nil {
+					for _, d := range *item.Directories {
+						err = folderScan(path.Join(scanDir, d))
+						if err != nil {
+							log.Println("Error trying to read the folder at \"", path.Join(scanDir, d), "\" =>", err)
+						}
+					}
+					continue
+				}
+			}
+
+			if item.Root == nil {
+				log.Println("An item with no root appeared in \"", scanDir, "\"")
+				continue
+			}
+
+			// If the item has a metadata file then import that and continue
+			if item.HasMetadata {
+				file, err := os.Open(path.Join(cfg.libraryPath, *item.Root, "metadata.json"))
+				if err != nil {
+					log.Println("Error trying to open metadata file in \"", *item.Root, "\" =>", err)
+					continue
+				}
+
+				var md fileManagement.MetadataFile
+				err = json.NewDecoder(file).Decode(&md)
+				file.Close()
+				if err != nil {
+					log.Println("Error trying to decode metadata file in \"", *item.Root, "\" =>", err)
+					continue
+				}
+
+				libraryParams[metadata.MetadataToBookParams(md)] = item
+				continue
+			}
+
+			title := path.Base(*item.Root)
+
+			var index *string
+			if series != nil {
+				split := strings.SplitN(title, " - ", 1)
+				if len(split) > 0 {
+					index = &split[0]
+					title = split[1]
+				}
+			}
+
+			var authorCat []database.Category
+			if author != nil {
+				authorCat = []database.Category{{Name: *author}}
+			}
+
+			var seriesCat []database.Category
+			if series != nil {
+				seriesCat = []database.Category{{Name: *series, Index: index}}
+			}
+
+			params := database.BookParams{
+				Title:   &title,
+				Authors: &authorCat,
+				Series:  &seriesCat,
+				Cover:   item.Cover,
+			}
+
+			libraryParams[params] = item
+		}
+		return nil
+	}
+
+	err = folderScan(cfg.libraryPath)
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Failed to scan library folder", err)
+		return
+	}
 
 }

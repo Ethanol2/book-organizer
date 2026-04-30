@@ -3,6 +3,7 @@ import BookItem from '@/components/LibraryItem.vue';
 import type { BookSummary } from '@/types/book';
 import { onMounted, ref } from 'vue';
 import { useRoute, useRouter, type LocationQueryValue } from 'vue-router';
+import { useNotificationsStore } from '@/stores/notifications';
 
 const route = useRoute();
 const router = useRouter();
@@ -175,7 +176,21 @@ async function loadMore() {
 }
 
 async function scanLibrary() {
-
+    isLoading.value = true;
+    try {
+        const resp = await fetch('/api/library/scan');
+        if (!resp.ok) {
+            throw new Error(`HTTP error with status: ${resp.status}`);
+        }
+        await resp.json();
+        await fetchBooks(false);
+        useNotificationsStore().notifyError('Scan Successful')
+    } catch (error) {
+        console.error('Error scanning library:', error);
+        useNotificationsStore().notifyError('Something went wrong while scanning library')
+    } finally {
+        isLoading.value = false;
+    }
 }
 
 function resetFilters() {

@@ -726,6 +726,32 @@ func (c Client) GetBookDirectory(id uuid.UUID) (*string, error) {
 	return dir, nil
 }
 
+func (c Client) GetAllBooksDirectories() ([]uuid.UUID, []string, error) {
+
+	rows, err := c.db.Query("SELECT id, directory FROM books WHERE directory IS NOT NULL")
+	if err != nil {
+		return []uuid.UUID{}, []string{}, err
+	}
+
+	ids := []uuid.UUID{}
+	dirs := []string{}
+	for rows.Next() {
+
+		var dir string
+		var id uuid.UUID
+
+		err = rows.Scan(&id, &dir)
+		if err != nil {
+			return []uuid.UUID{}, []string{}, err
+		}
+
+		ids = append(ids, id)
+		dirs = append(dirs, dir)
+	}
+
+	return ids, dirs, nil
+}
+
 func (c Client) DeleteBookFilesFromDatabase(id uuid.UUID) error {
 
 	indyTx := c.tx == nil

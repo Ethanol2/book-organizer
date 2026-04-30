@@ -19,14 +19,14 @@ type Download struct {
 
 //#region Setters
 
-func (c Client) AddDownload(tx *sql.Tx, files fileManagement.Files) (*Download, error) {
+func (c Client) AddDownload(tx *sql.Tx, files fileManagement.Files) error {
 	var err error
 
 	indyTx := tx == nil
 	if indyTx {
 		tx, err = c.db.Begin()
 		if err != nil {
-			return nil, err
+			return err
 		}
 		defer tx.Rollback()
 	}
@@ -35,30 +35,30 @@ func (c Client) AddDownload(tx *sql.Tx, files fileManagement.Files) (*Download, 
 
 	audio, text, err := files.FileListsToJson()
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	query := `
 	INSERT INTO downloads
-		(id, dir_name, audio_files, text_files, cover, created_at)
+		(id, dir_name, audio_files, text_files, cover, has_metadata, created_at)
 	VALUES
-		(?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+		(?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
 	`
-	_, err = tx.Exec(query, id, files.Root, audio, text, files.Cover)
+	_, err = tx.Exec(query, id, files.Root, audio, text, files.Cover, files.HasMetadata)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	if indyTx {
 		err = tx.Commit()
 		if err != nil {
-			return nil, err
+			return err
 		}
 	}
 
 	log.Println("Added \"", *files.Root, "\" to downloads")
 
-	return c.GetDownload(id)
+	return nil
 }
 
 func (c Client) AddDownloads(downloads []fileManagement.Files) error {
@@ -69,7 +69,7 @@ func (c Client) AddDownloads(downloads []fileManagement.Files) error {
 	}
 
 	for name := range downloads {
-		_, err = c.AddDownload(tx, downloads[name])
+		err = c.AddDownload(tx, downloads[name])
 		if err != nil {
 			return err
 		}
@@ -222,7 +222,7 @@ func (c Client) GetDownloads() ([]Download, error) {
 		var audioJson string
 		var textJson string
 
-		err := rows.Scan(&idStr, &download.Files.Root, &audioJson, &textJson, &download.Files.Cover, &download.CreatedAt)
+		err := rows.Scan(&idStr, &download.Files.Root, &audioJson, &textJson, &download.Files.Cover, &download.Files.HasMetadata, &download.CreatedAt)
 		if err != nil {
 			if errors.Is(err, sql.ErrNoRows) {
 				return nil, nil
@@ -270,7 +270,7 @@ func (c Client) getDownloadWithQuery(query string, args ...any) (*Download, erro
 	var audioJson string
 	var textJson string
 
-	err := c.db.QueryRow(query, args...).Scan(&idStr, &download.Files.Root, &audioJson, &textJson, &download.Files.Cover, &download.CreatedAt)
+	err := c.db.QueryRow(query, args...).Scan(&idStr, &download.Files.Root, &audioJson, &textJson, &download.Files.Cover, &download.Files.HasMetadata, &download.CreatedAt)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, nil
