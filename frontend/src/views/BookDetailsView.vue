@@ -295,27 +295,25 @@ onMounted(async () => {
           </div>
           <div class="file-overview">
             <div class="file-metric">
-              <span class="metric-label">Audio files</span>
-              <strong>{{ audioFiles.length }}</strong>
-            </div>
-            <div class="file-metric">
               <span class="metric-label">Text files</span>
-              <strong>{{ textFiles.length }}</strong>
+              <strong>( {{ textFiles.length }} )</strong>
             </div>
-          </div>
-
-          <div class="file-list-group" v-if="audioFiles.length">
-            <h3>Audio file names</h3>
+            <ul class="file-list">
+              <li v-for="filePath in textFiles" :key="filePath">{{ basename(filePath) }}</li>
+            </ul>
+            <div class="file-metric">
+              <span class="metric-label">Audio files</span>
+              <strong>( {{ audioFiles.length }} )</strong>
+            </div>
             <ul class="file-list">
               <li v-for="filePath in audioFiles" :key="filePath">{{ basename(filePath) }}</li>
             </ul>
           </div>
-
+          
+          <div class="file-list-group" v-if="audioFiles.length">
+          </div>
+          
           <div class="file-list-group" v-if="textFiles.length">
-            <h3>Text file names</h3>
-            <ul class="file-list">
-              <li v-for="filePath in textFiles" :key="filePath">{{ basename(filePath) }}</li>
-            </ul>
           </div>
         </section>
       </div>

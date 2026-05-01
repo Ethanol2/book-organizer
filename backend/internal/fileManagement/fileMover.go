@@ -1,16 +1,19 @@
 package fileManagement
 
 import (
+	"fmt"
 	"os"
 	"path"
 )
 
 func CreateDirectory(path string) error {
-	if _, err := os.Stat(path); os.IsNotExist(err) {
+	if info, err := os.Stat(path); err != nil {
 		err = os.Mkdir(path, os.ModePerm)
 		if err != nil {
 			return err
 		}
+	} else if !info.IsDir() {
+		return fmt.Errorf("couldn't create folder at \"%s\" because the path already points to a file")
 	}
 	return nil
 }

@@ -32,7 +32,7 @@ type SearchResults struct {
 	Items      []database.BookParams `json:"items"`
 }
 
-func BookToMetadata(book database.Book) fileManagement.MetadataFile {
+func BookToMetadata(book database.Book) *fileManagement.MetadataFile {
 	md := fileManagement.MetadataFile{}
 
 	pub := ""
@@ -82,7 +82,7 @@ func BookToMetadata(book database.Book) fileManagement.MetadataFile {
 	md.Asin = asin
 	md.Tags = book.Tags
 
-	return md
+	return &md
 }
 
 func MetadataToBookParams(metadata fileManagement.MetadataFile) database.BookParams {

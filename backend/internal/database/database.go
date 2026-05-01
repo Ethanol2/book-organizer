@@ -5,10 +5,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
-	"os"
 	"path"
 	"strconv"
 	"strings"
+
+	"github.com/Ethanol2/book-organizer/internal/fileManagement"
 )
 
 type Client struct {
@@ -169,130 +170,50 @@ func (c Client) generateJoiningTable(type1, type1Table, type2, type2Table string
 	return err
 }
 
-func (c Client) InsertTestData(metadataPath, testDataPath string, buildTestDownloads, buildTestLibrary bool, downloadTempFile func(string) (*os.File, error), moveFiles func(string, string) error) error {
+func (c Client) InsertTestData(metadataPath, coversPath string) ([]Book, error) {
+
+	fmt.Println()
+	fmt.Print("======= Inserting Test Data =======")
+	fmt.Println()
 
 	var testBooks []BookParams
 	err := json.Unmarshal([]byte(testData), &testBooks)
 	if err != nil {
-		return err
+		return []Book{}, err
 	}
 
-	testCoversPath := path.Join(testDataPath, "covers")
+	err = fileManagement.CreateDirectory(coversPath)
+	if err != nil {
+		fmt.Println("Error while creating the test covers directory \"", coversPath, "\"")
+		return []Book{}, err
+	}
 
-	// Create a folder to store the test data covers, to avoid having to download the covers each time
-	if _, err := os.Stat(testCoversPath); err != nil {
-		err = os.Mkdir(testCoversPath, 0755)
+	insertedBooks := []Book{}
+	for _, params := range testBooks {
+		book, err := c.AddBook(params)
 		if err != nil {
-			log.Println("Erorr while creating the test covers folder \"", testCoversPath, "\" =>", err)
-			return err
-		}
-	}
-
-	hasTestCover := []Book{}
-	for _, bookParams := range testBooks {
-		book, err := c.AddBook(bookParams)
-		if err != nil {
-			return err
+			return []Book{}, err
 		}
 
-		cover := ""
-		hasCoverURL := false
-		testCoverPath := ""
+		insertedBooks = append(insertedBooks, book)
 
-		if bookParams.ISBN != nil {
-			testCoverPath = path.Join(testCoversPath, *bookParams.ISBN+".jpg")
-			if _, err := os.Stat(testCoverPath); err == nil {
-				data, err := os.ReadFile(testCoverPath)
-				if err != nil {
-					log.Println("Error trying to read the test cover in the test covers folder \"", testCoverPath, "\" =>", testCoverPath)
-					continue
-				}
-				err = os.WriteFile(path.Join(metadataPath, book.Id.String()+".jpg"), data, 0644)
-				if err != nil {
-					log.Println("Error trying to copy the test cover to the metadata folder =>", err)
-					continue
-				}
-
-				hasTestCover = append(hasTestCover, book)
-				log.Println("Using the saved test cover")
-				fmt.Println()
-				continue
-			}
-
-			if bookParams.Cover != nil {
-				hasCoverURL = true
-				cover = *bookParams.Cover
-			} else {
-				hasCoverURL = true
-				cover = fmt.Sprintf("https://covers.openlibrary.org/b/isbn/%s-L.jpg", *bookParams.ISBN)
-			}
-		}
-
-		if hasCoverURL {
-			var coverFile *os.File
-			coverFile, err = downloadTempFile(cover)
+		if params.ISBN != nil {
+			err = fileManagement.HandleTestCover(
+				path.Join(coversPath, *params.ISBN+".jpg"),
+				path.Join(metadataPath, book.Id.String()+".jpg"),
+				fmt.Sprintf("https://covers.openlibrary.org/b/isbn/%s-L.jpg", *params.ISBN),
+			)
 			if err != nil {
-				log.Println(err)
-				log.Print("\nFailed to get cover for \"", book.Title, "\" => ", cover, "\n\n")
-				fmt.Println()
-				continue
-			}
-
-			coverPath := path.Join(metadataPath, book.Id.String()+path.Ext(coverFile.Name()))
-			err = moveFiles(coverFile.Name(), coverPath)
-			if err != nil {
-				log.Println(err)
-				log.Println("Failed to save cover for \"", book.Title, "\"")
-				fmt.Println()
-				continue
-			}
-			coverFile.Close()
-
-			if bookParams.ISBN != nil {
-
-				coverFileContent, err := os.ReadFile(coverPath)
-				if err != nil {
-					log.Println("Error trying to read the new metadata cover at \"", coverPath, "\" =>", err)
-					continue
-				}
-
-				err = os.WriteFile(testCoverPath, coverFileContent, 0644)
-				if err != nil {
-					log.Println("Error trying to write new cover to the test covers at \"", testCoverPath, "\" =>", err)
-				}
+				fmt.Println(err)
 			}
 		}
-		fmt.Println()
 	}
 
-	fmt.Print("\n======= Finished Inserting Test Data =======\n\n")
+	fmt.Println()
+	fmt.Print("======= Finished Inserting Test Data =======")
 	fmt.Println()
 
-	fmt.Print("\n======= Building Test Downloads and Library Folders =======\n\n")
-	fmt.Println()
-
-	// 	Test Downloads:
-	//     3 with just audio
-	//     3 with just text
-	//     3 with aduio and cover
-	//     3 with text, audio and cover
-	//     3 with metadata
-	//     3 with metadata and cover
-
-	// 	Test Library:
-	//     10 with no cover
-	//     10 with cover
-
-	for i := range hasTestCover {
-
-		// Insert Download
-
-	}
-
-	fmt.Print("\n======= Finished Building Test Downloads and Library Folders =======\n\n")
-	fmt.Println()
-
-	return nil
+	return insertedBooks, nil
 }
 
 func (c *Client) Begin() error {

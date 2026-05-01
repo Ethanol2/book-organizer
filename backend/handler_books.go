@@ -197,7 +197,7 @@ func (cfg *apiConfig) handlerUpdateBook(id uuid.UUID, w http.ResponseWriter, r *
 	}
 
 	if book.Files.Root != nil {
-		fileManagement.CreateMetadataFile(metadata.BookToMetadata(book), path.Join(path.Join(cfg.libraryPath, *book.Files.Root), "metadata.json"))
+		fileManagement.CreateMetadataFile(*metadata.BookToMetadata(book), path.Join(cfg.libraryPath, *book.Files.Root))
 	}
 
 	book.Files.Prepend(cfg.libraryName)

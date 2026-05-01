@@ -150,7 +150,7 @@ func (cfg *apiConfig) handlerAssociateDownloadToBook(downloadId uuid.UUID, w htt
 		fmt.Println()
 	}
 
-	err = fileManagement.CreateMetadataFile(metadata.BookToMetadata(book), path.Join(newPath, "metadata.json"))
+	err = fileManagement.CreateMetadataFile(*metadata.BookToMetadata(book), newPath)
 	if err != nil {
 		log.Println("failed to create metadata file:", err)
 	}
