@@ -143,7 +143,9 @@ func CreateTestDirectory(dirPath, pathPrefix string, metadata *MetadataFile, cov
 		return Files{}, err
 	}
 
-	files := Files{}
+	files := Files{
+		Root: &dirPath,
+	}
 
 	if metadata != nil {
 		log.Println("Writing metadata file")

@@ -401,7 +401,7 @@ func initConfig(flags cliFlags) (*apiConfig, error) {
 					path.Join(metadataPath, book.Id.String()+".jpg"), rand.Intn(10)+1, rand.Intn(10)+1,
 				)
 
-				err = book.InsertBookFiles(db)
+				err = book.ApplyBookFiles(db)
 				if err != nil {
 					return nil, err
 				}
@@ -422,7 +422,7 @@ func initConfig(flags cliFlags) (*apiConfig, error) {
 					path.Join(metadataPath, book.Id.String()+".jpg"), rand.Intn(10)+1, rand.Intn(10)+1,
 				)
 
-				err = book.InsertBookFiles(db)
+				err = book.ApplyBookFiles(db)
 				if err != nil {
 					return nil, err
 				}

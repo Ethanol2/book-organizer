@@ -389,7 +389,7 @@ func (c Client) AssociateBookAndDownload(bookId, downloadId uuid.UUID, author, s
 
 	files.UpdateDirectory(path.Join(author, series, bookDir))
 	tmpBook := Book{Id: &bookId, Files: files}
-	err = tmpBook.InsertBookFiles(c)
+	err = tmpBook.ApplyBookFiles(c)
 	if err != nil {
 		return Book{}, err
 	}
@@ -564,7 +564,7 @@ func (c Client) UpdateBook(id uuid.UUID, update BookParams) (Book, bool, error) 
 		}
 
 		book.Files.UpdateDirectory(path.Join(authorDir, seriesDir, bookDir))
-		err = book.InsertBookFiles(c)
+		err = book.ApplyBookFiles(c)
 		if err != nil {
 			return Book{}, false, err
 		}
@@ -808,7 +808,7 @@ func (book *Book) getBookCategories(c Client) error {
 }
 
 // Inserts files into a book directly, bypassing the update or association functions. Don't use this unless you have a good reason. Requires an active db transaction.
-func (book *Book) InsertBookFiles(db Client) error {
+func (book *Book) ApplyBookFiles(db Client) error {
 
 	if db.tx == nil {
 		return fmt.Errorf("updateBookFiles requires an active tx")

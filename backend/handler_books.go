@@ -341,21 +341,25 @@ func (cfg *apiConfig) handlerPostScanLibrary(w http.ResponseWriter, r *http.Requ
 	var folderScan func(string, ...string) error
 	folderScan = func(scanDir string, dirNames ...string) error {
 
+		// If we're 1 folder deep, the folder is the author
 		var author *string
 		if len(dirNames) > 0 {
 			author = &dirNames[0]
 		}
+		// If we're 2 folders deep, the folder might be the series
 		var series *string
 		if len(dirNames) > 1 {
 			series = &dirNames[1]
 		}
 
+		// List for the current folder
 		dirItems := []fileManagement.Files{}
 		adder := func(files []fileManagement.Files) error {
 			dirItems = append(dirItems, files...)
 			return nil
 		}
 
+		// Get the contents of the current folder
 		scanner := fileManagement.Scanner{
 			Directory:  scanDir,
 			AddHandler: adder,
@@ -365,19 +369,23 @@ func (cfg *apiConfig) handlerPostScanLibrary(w http.ResponseWriter, r *http.Requ
 			return err
 		}
 
+		// For each item in the folder
 		for _, item := range dirItems {
 
-			// If the item has no audio or text files then scan nested folders
+			// If the item has no audio or text files then scan nested folders, since we aren't in a book
 			if item.HasNoFiles() {
+				// Check if the folder has sub folders
 				if item.Directories != nil {
-					for _, d := range *item.Directories {
-						err = folderScan(path.Join(scanDir, d))
-						if err != nil {
-							log.Println("Error trying to read the folder at \"", path.Join(scanDir, d), "\" =>", err)
-						}
+					p := path.Join(scanDir, *item.Root)
+
+					// Getting around the variadic issue by appending to a new slice.
+					// The slicing nonsense ensures that append always thinks the old slice is too small to house the new one. slice[min:high:max]
+					err = folderScan(p, append(dirNames[:len(dirNames):len(dirNames)], *item.Root)...)
+					if err != nil {
+						log.Println("Error trying to read the folder at \"", p, "\" =>", err)
 					}
-					continue
 				}
+				continue
 			}
 
 			if item.Root == nil {
@@ -385,9 +393,16 @@ func (cfg *apiConfig) handlerPostScanLibrary(w http.ResponseWriter, r *http.Requ
 				continue
 			}
 
+			p := path.Join(dirNames...)
+
+			if item.Cover != nil {
+				c := path.Join(p, *item.Cover)
+				item.Cover = &c
+			}
+
 			// If the item has a metadata file then import that and continue
 			if item.HasMetadata {
-				file, err := os.Open(path.Join(cfg.libraryPath, *item.Root, "metadata.json"))
+				file, err := os.Open(path.Join(cfg.libraryPath, p, *item.Root, "metadata.json"))
 				if err != nil {
 					log.Println("Error trying to open metadata file in \"", *item.Root, "\" =>", err)
 					continue
@@ -409,8 +424,8 @@ func (cfg *apiConfig) handlerPostScanLibrary(w http.ResponseWriter, r *http.Requ
 
 			var index *string
 			if series != nil {
-				split := strings.SplitN(title, " - ", 1)
-				if len(split) > 0 {
+				split := strings.SplitN(title, " - ", 2)
+				if len(split) > 1 {
 					index = &split[0]
 					title = split[1]
 				}
@@ -430,7 +445,6 @@ func (cfg *apiConfig) handlerPostScanLibrary(w http.ResponseWriter, r *http.Requ
 				Title:   &title,
 				Authors: &authorCat,
 				Series:  &seriesCat,
-				Cover:   item.Cover,
 			}
 
 			libraryParams[params] = item
@@ -438,10 +452,52 @@ func (cfg *apiConfig) handlerPostScanLibrary(w http.ResponseWriter, r *http.Requ
 		return nil
 	}
 
+	log.Println("Starting library scan")
 	err = folderScan(cfg.libraryPath)
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, "Failed to scan library folder", err)
 		return
 	}
 
+	for params, files := range libraryParams {
+
+		log.Println("Adding \"", params.Title, "\" to the database")
+		book, err := cfg.db.AddBook(params)
+		if err != nil {
+			log.Println(err)
+			continue
+		}
+
+		log.Println("Inserting book files")
+		err = cfg.db.Begin()
+		if err != nil {
+			respondWithError(w, http.StatusInternalServerError, "Error adding books to the database", err)
+			return
+		}
+
+		book.Files = files
+		err = book.ApplyBookFiles(cfg.db)
+		if err != nil {
+			respondWithError(w, http.StatusInternalServerError, "Error adding books to the database", err)
+			cfg.db.Rollback()
+			return
+		}
+
+		err = cfg.db.Commit()
+		if err != nil {
+			respondWithError(w, http.StatusInternalServerError, "Error adding books to the database", err)
+			cfg.db.Rollback()
+			return
+		}
+	}
+
+	log.Println("Library Scan Complete")
+
+	bookSummaries, err := cfg.db.GetBooksSummary(map[string][]string{})
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Error retrieving book summaries after scan", err)
+		return
+	}
+
+	respondWithJson(w, http.StatusOK, bookSummaries)
 }
