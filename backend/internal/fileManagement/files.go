@@ -41,18 +41,21 @@ type MetadataFile struct {
 	Abridged      bool     `json:"abridged,omitempty"`
 }
 
-func (files Files) FileListsToJson() (string, string, error) {
+func (files Files) FileListsToJson() (*string, *string, error) {
 
 	audioBytes, err := json.Marshal(files.AudioFiles)
 	if err != nil {
-		return "", "", err
+		return nil, nil, err
 	}
 	textBytes, err := json.Marshal(files.TextFiles)
 	if err != nil {
-		return "", "", err
+		return nil, nil, err
 	}
 
-	return string(audioBytes), string(textBytes), nil
+	aStr := string(audioBytes)
+	tStr := string(textBytes)
+
+	return &aStr, &tStr, nil
 }
 
 func (files *Files) ParseAudioJson(audioJson string) error {

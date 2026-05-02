@@ -119,7 +119,7 @@ func main() {
 	mux.Handle("/", fHandler)
 
 	// Library Endpoints
-	mux.HandleFunc("GET /api/library/scan", cfg.handlerPostScanLibrary)
+	mux.HandleFunc("GET /api/library/scan", cfg.handlerGetScanLibrary)
 
 	// Downloads Endpoints
 	mux.HandleFunc("POST /api/downloads/{id}/associate", uuidMiddleware(cfg.handlerAssociateDownloadToBook))

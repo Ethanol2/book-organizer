@@ -3,7 +3,7 @@ import { ref, computed, onMounted } from 'vue';
 import type { Category } from '@/types/book';
 
 interface Props {
-  list: Category[] | string[];
+  list: Category[] | string[] | undefined;
   title: string;
   fieldName: string;
   listLimit: number;
@@ -39,7 +39,7 @@ onMounted(() => {
     <dt>
       {{ title }}
     </dt>
-    <div v-if="listLength > 0">
+    <div v-if="listLength > 0 && list">
         <div v-if="showAll" class="search-category-button">
           <dd v-for="(item, index) in list" :key="typeof item === 'string' ? item : item.name">
             <a @click="handleItemClick(typeof item === 'string' ? item : item.name)">

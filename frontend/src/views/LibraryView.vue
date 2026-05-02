@@ -119,20 +119,8 @@ function syncRouteQuery() {
     });
 }
 
-async function fetchBooks(append = false) {
-    if (isLoading.value || hasLoadedAll.value) return;
-    
-    isLoading.value = true;
-    try {
-        const queryString = buildQueryString();
-        const resp = await fetch(`api/books${queryString}`);
-        if (!resp.ok) {
-            throw new Error(`HTTP error with status: ${resp.status}`);
-        }
-
-        const data = await resp.json();
-        
-        if (append) {
+function handleFetchData(data: any, append = false) {
+    if (append) {
             books.value.push(...data.items);
         } else {
             if (data.items == null || data.items.length === 0) {
@@ -148,15 +136,59 @@ async function fetchBooks(append = false) {
         
         // Check if we've loaded all items
         const loadedCount = append 
-            ? books.value.length 
-            : data.items.length;
+            ? books.value?.length 
+            : data.items?.length;
         
         if (loadedCount >= data.results_count) {
             hasLoadedAll.value = true;
         }
+}
+
+async function fetchBooks(append = false) {
+    if (isLoading.value || hasLoadedAll.value) return;
+    
+    isLoading.value = true;
+    try {
+        const queryString = buildQueryString();
+        const resp = await fetch(`api/books${queryString}`);
+        if (!resp.ok) {
+            throw new Error(`HTTP error with status: ${resp.status}`);
+        }
+
+        const data = await resp.json();
+        handleFetchData(data, append);       
 
     } catch (error) {
         console.error('Error fetching books list:', error);
+    } finally {
+        isLoading.value = false;
+    }
+}
+
+async function scanLibrary() {
+    isLoading.value = true;
+    try {
+        const resp = await fetch('/api/library/scan');
+        if (!resp.ok) {
+            throw new Error(`HTTP error with status: ${resp.status}`);
+        }
+        const data = await resp.json();
+        handleFetchData(data.results);
+        
+        useNotificationsStore().notifySuccess('Scan Complete')
+        
+        const errors = data.errors;
+        if (errors == undefined || errors.length === 0) {
+            useNotificationsStore().notifySuccess('No errors')
+        }
+        else {
+            useNotificationsStore().notifyError(`${errors.length} errors occured during the scan. See console for details`)
+            console.error("Scan complete with " + errors.length + " errors \n\n" + errors)
+        }
+        
+    } catch (error) {
+        console.error('Error scanning library:', error);
+        useNotificationsStore().notifyError('Something went wrong while scanning the library')
     } finally {
         isLoading.value = false;
     }
@@ -173,24 +205,6 @@ async function loadMore() {
     if (isLoading.value || hasLoadedAll.value) return;
     currentPage.value++;
     await fetchBooks(true);
-}
-
-async function scanLibrary() {
-    isLoading.value = true;
-    try {
-        const resp = await fetch('/api/library/scan');
-        if (!resp.ok) {
-            throw new Error(`HTTP error with status: ${resp.status}`);
-        }
-        await resp.json();
-        await fetchBooks(false);
-        useNotificationsStore().notifyError('Scan Successful')
-    } catch (error) {
-        console.error('Error scanning library:', error);
-        useNotificationsStore().notifyError('Something went wrong while scanning library')
-    } finally {
-        isLoading.value = false;
-    }
 }
 
 function resetFilters() {

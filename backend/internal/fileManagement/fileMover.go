@@ -13,7 +13,7 @@ func CreateDirectory(path string) error {
 			return err
 		}
 	} else if !info.IsDir() {
-		return fmt.Errorf("couldn't create folder at \"%s\" because the path already points to a file")
+		return fmt.Errorf("couldn't create folder at \"%s\" because the path already points to a file", path)
 	}
 	return nil
 }

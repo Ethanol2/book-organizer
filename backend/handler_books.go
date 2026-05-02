@@ -327,29 +327,33 @@ func (cfg *apiConfig) handlerDeleteBook(id uuid.UUID, w http.ResponseWriter, r *
 	w.WriteHeader(http.StatusNoContent)
 }
 
-func (cfg *apiConfig) handlerPostScanLibrary(w http.ResponseWriter, r *http.Request) {
+func (cfg *apiConfig) handlerGetScanLibrary(w http.ResponseWriter, r *http.Request) {
 
 	libraryParams := map[database.BookParams]fileManagement.Files{}
 
-	// Might need to create a new slice from dirs that's just the base names
+	// Get existing library to prevent duplicates
 	_, dirs, err := cfg.db.GetAllBooksDirectories()
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, "Something went wrong while preparing for the scan", err)
 		return
 	}
+	// Get base since the roots include author and series
+	for i := range dirs {
+		dirs[i] = path.Base(dirs[i])
+	}
 
-	var folderScan func(string, ...string) error
-	folderScan = func(scanDir string, dirNames ...string) error {
+	scanErrors := []string{}
+	var folderScan func(string, string, []string) error
+	folderScan = func(dirPrefix string, dir string, names []string) error {
 
-		// If we're 1 folder deep, the folder is the author
-		var author *string
-		if len(dirNames) > 0 {
-			author = &dirNames[0]
+		currentPath := path.Join(dirPrefix, dir)
+		if dir != "" {
+			names = append(names, dir)
 		}
-		// If we're 2 folders deep, the folder might be the series
-		var series *string
-		if len(dirNames) > 1 {
-			series = &dirNames[1]
+
+		// Check the recursion hasn't gone too deep -> Author/Series/Book -> max 3 folder levels
+		if len(names) > 3 {
+			return fmt.Errorf("scan function is too deep => max folder depth: 3 | current depth:%d", len(names))
 		}
 
 		// List for the current folder
@@ -361,7 +365,7 @@ func (cfg *apiConfig) handlerPostScanLibrary(w http.ResponseWriter, r *http.Requ
 
 		// Get the contents of the current folder
 		scanner := fileManagement.Scanner{
-			Directory:  scanDir,
+			Directory:  currentPath,
 			AddHandler: adder,
 		}
 		err := scanner.ScanNew(dirs)
@@ -376,24 +380,24 @@ func (cfg *apiConfig) handlerPostScanLibrary(w http.ResponseWriter, r *http.Requ
 			if item.HasNoFiles() {
 				// Check if the folder has sub folders
 				if item.Directories != nil {
-					p := path.Join(scanDir, *item.Root)
-
-					// Getting around the variadic issue by appending to a new slice.
-					// The slicing nonsense ensures that append always thinks the old slice is too small to house the new one. slice[min:high:max]
-					err = folderScan(p, append(dirNames[:len(dirNames):len(dirNames)], *item.Root)...)
+					err := folderScan(currentPath, *item.Root, names)
 					if err != nil {
-						log.Println("Error trying to read the folder at \"", p, "\" =>", err)
+						strErr := fmt.Sprintln("Error trying to read the folder at \"", currentPath, *item.Root, "\" =>", err)
+						log.Print(strErr)
+						scanErrors = append(scanErrors, strErr)
 					}
 				}
 				continue
 			}
 
 			if item.Root == nil {
-				log.Println("An item with no root appeared in \"", scanDir, "\"")
+				err := fmt.Sprintln("An item with no root appeared in \"", dirPrefix, "\"")
+				log.Print(err)
+				scanErrors = append(scanErrors, err)
 				continue
 			}
 
-			p := path.Join(dirNames...)
+			p := path.Join(names...)
 
 			if item.Cover != nil {
 				c := path.Join(p, *item.Cover)
@@ -404,7 +408,9 @@ func (cfg *apiConfig) handlerPostScanLibrary(w http.ResponseWriter, r *http.Requ
 			if item.HasMetadata {
 				file, err := os.Open(path.Join(cfg.libraryPath, p, *item.Root, "metadata.json"))
 				if err != nil {
-					log.Println("Error trying to open metadata file in \"", *item.Root, "\" =>", err)
+					strErr := fmt.Sprintln("Error trying to open metadata file in \"", *item.Root, "\" =>", err)
+					log.Print(strErr)
+					scanErrors = append(scanErrors, strErr)
 					continue
 				}
 
@@ -412,7 +418,9 @@ func (cfg *apiConfig) handlerPostScanLibrary(w http.ResponseWriter, r *http.Requ
 				err = json.NewDecoder(file).Decode(&md)
 				file.Close()
 				if err != nil {
-					log.Println("Error trying to decode metadata file in \"", *item.Root, "\" =>", err)
+					strErr := fmt.Sprintln("Error trying to decode metadata file in \"", *item.Root, "\" =>", err)
+					log.Print(strErr)
+					scanErrors = append(scanErrors, strErr)
 					continue
 				}
 
@@ -422,23 +430,20 @@ func (cfg *apiConfig) handlerPostScanLibrary(w http.ResponseWriter, r *http.Requ
 
 			title := path.Base(*item.Root)
 
-			var index *string
-			if series != nil {
+			var authorCat []database.Category
+			authorCat = []database.Category{{Name: names[0]}}
+
+			var seriesCat []database.Category
+			if len(names) > 1 {
+
+				var index *string
 				split := strings.SplitN(title, " - ", 2)
 				if len(split) > 1 {
 					index = &split[0]
 					title = split[1]
 				}
-			}
 
-			var authorCat []database.Category
-			if author != nil {
-				authorCat = []database.Category{{Name: *author}}
-			}
-
-			var seriesCat []database.Category
-			if series != nil {
-				seriesCat = []database.Category{{Name: *series, Index: index}}
+				seriesCat = []database.Category{{Name: names[1], Index: index}}
 			}
 
 			params := database.BookParams{
@@ -453,7 +458,7 @@ func (cfg *apiConfig) handlerPostScanLibrary(w http.ResponseWriter, r *http.Requ
 	}
 
 	log.Println("Starting library scan")
-	err = folderScan(cfg.libraryPath)
+	err = folderScan(cfg.libraryPath, "", []string{})
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, "Failed to scan library folder", err)
 		return
@@ -461,7 +466,7 @@ func (cfg *apiConfig) handlerPostScanLibrary(w http.ResponseWriter, r *http.Requ
 
 	for params, files := range libraryParams {
 
-		log.Println("Adding \"", params.Title, "\" to the database")
+		log.Println("Adding \"", *params.Title, "\" to the database")
 		book, err := cfg.db.AddBook(params)
 		if err != nil {
 			log.Println(err)
@@ -493,11 +498,22 @@ func (cfg *apiConfig) handlerPostScanLibrary(w http.ResponseWriter, r *http.Requ
 
 	log.Println("Library Scan Complete")
 
-	bookSummaries, err := cfg.db.GetBooksSummary(map[string][]string{})
+	results, err := cfg.db.GetBooksSummary(map[string][]string{})
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, "Error retrieving book summaries after scan", err)
 		return
 	}
 
-	respondWithJson(w, http.StatusOK, bookSummaries)
+	for i := range results.Items {
+		if results.Items[i].Cover != nil {
+			cover := *results.Items[i].Cover
+			cover = path.Join(cfg.libraryName, cover)
+			results.Items[i].Cover = &cover
+		}
+	}
+
+	respondWithJson(w, http.StatusOK, struct {
+		Results database.BookSearchResults[[]database.BookOverview] `json:"results"`
+		Errors  []string                                            `json:"errors"`
+	}{Results: results, Errors: scanErrors})
 }
