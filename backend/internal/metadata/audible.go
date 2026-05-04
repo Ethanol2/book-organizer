@@ -5,6 +5,9 @@ import (
 	"fmt"
 	"log"
 	"net/url"
+	"regexp"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/Ethanol2/book-organizer/internal/cache"
@@ -173,6 +176,10 @@ func SearchAudible(params SearchParams, region string, cache *cache.Cache) (Sear
 
 func GetFromAudible(asin, region string, cache *cache.Cache) (database.BookParams, error) {
 
+	if !IsValidASIN(asin) {
+		return database.BookParams{}, fmt.Errorf("invalid asin")
+	}
+
 	u := url.URL{
 		Scheme: "https",
 		Host:   "api.audnex.us",
@@ -250,13 +257,18 @@ func GetFromAudible(asin, region string, cache *cache.Cache) (database.BookParam
 		})
 	}
 
+	var isbn *string
+	if IsValidISBN13(item.Isbn) {
+		isbn = &item.Isbn
+	}
+
 	return database.BookParams{
 		Title:       &item.Title,
 		Description: &item.Description,
 		Year:        &year,
 		Publisher:   &item.PublisherName,
-		ISBN:        &item.Isbn,
-		ASIN:        &item.Asin,
+		ISBN:        isbn,
+		ASIN:        &asin,
 		Genres:      &genres,
 		Series:      &series,
 		Authors:     &authors,
@@ -273,4 +285,57 @@ func IsValidAudibleRegion(region string) bool {
 		}
 	}
 	return false
+}
+
+// Provided by Gemini
+// IsValidASIN checks if a string is a valid Amazon Standard Identification Number.
+func IsValidASIN(asin string) bool {
+	asin = strings.ToUpper(strings.TrimSpace(asin))
+
+	// ASIN must be exactly 10 alphanumeric characters
+	match, _ := regexp.MatchString("^[A-Z0-9]{10}$", asin)
+	if !match {
+		return false
+	}
+
+	// If it starts with 'B', it's a standard ASIN (non-book)
+	// These don't have a public checksum formula, so format is enough.
+	if strings.HasPrefix(asin, "B") {
+		return true
+	}
+
+	// If it doesn't start with 'B', it's likely an ISBN-10 (used for books)
+	// We should validate the ISBN-10 checksum.
+	return isValidISBN10(asin)
+}
+
+func isValidISBN10(isbn string) bool {
+	if len(isbn) != 10 {
+		return false
+	}
+
+	sum := 0
+	for i := 0; i < 9; i++ {
+		digit, err := strconv.Atoi(string(isbn[i]))
+		if err != nil {
+			return false // Must be digits 0-9
+		}
+		sum += digit * (10 - i)
+	}
+
+	// The last character can be 'X' (representing 10) or a digit
+	lastChar := isbn[9]
+	var lastValue int
+	if lastChar == 'X' {
+		lastValue = 10
+	} else {
+		var err error
+		lastValue, err = strconv.Atoi(string(lastChar))
+		if err != nil {
+			return false
+		}
+	}
+
+	sum += lastValue
+	return sum%11 == 0
 }

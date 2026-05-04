@@ -168,7 +168,8 @@ async function fetchBooks(append = false) {
 async function scanLibrary() {
     isLoading.value = true;
     try {
-        const resp = await fetch('/api/library/scan');
+        const queryString = buildQueryString();
+        const resp = await fetch(`/api/library/scan${queryString}`);
         if (!resp.ok) {
             throw new Error(`HTTP error with status: ${resp.status}`);
         }

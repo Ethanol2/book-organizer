@@ -74,13 +74,43 @@ type BookParams struct {
 	Key   *string `json:"key"`
 }
 
-func (c Client) CheckBookExists(id uuid.UUID) (bool, error) {
+func (c Client) CheckBookExistsID(id uuid.UUID) (bool, error) {
 	var exists bool
 	err := c.db.QueryRow("SELECT EXISTS(SELECT 1 FROM books WHERE id = ?)", id).Scan(&exists)
 	if err != nil {
 		return false, err
 	}
 	return exists, nil
+}
+func (c Client) CheckBookExistsISBN(isbn string) (bool, uuid.UUID, error) {
+	var id uuid.UUID
+	err := c.db.QueryRow("SELECT id FROM books WHERE isbn = ? LIMIT 1", isbn).Scan(&id)
+	if err == sql.ErrNoRows {
+		return false, uuid.Nil, nil
+	} else if err != nil {
+		return false, uuid.Nil, err
+	}
+
+	return true, id, nil
+}
+func (c Client) CheckBookExistsASIN(asin string) (bool, uuid.UUID, error) {
+	var id uuid.UUID
+	err := c.db.QueryRow("SELECT id FROM books WHERE asin = ? LIMIT 1", asin).Scan(&id)
+	if err == sql.ErrNoRows {
+		return false, uuid.Nil, nil
+	} else if err != nil {
+		return false, uuid.Nil, err
+	}
+
+	return true, id, nil
+}
+func (c Client) CheckBookHasFiles(id uuid.UUID) (bool, error) {
+	var hasFiles bool
+	err := c.db.QueryRow("SELECT EXISTS(SELECT 1 FROM books WHERE id = ? AND directory NOT NULL)", id).Scan(&hasFiles)
+	if err != nil {
+		return false, err
+	}
+	return hasFiles, nil
 }
 
 func (c Client) AddBook(params BookParams) (Book, error) {
@@ -96,13 +126,6 @@ func (c Client) AddBook(params BookParams) (Book, error) {
 	tagsJson, err := json.Marshal(params.Tags)
 	if err != nil {
 		return Book{}, err
-	}
-
-	if params.ISBN != nil && *params.ISBN == "" {
-		params.ISBN = nil
-	}
-	if params.ASIN != nil && *params.ASIN == "" {
-		params.ASIN = nil
 	}
 
 	query := `
@@ -778,6 +801,45 @@ func (c Client) DeleteBookFilesFromDatabase(id uuid.UUID) error {
 	return nil
 }
 
+func (c Client) UpdateBookFiles(id uuid.UUID, files fileManagement.Files) error {
+
+	indyTx := c.tx == nil
+	if indyTx {
+		err := c.Begin()
+		if err != nil {
+			return err
+		}
+		defer c.Rollback()
+	}
+
+	audio, text, err := files.FileListsToJson()
+	if err != nil {
+		return err
+	}
+
+	_, err = c.tx.Exec(`
+	UPDATE books 
+	SET 
+		updated_at = CURRENT_TIMESTAMP,
+		directory = ?,
+		audio_files = ?,
+		text_files = ?,
+		cover = ?
+	WHERE id = ?`, files.Root, audio, text, files.Cover, id)
+	if err != nil {
+		return err
+	}
+
+	if indyTx {
+		err = c.Commit()
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
 // #region Book Methods
 
 func (book *Book) getBookCategories(c Client) error {
@@ -808,29 +870,10 @@ func (book *Book) getBookCategories(c Client) error {
 }
 
 // Inserts files into a book directly, bypassing the update or association functions. Don't use this unless you have a good reason. Requires an active db transaction.
-func (book *Book) ApplyBookFiles(db Client) error {
+func (book *Book) ApplyBookFiles(c Client) error {
 
-	if db.tx == nil {
-		return fmt.Errorf("updateBookFiles requires an active tx")
+	if book.Id == nil {
+		return fmt.Errorf("id required to apply book files")
 	}
-
-	audio, text, err := book.Files.FileListsToJson()
-	if err != nil {
-		return err
-	}
-
-	_, err = db.tx.Exec(`
-	UPDATE books 
-	SET 
-		updated_at = CURRENT_TIMESTAMP,
-		directory = ?,
-		audio_files = ?,
-		text_files = ?,
-		cover = ?
-	WHERE id = ?`, book.Files.Root, audio, text, book.Files.Cover, book.Id)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return c.UpdateBookFiles(*book.Id, book.Files)
 }

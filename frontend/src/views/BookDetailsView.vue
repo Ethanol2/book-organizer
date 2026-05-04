@@ -56,6 +56,7 @@ function openEditModal() {
 
   editParams.value = buildEditParams(book.value);
   showEditModal.value = true;
+
 }
 
 function closeEditModal() {
@@ -115,7 +116,7 @@ async function submitEdit(newData: BookParams) {
   }
 }
 
-async function deleteBook(payload: { deleteFiles: boolean }) {
+async function deleteBook(payload: { deleteBook: boolean, deleteFiles: boolean }) {
   if (!book.value || deleting.value) {
     return;
   }
@@ -123,7 +124,7 @@ async function deleteBook(payload: { deleteFiles: boolean }) {
   deleting.value = true;
 
   try {
-    const resp = await fetch(`/api/books/${book.value.id}?${(new URLSearchParams({ "delete files": payload.deleteFiles.toString() }))}`, {
+    const resp = await fetch(`/api/books/${book.value.id}?${(new URLSearchParams({ "book": payload.deleteBook.toString(), "files": payload.deleteFiles.toString() }))}`, {
       method: 'DELETE',
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
@@ -136,8 +137,18 @@ async function deleteBook(payload: { deleteFiles: boolean }) {
     }
 
     closeEditModal();
-    notifications.notifySuccess('Book deleted successfully!');
+
+    if (payload.deleteBook && payload.deleteFiles) {
+      notifications.notifySuccess('Book deleted successfully!');
+    }
+    else if (payload.deleteBook) {
+      notifications.notifySuccess('Book deleted successfully!');
+    }
+    else if (payload.deleteFiles) {
+      notifications.notifySuccess('Files deleted successfully!');    
+    }
     await router.push('/');
+    
   } catch (err) {
     console.error('Delete book error:', err);
     notifications.notifyError('Failed to delete book: ' + (err instanceof Error ? err.message : String(err)));
@@ -320,8 +331,8 @@ onMounted(async () => {
     </div>
     <div v-else class="status-message">Book not found.</div>
 
-    <AddBookModal :show="showEditModal" :params="editParams" :showDeleteButton="true" @close="closeEditModal"
-      @add-book="submitEdit" @delete-book="deleteBook" />
+    <AddBookModal :show="showEditModal" :params="editParams" :showDeleteButton="true" :has-files="book?.files !== null && book?.files.root !== null"
+     @close="closeEditModal" @add-book="submitEdit" @delete-book="deleteBook"/>
   </div>
 </template>
 

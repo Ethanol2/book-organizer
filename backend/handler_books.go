@@ -87,25 +87,42 @@ func (cfg *apiConfig) handlerGetBooks(w http.ResponseWriter, r *http.Request) {
 
 func (cfg *apiConfig) handlerPostBook(w http.ResponseWriter, r *http.Request) {
 
-	var bookParams database.BookParams
-	err := json.NewDecoder(r.Body).Decode(&bookParams)
+	var params database.BookParams
+	err := json.NewDecoder(r.Body).Decode(&params)
 	if err != nil {
 		respondWithError(w, http.StatusBadRequest, "Couldn't read body", err)
 		return
 	}
 
 	var coverFile *os.File
-	if bookParams.Cover != nil {
-		coverFile, err = fileManagement.DownloadTempFile(*bookParams.Cover)
+	if params.Cover != nil {
+		coverFile, err = fileManagement.DownloadTempFile(*params.Cover)
 		if err != nil {
 			respondWithError(w, http.StatusBadRequest, "Failed to fetch cover from url. Only png and jpg are currently supported", err)
-			log.Println("Image:", *bookParams.Cover)
+			log.Println("Image:", *params.Cover)
 			return
 		}
 		defer coverFile.Close()
 	}
 
-	book, err := cfg.db.AddBook(bookParams)
+	if params.ISBN != nil {
+		if *params.ISBN == "" {
+			params.ISBN = nil
+		} else if !metadata.IsValidISBN13(*params.ISBN) {
+			respondWithError(w, http.StatusBadRequest, "Invalid ISBN", nil)
+			return
+		}
+	}
+	if params.ASIN != nil {
+		if *params.ASIN == "" {
+			params.ASIN = nil
+		} else if !metadata.IsValidASIN(*params.ASIN) {
+			respondWithError(w, http.StatusBadRequest, "Invalid ASIN", nil)
+			return
+		}
+	}
+
+	book, err := cfg.db.AddBook(params)
 	if err != nil {
 		if sqliteErr, ok := err.(sqlite3.Error); ok {
 			if sqliteErr.ExtendedCode == sqlite3.ErrConstraintUnique {
@@ -131,11 +148,28 @@ func (cfg *apiConfig) handlerPostBook(w http.ResponseWriter, r *http.Request) {
 
 func (cfg *apiConfig) handlerUpdateBook(id uuid.UUID, w http.ResponseWriter, r *http.Request) {
 
-	var bookParams database.BookParams
-	err := json.NewDecoder(r.Body).Decode(&bookParams)
+	var params database.BookParams
+	err := json.NewDecoder(r.Body).Decode(&params)
 	if err != nil {
 		respondWithError(w, http.StatusBadRequest, "Failed to read body", err)
 		return
+	}
+
+	if params.ISBN != nil {
+		if *params.ISBN == "" {
+			params.ISBN = nil
+		} else if !metadata.IsValidISBN13(*params.ISBN) {
+			respondWithError(w, http.StatusBadRequest, "Invalid ISBN", nil)
+			return
+		}
+	}
+	if params.ASIN != nil {
+		if *params.ASIN == "" {
+			params.ASIN = nil
+		} else if !metadata.IsValidASIN(*params.ASIN) {
+			respondWithError(w, http.StatusBadRequest, "Invalid ASIN", nil)
+			return
+		}
 	}
 
 	// Begining db transaction here in case the file moving doesn't work
@@ -148,7 +182,7 @@ func (cfg *apiConfig) handlerUpdateBook(id uuid.UUID, w http.ResponseWriter, r *
 
 	oldPath, err := cfg.db.GetBookDirectory(id)
 
-	book, needsFileUpdate, err := cfg.db.UpdateBook(id, bookParams)
+	book, needsFileUpdate, err := cfg.db.UpdateBook(id, params)
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, "Failed to update database", err)
 		return
@@ -286,19 +320,15 @@ func (cfg *apiConfig) handlerGetBookCover(id uuid.UUID, w http.ResponseWriter, r
 
 func (cfg *apiConfig) handlerDeleteBook(id uuid.UUID, w http.ResponseWriter, r *http.Request) {
 
-	exists, err := cfg.db.CheckBookExists(id)
-	if err != nil {
+	if exists, err := cfg.db.CheckBookExistsID(id); err != nil {
 		respondWithError(w, http.StatusInternalServerError, "Something went wrong while querying the database", err)
 		return
-	}
-
-	if !exists {
+	} else if !exists {
 		w.WriteHeader(http.StatusNotFound)
 		return
 	}
 
-	deleteFiles := r.URL.Query().Get("delete files")
-	if deleteFiles == "true" {
+	if deleteFiles := r.URL.Query().Get("files"); deleteFiles == "true" {
 		log.Println("Deleting files for \"", id, "\"")
 		dir, err := cfg.db.GetBookDirectory(id)
 		if err != nil {
@@ -309,20 +339,25 @@ func (cfg *apiConfig) handlerDeleteBook(id uuid.UUID, w http.ResponseWriter, r *
 			err = fileManagement.DeleteFiles(path.Join(cfg.libraryPath, *dir))
 			if err != nil {
 				respondWithError(w, http.StatusInternalServerError, "Couldn't delete book files", err)
+				return
 			}
 		}
+		err = cfg.db.UpdateBookFiles(id, fileManagement.Files{})
 	}
 
-	// Delete metedata cover
-	err = fileManagement.DeleteFiles(path.Join(cfg.metadataPath, id.String()+".jpg"))
-	if err != nil {
-		log.Println(err)
-	}
+	if deleteBook := r.URL.Query().Get("book"); deleteBook == "true" {
 
-	err = cfg.db.DeleteBook(id)
-	if err != nil {
-		respondWithError(w, http.StatusInternalServerError, "Failed to delete book from the database", err)
-		return
+		// Delete metedata cover
+		err := fileManagement.DeleteFiles(path.Join(cfg.metadataPath, id.String()+".jpg"))
+		if err != nil {
+			log.Println(err)
+		}
+
+		err = cfg.db.DeleteBook(id)
+		if err != nil {
+			respondWithError(w, http.StatusInternalServerError, "Failed to delete book from the database", err)
+			return
+		}
 	}
 	w.WriteHeader(http.StatusNoContent)
 }
@@ -343,8 +378,8 @@ func (cfg *apiConfig) handlerGetScanLibrary(w http.ResponseWriter, r *http.Reque
 	}
 
 	scanErrors := []string{}
-	var folderScan func(string, string, []string) error
-	folderScan = func(dirPrefix string, dir string, names []string) error {
+	var folderScan func(string, string, []string)
+	folderScan = func(dirPrefix string, dir string, names []string) {
 
 		currentPath := path.Join(dirPrefix, dir)
 		if dir != "" {
@@ -353,7 +388,10 @@ func (cfg *apiConfig) handlerGetScanLibrary(w http.ResponseWriter, r *http.Reque
 
 		// Check the recursion hasn't gone too deep -> Author/Series/Book -> max 3 folder levels
 		if len(names) > 3 {
-			return fmt.Errorf("scan function is too deep => max folder depth: 3 | current depth:%d", len(names))
+			err := fmt.Sprintf("scan max depth (3) exceeded: %d", len(names))
+			log.Println(err)
+			scanErrors = append(scanErrors, err)
+			return
 		}
 
 		// List for the current folder
@@ -370,7 +408,10 @@ func (cfg *apiConfig) handlerGetScanLibrary(w http.ResponseWriter, r *http.Reque
 		}
 		err := scanner.ScanNew(dirs)
 		if err != nil {
-			return err
+			strErr := fmt.Sprintln("Error trying to read the folder at \"", currentPath, "\" =>", err)
+			log.Print(strErr)
+			scanErrors = append(scanErrors, strErr)
+			return
 		}
 
 		// For each item in the folder
@@ -380,12 +421,7 @@ func (cfg *apiConfig) handlerGetScanLibrary(w http.ResponseWriter, r *http.Reque
 			if item.HasNoFiles() {
 				// Check if the folder has sub folders
 				if item.Directories != nil {
-					err := folderScan(currentPath, *item.Root, names)
-					if err != nil {
-						strErr := fmt.Sprintln("Error trying to read the folder at \"", currentPath, *item.Root, "\" =>", err)
-						log.Print(strErr)
-						scanErrors = append(scanErrors, strErr)
-					}
+					folderScan(currentPath, *item.Root, names)
 				}
 				continue
 			}
@@ -399,6 +435,9 @@ func (cfg *apiConfig) handlerGetScanLibrary(w http.ResponseWriter, r *http.Reque
 
 			p := path.Join(names...)
 
+			root := path.Join(p, *item.Root)
+			item.Root = &root
+
 			if item.Cover != nil {
 				c := path.Join(p, *item.Cover)
 				item.Cover = &c
@@ -406,7 +445,7 @@ func (cfg *apiConfig) handlerGetScanLibrary(w http.ResponseWriter, r *http.Reque
 
 			// If the item has a metadata file then import that and continue
 			if item.HasMetadata {
-				file, err := os.Open(path.Join(cfg.libraryPath, p, *item.Root, "metadata.json"))
+				file, err := os.Open(path.Join(cfg.libraryPath, *item.Root, "metadata.json"))
 				if err != nil {
 					strErr := fmt.Sprintln("Error trying to open metadata file in \"", *item.Root, "\" =>", err)
 					log.Print(strErr)
@@ -454,51 +493,108 @@ func (cfg *apiConfig) handlerGetScanLibrary(w http.ResponseWriter, r *http.Reque
 
 			libraryParams[params] = item
 		}
-		return nil
 	}
 
 	log.Println("Starting library scan")
-	err = folderScan(cfg.libraryPath, "", []string{})
-	if err != nil {
-		respondWithError(w, http.StatusInternalServerError, "Failed to scan library folder", err)
-		return
-	}
+	folderScan(cfg.libraryPath, "", []string{})
 
-	for params, files := range libraryParams {
-
-		log.Println("Adding \"", *params.Title, "\" to the database")
-		book, err := cfg.db.AddBook(params)
-		if err != nil {
-			log.Println(err)
-			continue
-		}
-
+	applyBookFiles := func(book database.Book, files fileManagement.Files) error {
 		log.Println("Inserting book files")
 		err = cfg.db.Begin()
 		if err != nil {
-			respondWithError(w, http.StatusInternalServerError, "Error adding books to the database", err)
-			return
+			return err
 		}
+		defer cfg.db.Rollback()
 
 		book.Files = files
 		err = book.ApplyBookFiles(cfg.db)
 		if err != nil {
-			respondWithError(w, http.StatusInternalServerError, "Error adding books to the database", err)
-			cfg.db.Rollback()
-			return
+			return err
 		}
 
 		err = cfg.db.Commit()
 		if err != nil {
+			return err
+		}
+		return nil
+	}
+	updateExistingBook := func(id uuid.UUID, params database.BookParams, files fileManagement.Files) error {
+		hasFiles, err := cfg.db.CheckBookHasFiles(id)
+		if err != nil {
+			scanErrors = append(scanErrors, "Something went wrong checking for files associated with ", *params.Title)
+			return nil
+		}
+
+		if hasFiles {
+			scanErrors = append(scanErrors, fmt.Sprintf("Duplicate files for %s exist at %s", *params.Title, *files.Root))
+			return nil
+		}
+
+		book, _, err := cfg.db.UpdateBook(id, params)
+		if err != nil {
+			return err
+		}
+
+		err = applyBookFiles(book, files)
+		if err != nil {
+			return err
+		}
+		return nil
+	}
+
+	for params, files := range libraryParams {
+
+		if params.ISBN != nil {
+			if strings.TrimSpace(*params.ISBN) == "" {
+				params.ISBN = nil
+			} else if !metadata.IsValidISBN13(*params.ISBN) {
+				scanErrors = append(scanErrors, "ISBN not valid => "+*files.Root)
+				continue
+			} else if ok, id, _ := cfg.db.CheckBookExistsISBN(*params.ISBN); ok {
+
+				err = updateExistingBook(id, params, files)
+				if err != nil {
+					respondWithError(w, http.StatusInternalServerError, "Error adding books to the database", err)
+					return
+				}
+				continue
+			}
+		}
+
+		if params.ASIN != nil {
+			if strings.TrimSpace(*params.ASIN) == "" {
+				params.ASIN = nil
+			} else if !metadata.IsValidASIN(*params.ASIN) {
+				scanErrors = append(scanErrors, "ASIN not valid => "+*files.Root)
+				continue
+			} else if ok, id, _ := cfg.db.CheckBookExistsASIN(*params.ISBN); ok {
+
+				err = updateExistingBook(id, params, files)
+				if err != nil {
+					respondWithError(w, http.StatusInternalServerError, "Error adding books to the database", err)
+					return
+				}
+				continue
+			}
+		}
+
+		log.Println("Adding \"", *params.Title, "\" to the database")
+		book, err := cfg.db.AddBook(params)
+		if err != nil {
 			respondWithError(w, http.StatusInternalServerError, "Error adding books to the database", err)
-			cfg.db.Rollback()
+			return
+		}
+
+		err = applyBookFiles(book, files)
+		if err != nil {
+			respondWithError(w, http.StatusInternalServerError, "Error adding books to the database", err)
 			return
 		}
 	}
 
 	log.Println("Library Scan Complete")
 
-	results, err := cfg.db.GetBooksSummary(map[string][]string{})
+	results, err := cfg.db.GetBooksSummary(r.URL.Query())
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, "Error retrieving book summaries after scan", err)
 		return

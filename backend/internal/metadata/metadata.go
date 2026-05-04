@@ -146,6 +146,36 @@ func MetadataToBookParams(metadata fileManagement.MetadataFile) database.BookPar
 	}
 }
 
+// Function provided by Gemini
+// IsValidISBN13 validates the checksum of a 13-digit ISBN string.
+func IsValidISBN13(isbn string) bool {
+	// 1. Remove common formatting (hyphens and spaces)
+	isbn = strings.ReplaceAll(isbn, "-", "")
+	isbn = strings.ReplaceAll(isbn, " ", "")
+
+	// 2. Validate format: exactly 13 digits
+	match, _ := regexp.MatchString(`^\d{13}$`, isbn)
+	if !match {
+		return false
+	}
+
+	// 3. Calculate weighted sum
+	sum := 0
+	for i, char := range isbn {
+		digit := int(char - '0')
+		if i%2 == 0 {
+			// Even index (1st, 3rd, 5th digit...) multiplier is 1
+			sum += digit
+		} else {
+			// Odd index (2nd, 4th, 6th digit...) multiplier is 3
+			sum += digit * 3
+		}
+	}
+
+	// 4. Check if the final sum is a multiple of 10
+	return sum%10 == 0
+}
+
 func stripTags(s string) string {
 
 	s = strings.ReplaceAll(s, "<br>", "\n")

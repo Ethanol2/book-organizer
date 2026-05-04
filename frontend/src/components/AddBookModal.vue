@@ -3,6 +3,12 @@ import { computed, ref, watch } from 'vue'
 import type { BookParams } from '@/types/book'
 import { getCategoriesString, getCategoriesArray, getSeriesArray, getSeriesString } from '@/types/book'
 
+enum deleteMode {
+  BookAndFiles = "Delete book and files",
+  BookOnly = "Delete book only",
+  FilesOnly = "Delete files only"
+}
+
 // Modal component for adding/editing books with form fields and submission
 const titleInput = ref('')
 const subtitleInput = ref('')
@@ -18,29 +24,31 @@ const genresInput = ref('')
 const tagsInput = ref('')
 const showDeleteConfirm = ref(false)
 const deleteBookText = ref('Delete Book')
-const deleteFiles = ref(true)
+const deleteModeSelection = ref<deleteMode>(deleteMode.BookAndFiles)
 
 interface ModalProps {
   show: boolean
   params: BookParams | null
   showDeleteButton?: boolean
+  hasFiles?: boolean
 }
 
 const props = withDefaults(defineProps<ModalProps>(), {
   show: false,
   params: null,
   showDeleteButton: false,
+  hasFiles: false
 })
 
 const emit = defineEmits<{
   close: []
   'add-book': [BookParams]
-  'delete-book': [{ deleteFiles: boolean }]
+  'delete-book': [{ deleteBook: boolean, deleteFiles: boolean }]
 }>()
 
 function resetConfirmState() {
   showDeleteConfirm.value = false
-  deleteFiles.value = true
+  deleteModeSelection.value = deleteMode.BookAndFiles
 }
 
 function resetFormFields() {
@@ -98,12 +106,35 @@ function handleDeleteClick() {
 }
 
 function confirmDelete() {
-  emit('delete-book', { deleteFiles: deleteFiles.value })
+  emit('delete-book',
+    {
+      deleteBook: deleteModeSelection.value === deleteMode.BookAndFiles || deleteModeSelection.value === deleteMode.BookOnly,
+      deleteFiles: deleteModeSelection.value === deleteMode.BookAndFiles || deleteModeSelection.value === deleteMode.FilesOnly
+    }
+  )
   resetConfirmState()
 }
 
 function handleModalClick(e: Event) {
   e.stopPropagation()
+}
+
+function getDeleteConfirmText(): string {
+
+  if (!props.hasFiles) {
+    return 'Are you sure you want to delete this book?'
+  }
+
+  switch (deleteModeSelection.value) {
+    case deleteMode.BookAndFiles:
+      return 'Are you sure you want to delete this book and its files?'
+    case deleteMode.BookOnly:
+      return 'Are you sure you want to delete this book?'
+    case deleteMode.FilesOnly:
+      return 'Are you sure you want to delete these files?'
+    default:
+      return 'Something went wrong'
+  }
 }
 
 const modalTitle = computed(() => (props.params ? 'Edit Book' : 'Add Book'))
@@ -152,12 +183,15 @@ watch(
 
           <div v-if="showDeleteConfirm" class="delete-confirmation">
             <div class="delete-confirmation-row">
-              <p class="delete-confirmation-copy">Are you sure you want to delete this book?</p>
+              <p class="delete-confirmation-copy">{{ getDeleteConfirmText() }}</p>
               <button type="button" class="confirm-delete-button" @click="confirmDelete">Delete</button>
             </div>
-            <label class="delete-files-checkbox">
-              <input type="checkbox" v-model="deleteFiles" />
-              Also delete book files
+            <label class="delete-files-checkbox" v-if="props.hasFiles">
+              <select class="search-select" v-model="deleteModeSelection" aria-label="Delete Mode">
+                <option v-for="(type, value) in deleteMode" :key="value" :value="type">
+                  {{ type }}
+                </option>
+              </select>
             </label>
           </div>
         </div>

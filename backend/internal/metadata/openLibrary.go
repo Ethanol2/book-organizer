@@ -217,8 +217,12 @@ func (results *OpenLibrarySearchResults) parse(genres *[]string) SearchResults {
 			seriesList = append(seriesList, series)
 		}
 
+		var isbn *string
 		if result.LendingIdentifierS != "" {
-			result.LendingIdentifierS = strings.Trim(result.LendingIdentifierS, "isbn_")
+			val := strings.Trim(result.LendingIdentifierS, "isbn_")
+			if IsValidISBN13(val) {
+				isbn = &val
+			}
 		}
 
 		cover := fmt.Sprintf("https://covers.openlibrary.org/b/id/%d-L.jpg", result.CoverI)
@@ -228,7 +232,7 @@ func (results *OpenLibrarySearchResults) parse(genres *[]string) SearchResults {
 			Title:    &result.Title,
 			Subtitle: &result.Subtitle,
 			Year:     &result.FirstPublishYear,
-			ISBN:     &result.LendingIdentifierS,
+			ISBN:     isbn,
 			Authors:  &authors,
 			Series:   &seriesList,
 			Cover:    &cover,

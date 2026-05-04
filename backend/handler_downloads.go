@@ -66,7 +66,7 @@ func (cfg *apiConfig) handlerAssociateDownloadToBook(downloadId uuid.UUID, w htt
 		return
 	}
 
-	bookExists, err := cfg.db.CheckBookExists(bookIdStruct.BookId)
+	bookExists, err := cfg.db.CheckBookExistsID(bookIdStruct.BookId)
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, "Database error", err)
 		return

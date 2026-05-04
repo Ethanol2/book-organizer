@@ -49,17 +49,7 @@ func (c Client) AddCategory(categoryType CategoryType, name string) (Category, e
 		(NULL, ?)
 	ON CONFLICT(name)
 		DO NOTHING
-	`, categoryType)
-
-	_, err = c.tx.Exec(query, name)
-	if err != nil {
-		return Category{}, err
-	}
-
-	log.Println("Added \"", name, "\" to", categoryType)
-
-	query = fmt.Sprintf(`
-	SELECT id FROM %s WHERE name = ?
+	RETURNING id
 	`, categoryType)
 
 	var id int
@@ -67,6 +57,8 @@ func (c Client) AddCategory(categoryType CategoryType, name string) (Category, e
 	if err != nil {
 		return Category{}, err
 	}
+
+	log.Println("Added \"", name, "\" to", categoryType)
 
 	if indyTx {
 		err = c.Commit()
@@ -145,42 +137,6 @@ func (c Client) GetCategory(categoryType CategoryType, id int) (Category, error)
 	return cat, err
 }
 
-func (c Client) GetCategoryByValue(categoryType CategoryType, name string) (Category, error) {
-	var err error
-	indyTx := c.tx == nil
-	if indyTx {
-		err = c.Begin()
-		if err != nil {
-			return Category{}, err
-		}
-		defer c.Rollback()
-	}
-
-	query := fmt.Sprintf(`
-	SELECT * FROM %s WHERE name = ?
-	`, categoryType)
-
-	cat := Category{Type: categoryType}
-	err = c.db.QueryRow(query, name).Scan(&cat.Id, &cat.Name)
-	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return Category{}, nil
-		}
-		return Category{}, err
-	}
-
-	defer log.Println("Retrieved \"", cat.Name, "\" from", categoryType)
-
-	if indyTx {
-		err = c.Commit()
-		if err != nil {
-			return Category{}, err
-		}
-	}
-
-	return cat, err
-}
-
 func (c Client) GetAllOfCategory(categoryType CategoryType) ([]Category, error) {
 
 	rows, err := c.db.Query(fmt.Sprintf("SELECT * FROM %s", categoryType))
@@ -207,12 +163,19 @@ func (c Client) GetAllOfCategory(categoryType CategoryType) ([]Category, error) 
 func (c Client) associateBookAndCategoryType(bookId string, category Category, rank int) error {
 
 	if category.Id == nil {
-		cat, err := c.AddCategory(category.Type, category.Name)
+		ok, err := category.GetID(c.tx)
 		if err != nil {
 			return err
 		}
-		cat.Index = category.Index
-		category = cat
+
+		if !ok {
+			cat, err := c.AddCategory(category.Type, category.Name)
+			if err != nil {
+				return err
+			}
+			cat.Index = category.Index
+			category = cat
+		}
 	}
 
 	insertLine := ""
@@ -400,4 +363,30 @@ func (c Client) CleanupCategories() error {
 	}
 
 	return nil
+}
+
+func (cat Category) GetID(tx *sql.Tx) (bool, error) {
+
+	if cat.Type == NoType {
+		return false, fmt.Errorf("category must have a type to find id")
+	}
+	if cat.Name == "" {
+		return false, fmt.Errorf("category must have a value to find id")
+	}
+
+	query := fmt.Sprintf(`
+	SELECT id FROM %s WHERE name = ?
+	`, cat.Type)
+
+	err := tx.QueryRow(query, cat.Name).Scan(&cat.Id)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return false, nil
+		}
+		return false, err
+	}
+
+	// defer log.Println("Retrieved \"", cat.Name, "\" from", cat.Type)
+
+	return true, nil
 }
