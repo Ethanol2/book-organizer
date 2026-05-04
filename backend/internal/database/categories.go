@@ -163,12 +163,9 @@ func (c Client) GetAllOfCategory(categoryType CategoryType) ([]Category, error) 
 func (c Client) associateBookAndCategoryType(bookId string, category Category, rank int) error {
 
 	if category.Id == nil {
-		ok, err := category.GetID(c.tx)
-		if err != nil {
+		if ok, err := category.GetID(c.tx); err != nil {
 			return err
-		}
-
-		if !ok {
+		} else if !ok {
 			cat, err := c.AddCategory(category.Type, category.Name)
 			if err != nil {
 				return err
@@ -365,7 +362,7 @@ func (c Client) CleanupCategories() error {
 	return nil
 }
 
-func (cat Category) GetID(tx *sql.Tx) (bool, error) {
+func (cat *Category) GetID(tx *sql.Tx) (bool, error) {
 
 	if cat.Type == NoType {
 		return false, fmt.Errorf("category must have a type to find id")
@@ -380,7 +377,7 @@ func (cat Category) GetID(tx *sql.Tx) (bool, error) {
 
 	err := tx.QueryRow(query, cat.Name).Scan(&cat.Id)
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
+		if err == sql.ErrNoRows {
 			return false, nil
 		}
 		return false, err
