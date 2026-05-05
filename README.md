@@ -109,7 +109,11 @@ Books are stored in a SQLite database. Once a pending download is associated wit
 
 `Author/Series/Book Title/`
 
-The system can fetch metadata from Google Books and OpenLibrary.
+The system can fetch metadata from OpenLibrary, Google Books, and Audible.
+
+### Library Scanning
+
+The backend can scan an existing library folder for untracked book directories and import or match them into the database.
 
 ### Frontend
 
@@ -127,24 +131,9 @@ Go-based RESTful API handling all data management, metadata search, file organiz
 
 ## Planned Features
 
-### Audible
-
-In my experience, Audible is a vastly better source of metadata than OpenLibrary and Google Books. The complication is that the endpoints aren't officially accessible, so no official documentation (as far as I know).
-
-### Login
-
-Add a login system to protect libraries that are publically accessible
-
-### Library Scanning
-
-Add a scanning system for adding books already in a library
-
-
-
 ### qBittorrent Integration (Nice-to-have)
 
 After the core library flow is working, the app will integrate with qBittorrent to track labeled downloads. For completed torrents with a specific label (e.g. `books`), the app will automatically add them to the pending list. The frontend will also surface whether qBittorrent is reachable.
-
 
 ## API Reference ✅
 
@@ -251,12 +240,20 @@ Below are the current HTTP endpoints and the JSON structures they expect and ret
 
 ---
 
+### Library Scan 🔍
+
+- **GET /api/library/scan**
+  - **Description:** Scan the configured library folder for untracked book directories, import or match new books into the database, and return updated book summaries.
+  - **Query Params:** optional search and pagination filters such as `title`, `author`, `year`, `publisher`, `isbn`, `genre`, `language`, `page`, and `limit`
+  - **Response:** 200 OK — object containing `results` and any `errors` encountered during the scan
+
 ### Metadata 🔎
 
 - **GET /api/metadata/**
-  - **Description:** Search for metadata from OpenLibrary or Google Books
-  - **Query Params:** (all fields are optional)
-    - `source` — metadata source to search (`openlibrary` or `googlebooks`; defaults to `openlibrary`)
+  - **Description:** Search for metadata from OpenLibrary, Google Books, or Audible
+  - **Query Params:** (all fields are optional unless otherwise noted)
+    - `source` — metadata source to search (`open library`, `google books`, or `audible`)
+    - `region` — Audible region code (required when `source=audible`; valid values: `co.au`, `ca`, `de`, `es`, `fr`, `co.in`, `it`, `co.jp`, `com`, `co.uk`)
     - `title` — book title
     - `author` — author name
     - `year` — publication year
@@ -264,14 +261,17 @@ Below are the current HTTP endpoints and the JSON structures they expect and ret
     - `isbn` — ISBN
     - `genre` — genre(s) (repeatable: `?genre=scifi&genre=fantasy`)
     - `language` — language code(s) (repeatable: `?language=eng&language=fr`)
+    - `page` — page number for pagination
+    - `limit` — number of results per page
   - **Response:** 200 OK — `SearchResults` object
 
 - **GET /api/metadata/{id}**
   - **Description:** Get detailed metadata for a specific result from a metadata source
   - **URL Params:**
-    - `id` — metadata provider ID (OpenLibrary work ID or Google Books volume ID)
+    - `id` — metadata provider ID (OpenLibrary work ID, Google Books volume ID, or Audible ASIN)
   - **Query Params:**
-    - `source` — metadata source (`openlibrary` or `googlebooks`)
+    - `source` — metadata source (`open library`, `google books`, or `audible`)
+    - `region` — Audible region code (required when `source=audible`)
   - **Response:** 200 OK — full `Book` object with metadata populated
 
 ---
@@ -323,32 +323,38 @@ These are served directly from the configured folders:
     -d '{"description":"Updated summary"}' | jq .
   ```
 
-- Upload a cover image:
-  ```bash
-  curl -X PATCH http://localhost:8080/api/books/<BOOK_ID>/cover \
-    -H "Content-Type: image/jpeg" \
-    --data-binary @cover.jpg | jq .
-  ```
-
 - Delete a book:
   ```bash
   curl -X DELETE http://localhost:8080/api/books/<BOOK_ID> | jq .
   ```
 
-### Metadata
+### Library
 
-- Search OpenLibrary (JSON body):
+- Scan the library for untracked books:
   ```bash
-  curl -X GET http://localhost:8080/api/metadata/openlibrary \
-    -H "Content-Type: application/json" \
-    -d '{"title":"The Martian"}' | jq .
+  curl -s "http://localhost:8080/api/library/scan" | jq .
   ```
 
-- Search Google Books (requires GOOGLE_BOOKS_API_KEY):
+### Metadata
+
+- Search OpenLibrary:
   ```bash
-  curl -X GET http://localhost:8080/api/metadata/googlebooks \
-    -H "Content-Type: application/json" \
-    -d '{"title":"The Martian"}' | jq .
+  curl -s "http://localhost:8080/api/metadata?source=open%20library&title=The%20Martian" | jq .
+  ```
+
+- Search Google Books (requires `GOOGLE_BOOKS_API_KEY`):
+  ```bash
+  curl -s "http://localhost:8080/api/metadata?source=google%20books&title=The%20Martian" | jq .
+  ```
+
+- Search Audible (requires `region`):
+  ```bash
+  curl -s "http://localhost:8080/api/metadata?source=audible&region=com&title=The%20Martian" | jq .
+  ```
+
+- Get detailed metadata for a result:
+  ```bash
+  curl -s "http://localhost:8080/api/metadata/<METADATA_ID>?source=open%20library" | jq .
   ```
 
 ---
