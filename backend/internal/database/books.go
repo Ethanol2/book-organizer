@@ -261,9 +261,10 @@ func (c Client) GetBooks(filters map[string][]string) (BookSearchResults[[]Book]
 	books := []Book{}
 
 	count, page, pageQuery := buildPageQuery(filters)
+	searchQuery, searchTerms := buildSearchQuery(filters)
 
-	query := "SELECT *, (SELECT COUNT(*) FROM books) AS total_count FROM books " + buildSearchQuery(filters) + pageQuery
-	rows, err := c.tx.Query(query)
+	query := "SELECT *, (SELECT COUNT(*) FROM books) AS total_count FROM books " + searchQuery + pageQuery
+	rows, err := c.tx.Query(query, searchTerms...)
 	if err != nil {
 		log.Println("Query:\n", query)
 		return BookSearchResults[[]Book]{}, err
@@ -345,9 +346,13 @@ func (c Client) GetBooksSummary(filters map[string][]string) (BookSearchResults[
 	defer c.Rollback()
 
 	countLimit, page, pageQuery := buildPageQuery(filters)
-	query := "SELECT books.id, books.title, books.subtitle, books.cover, books.directory, (SELECT COUNT(*) FROM books) AS total_count  FROM books " + buildSearchQuery(filters) + pageQuery
+	searchQuery, searchTerms := buildSearchQuery(filters)
+	query := "SELECT books.id, books.title, books.subtitle, books.cover, books.directory, (SELECT COUNT(*) FROM books) AS total_count  FROM books " + searchQuery + pageQuery
 
-	rows, err := c.tx.Query(query)
+	fmt.Println(query)
+	fmt.Println(searchTerms...)
+
+	rows, err := c.tx.Query(query, searchTerms...)
 	if err != nil {
 		log.Println("Query:\n", query)
 		return BookSearchResults[[]BookOverview]{}, err

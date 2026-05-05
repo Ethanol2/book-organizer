@@ -249,7 +249,7 @@ func (c *Client) Commit() error {
 	return nil
 }
 
-func buildSearchQuery(filters map[string][]string) string {
+func buildSearchQuery(filters map[string][]string) (string, []any) {
 	var advSearchFields = [...]string{"authors", "narrators", "genres", "series", "publisher", "publish_year", "isbn", "asin", "tags"}
 	joinList := map[CategoryType]bool{
 		Authors:   false,
@@ -258,22 +258,18 @@ func buildSearchQuery(filters map[string][]string) string {
 		Series:    false,
 	}
 
-	cleanString := func(term string) string {
-		term = strings.TrimSpace(term)
-		term = strings.ReplaceAll(term, ",", "','")
-		term = strings.ReplaceAll(term, "'", "''")
-		return term
-	}
+	searchTerms := []any{}
 
 	hasFilter := false
 	filter := ""
 	if search, ok := filters["search"]; ok {
 		hasFilter = true
-		term := cleanString(search[0])
+		term := "%" + search[0] + "%"
 		filter += `
-		(books.title LIKE '%` + term + `%' OR 
-		books.subtitle LIKE '%` + term + `%' OR 
-		books.description LIKE '%` + term + `%') `
+		(books.title LIKE ? OR 
+		books.subtitle LIKE ? OR 
+		books.description LIKE ?) `
+		searchTerms = append(searchTerms, term, term, term)
 	}
 
 	advFilter := []string{}
@@ -286,14 +282,15 @@ func buildSearchQuery(filters map[string][]string) string {
 
 				split := strings.Split(terms[0], ",")
 				for _, term := range split {
-					term = strings.TrimSpace(term)
-					advFilter = append(advFilter, `books.`+field+` LIKE "%`+term+`%" `)
+					advFilter = append(advFilter, `books.`+field+` LIKE ? `)
+					searchTerms = append(searchTerms, "%"+strings.TrimSpace(term)+"%")
 				}
 			} else {
 				// Field is attached via joining table
 
 				joinList[cat] = true
-				advFilter = append(advFilter, string(cat)+".name IN ('"+cleanString(terms[0])+"')")
+				advFilter = append(advFilter, string(cat)+".name LIKE ?")
+				searchTerms = append(searchTerms, "%"+terms[0]+"%")
 			}
 		}
 	}
@@ -320,7 +317,12 @@ func buildSearchQuery(filters map[string][]string) string {
 	if sortType, ok := filters["sortBy"]; ok {
 		order := ""
 		if o, ok := filters["sortOrder"]; ok {
-			order = o[0]
+			switch o[0] {
+			case "asc":
+				order = "ASC"
+			case "desc":
+				order = "DESC"
+			}
 		}
 
 		switch sortType[0] {
@@ -356,7 +358,7 @@ func buildSearchQuery(filters map[string][]string) string {
 
 	//fmt.Println(join + filter + strings.Join(advFilter, " AND ") + sort)
 
-	return join + filter + strings.Join(advFilter, " AND ") + sort
+	return join + filter + strings.Join(advFilter, " AND ") + sort, searchTerms
 }
 func buildPageQuery(filters map[string][]string) (int, int, string) {
 
