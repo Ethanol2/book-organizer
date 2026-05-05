@@ -135,9 +135,7 @@ func main() {
 	mux.HandleFunc("POST /api/books", cfg.handlerPostBook)
 	mux.HandleFunc("GET /api/books", cfg.handlerGetBooks)
 	mux.HandleFunc("GET /api/books/{id}", uuidMiddleware(cfg.handlerGetBook))
-	mux.HandleFunc("GET /api/books/{id}/cover", uuidMiddleware(cfg.handlerGetBookCover))
 	mux.HandleFunc("PATCH /api/books/{id}", uuidMiddleware(cfg.handlerUpdateBook))
-	mux.HandleFunc("PATCH /api/books/{id}/cover", uuidMiddleware(cfg.handlerUpdateBookCover))
 	mux.HandleFunc("DELETE /api/books/{id}", uuidMiddleware(cfg.handlerDeleteBook))
 
 	// Metadata
@@ -145,8 +143,8 @@ func main() {
 	mux.HandleFunc("GET /api/metadata/{id}", cfg.handlerGetMetadataBookDetails)
 
 	// Media
-	mux.Handle("/media/downloads/", http.StripPrefix("/media/downloads/", http.FileServer(http.Dir(cfg.downloadsPath))))
-	mux.Handle("/media/library/", http.StripPrefix("/media/library/", http.FileServer(http.Dir(cfg.libraryPath))))
+	mux.Handle("/media/downloads/", http.StripPrefix(cfg.downloadsName, http.FileServer(http.Dir(cfg.downloadsPath))))
+	mux.Handle("/media/library/", http.StripPrefix(cfg.libraryName, http.FileServer(http.Dir(cfg.libraryPath))))
 	mux.Handle("/media/metadata/", http.StripPrefix("/media/metadata/", http.FileServer(http.Dir(cfg.metadataPath))))
 
 	srv := &http.Server{

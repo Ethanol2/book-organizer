@@ -91,7 +91,9 @@ async function submitEdit(newData: BookParams) {
   newData.genres = isIdentical(newData?.genres, book.value.genres) ? undefined : newData.genres;
   newData.narrators = isIdentical(newData?.narrators, book.value.narrators) ? undefined : newData.narrators;
   newData.tags = newData?.tags === book.value.tags ? undefined : newData.tags;
-  newData.cover = newData?.cover == book.value.files?.cover ? undefined : newData.cover;
+  
+  var coverChanged = newData?.cover !== book.value.files?.cover;
+  newData.cover = coverChanged ? newData.cover : undefined;
 
   try {
     const resp = await fetch(`/api/books/${book.value.id}`, {
@@ -110,6 +112,10 @@ async function submitEdit(newData: BookParams) {
     book.value = await resp.json();
     closeEditModal();
     notifications.notifySuccess('Book updated successfully!');
+
+    if (coverChanged) {
+      window.location.reload();
+    }
   } catch (err) {
     console.error('Update book error:', err);
     notifications.notifyError('Failed to update book: ' + (err instanceof Error ? err.message : String(err)));
