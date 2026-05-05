@@ -2,6 +2,7 @@ package fileManagement
 
 import (
 	"encoding/json"
+	"os"
 	"path"
 )
 
@@ -121,4 +122,20 @@ func (files *Files) applyModifier(mod func([]string) *[]string) {
 
 func (files *Files) HasNoFiles() bool {
 	return (files.AudioFiles == nil || len(*files.AudioFiles) == 0) && (files.TextFiles == nil || len(*files.TextFiles) == 0)
+}
+
+func OpenMetadataFile(filePath string) (*MetadataFile, error) {
+	file, err := os.Open(filePath)
+	if err != nil {
+		return nil, err
+	}
+	defer file.Close()
+
+	var md MetadataFile
+	err = json.NewDecoder(file).Decode(&md)
+	if err != nil {
+		return nil, err
+	}
+
+	return &md, nil
 }

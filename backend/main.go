@@ -159,7 +159,7 @@ func main() {
 		Directory: cfg.downloadsPath,
 
 		AddHandler:    cfg.db.AddDownloads,
-		UpdateHandler: cfg.db.UpdateDownloadsFiles,
+		UpdateHandler: cfg.db.UpdateDownloadFiles,
 		DeleteHandler: cfg.db.DeleteDownload,
 		GetExisting:   cfg.db.GetAllDownloadsIdsAndDirs,
 	}

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue';
-import type { Category } from '@/types/book';
+import type { Category, Series } from '@/types/book';
 
 interface Props {
   list: Category[] | string[] | undefined;
@@ -26,6 +26,18 @@ function toggleShowAll() {
   showAll.value = !showAll.value;
 }
 
+function getItemName(item: Category | Series | string): string {
+  if (typeof item === 'string') {
+    return item;
+  }
+
+  if ("index" in item) {
+    return `${item.name} #${item.index}`
+  }
+
+  return item.name;
+}
+
 onMounted(() => {
   if (listLength.value < props.listLimit) {
     showAll.value = true;
@@ -43,7 +55,7 @@ onMounted(() => {
         <div v-if="showAll" class="search-category-button">
           <dd v-for="(item, index) in list" :key="typeof item === 'string' ? item : item.name">
             <a @click="handleItemClick(typeof item === 'string' ? item : item.name)">
-              {{ typeof item === 'string' ? item : item.name }}{{ index < list.length - 1 ? ', ' : '' }}
+              {{ getItemName(item) }}{{ index < list.length - 1 ? ', ' : '' }}
             </a>
           </dd>
           <a v-if="listLength > listLimit"
@@ -55,7 +67,7 @@ onMounted(() => {
         <div v-else class="search-category-button">
           <dd v-for="(item, index) in shortList" :key="typeof item === 'string' ? item : item.name">
             <a @click="handleItemClick(typeof item === 'string' ? item : item.name)">
-              {{ typeof item === 'string' ? item : item.name }}{{ index < listLimit - 1 ? ', ' : '' }}
+              {{ getItemName(item) }}{{ index < listLimit - 1 ? ', ' : '' }}
             </a>
           </dd>
           <a v-if="listLength > listLimit"

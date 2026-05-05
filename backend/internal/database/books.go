@@ -840,6 +840,35 @@ func (c Client) UpdateBookFiles(id uuid.UUID, files fileManagement.Files) error 
 	return nil
 }
 
+func (c Client) UpdateBooksFiles(idsFiles map[uuid.UUID]fileManagement.Files) error {
+
+	indyTx := c.tx == nil
+	if indyTx {
+		err := c.Begin()
+		if err != nil {
+			return err
+		}
+		defer c.Rollback()
+	}
+
+	for id, files := range idsFiles {
+
+		err := c.UpdateBookFiles(id, files)
+		if err != nil {
+			return err
+		}
+	}
+
+	if indyTx {
+		err := c.Commit()
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
 // #region Book Methods
 
 func (book *Book) getBookCategories(c Client) error {

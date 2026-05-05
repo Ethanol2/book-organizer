@@ -93,7 +93,7 @@ func MetadataToBookParams(metadata fileManagement.MetadataFile) database.BookPar
 
 	series := []database.Category{}
 	for _, s := range metadata.Series {
-		split := strings.SplitN(s, "#", 1)
+		split := strings.SplitN(s, "#", 2)
 		cat := database.Category{
 			Name: strings.TrimSpace(split[0]),
 		}

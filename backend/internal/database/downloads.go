@@ -80,15 +80,15 @@ func (c Client) AddDownloads(downloads []fileManagement.Files) error {
 	return nil
 }
 
-func (c Client) UpdateDownloadFiles(tx *sql.Tx, id uuid.UUID, files fileManagement.Files) error {
+func (c Client) UpdateDownloadFiles(id uuid.UUID, files fileManagement.Files) error {
 	var err error
-	indyTx := tx == nil
+	indyTx := c.tx == nil
 	if indyTx {
-		tx, err = c.db.Begin()
+		err = c.Begin()
 		if err != nil {
 			return err
 		}
-		defer tx.Rollback()
+		defer c.Rollback()
 	}
 
 	audio, text, err := files.FileListsToJson()
@@ -104,13 +104,13 @@ func (c Client) UpdateDownloadFiles(tx *sql.Tx, id uuid.UUID, files fileManageme
 			cover = ?
 		WHERE id = ?
 	`
-	_, err = tx.Exec(query, audio, text, files.Cover, id)
+	_, err = c.tx.Exec(query, audio, text, files.Cover, id)
 	if err != nil {
 		return err
 	}
 
 	if indyTx {
-		err = tx.Commit()
+		err = c.Commit()
 		if err != nil {
 			return err
 		}
@@ -128,7 +128,7 @@ func (c Client) UpdateDownloadsFiles(files map[uuid.UUID]fileManagement.Files) e
 	defer tx.Rollback()
 
 	for id := range files {
-		err = c.UpdateDownloadFiles(tx, id, files[id])
+		err = c.UpdateDownloadFiles(id, files[id])
 		if err != nil {
 			return err
 		}

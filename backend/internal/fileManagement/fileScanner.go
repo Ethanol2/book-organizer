@@ -21,7 +21,7 @@ type Scanner struct {
 
 	AddHandler    func([]Files) error
 	DeleteHandler func(uuid.UUID) error
-	UpdateHandler func(map[uuid.UUID]Files) error
+	UpdateHandler func(uuid.UUID, Files) error
 	GetExisting   func() ([]uuid.UUID, []string, error)
 }
 
@@ -126,8 +126,6 @@ func (scan *Scanner) ScanNew(toIgnore []string) error {
 
 func (scan *Scanner) ScanExisting(ids []uuid.UUID, dirs []string) error {
 
-	files := map[uuid.UUID]Files{}
-
 	for i, dir := range dirs {
 
 		path := path.Join(scan.Directory, dir)
@@ -137,7 +135,7 @@ func (scan *Scanner) ScanExisting(ids []uuid.UUID, dirs []string) error {
 			if err != nil {
 				log.Println(err)
 			}
-			log.Println("Download \"", dir, "\" was not found and removed from the database")
+			log.Println("\"", dir, "\" was not found")
 			continue
 		}
 
@@ -147,12 +145,10 @@ func (scan *Scanner) ScanExisting(ids []uuid.UUID, dirs []string) error {
 			continue
 		}
 
-		files[ids[i]] = newFiles
-	}
-
-	err := scan.UpdateHandler(files)
-	if err != nil {
-		return err
+		err = scan.UpdateHandler(ids[i], newFiles)
+		if err != nil {
+			return err
+		}
 	}
 
 	return nil
