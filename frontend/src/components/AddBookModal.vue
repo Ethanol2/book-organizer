@@ -15,6 +15,7 @@ const subtitleInput = ref('')
 const descriptionInput = ref('')
 const yearInput = ref('')
 const isbnInput = ref('')
+const asinInput = ref('')
 const publisherInput = ref('')
 const coverInput = ref('')
 const authorsInput = ref('')
@@ -29,7 +30,7 @@ const deleteModeSelection = ref<deleteMode>(deleteMode.BookAndFiles)
 interface ModalProps {
   show: boolean
   params: BookParams | null
-  showDeleteButton?: boolean
+  isEditMode?: boolean
   hasFiles?: boolean
 }
 
@@ -59,6 +60,7 @@ function resetFormFields() {
   descriptionInput.value = params?.description ?? ''
   yearInput.value = params?.year != null ? String(params.year) : ''
   isbnInput.value = params?.isbn ?? ''
+  asinInput.value = params?.asin ?? ''
   publisherInput.value = params?.publisher ?? ''
   coverInput.value = params?.cover ?? ''
   authorsInput.value = getCategoriesString(params?.authors ?? [])
@@ -79,6 +81,7 @@ function handleSubmit() {
     description: descriptionInput.value.trim() || null,
     publisher: publisherInput.value.trim() || null,
     isbn: isbnInput.value.trim() || null,
+    asin: asinInput.value.trim() || null,
     cover: coverInput.value.trim() || null,
     year: yearValue ? Number(yearValue) : null,
     authors: getCategoriesArray(authorsInput.value),
@@ -137,8 +140,7 @@ function getDeleteConfirmText(): string {
   }
 }
 
-const modalTitle = computed(() => (props.params ? 'Edit Book' : 'Add Book'))
-const submitLabel = computed(() => (props.params ? 'Save Changes' : 'Add Book'))
+const modalTitle = computed(() => (props.isEditMode ? 'Edit Book' : 'Add Book'))
 
 watch(
   [() => props.params, () => props.show],
@@ -165,6 +167,7 @@ watch(
         <label>Description: <textarea v-model="descriptionInput"></textarea></label>
         <label>Year: <input v-model="yearInput" type="number" /></label>
         <label>ISBN: <input v-model="isbnInput" type="text" /></label>
+        <label>ASIN: <input v-model="asinInput" type="text" /></label>
         <label>Publisher: <input v-model="publisherInput" type="text" /></label>
         <label>Authors (comma-separated): <input v-model="authorsInput" type="text" /></label>
         <label>Narrators (comma-separated): <input v-model="narratorsInput" type="text" /></label>
@@ -172,13 +175,17 @@ watch(
         <label>Tags (comma-separated): <input v-model="tagsInput" type="text" /></label>
         <label>Cover URL: <input v-model="coverInput" type="text" /></label>
 
+        <div v-if="coverInput != ''" class="cover">
+          <img :src="coverInput" />
+        </div>
+
         <!-- Action buttons -->
         <div class="modal-buttons">
           <button type="button" @click="handleOverlayClick">Cancel</button>
-          <button type="submit">{{ submitLabel }}</button>
+          <button type="submit">Save</button>
         </div>
 
-        <div v-if="props.params && props.showDeleteButton" class="modal-delete-wrap">
+        <div v-if="props.params && props.isEditMode" class="modal-delete-wrap">
           <button type="button" class="delete-book-button" @click="handleDeleteClick">{{ deleteBookText }}</button>
 
           <div v-if="showDeleteConfirm" class="delete-confirmation">
@@ -202,42 +209,6 @@ watch(
 </template>
 
 <style scoped>
-/* Modal overlay background */
-.modal-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100vw;
-  height: 100vh;
-  background: rgba(0, 0, 0, 0.5);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-}
-
-/* Modal dialog container */
-.modal {
-  background: var(--color-background);
-  padding: 2rem;
-  border-radius: 8px;
-  max-width: 600px;
-  width: 90%;
-  max-height: 80vh;
-  overflow-y: auto;
-}
-
-.modal h3 {
-  margin-top: 0;
-  margin-bottom: 1rem;
-}
-
-/* Form labels and inputs */
-.modal label {
-  display: block;
-  margin-bottom: 0.5rem;
-  font-weight: 500;
-}
 
 .modal input,
 .modal textarea {
@@ -382,5 +353,15 @@ watch(
 .confirm-delete-button {
   border: 1px solid #d43f3a;
   background: #d9534f;
+}
+
+.cover img{
+  width: 100%;
+  max-height: 250px;
+  object-fit: contain;
+  flex-shrink: 0;
+  border-radius: 6px;
+  background: var(--color-background);
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.08);
 }
 </style>

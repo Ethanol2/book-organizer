@@ -321,46 +321,12 @@ watch(() => props.modelShow, (newVal) => {
 </template>
 
 <style scoped>
-/* Modal overlay background */
-.modal-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100vw;
-  height: 100vh;
-  background: rgba(0, 0, 0, 0.5);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-}
-
-/* Modal dialog container */
-.modal {
-  background: var(--color-background);
-  padding: 2rem;
-  border-radius: 8px;
-  max-width: 600px;
-  width: 90%;
-  height: 800px;
-  display: flex;
-  flex-direction: column;
-  position: relative;
-}
-
-.modal h3 {
-  margin-top: 0;
-  margin-bottom: 0.25rem;
-}
-
-.modal h3 strong {
-  font-weight: 900;
-}
 
 /* Checkbox label */
 .modal > label {
   margin-bottom: 1.5rem;
 }
+
 /* Search section */
 .search-section {
   margin-bottom: 1rem;

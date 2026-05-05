@@ -25,6 +25,7 @@ export type BookParams = {
   description?: string | null
   year?: number | null
   isbn?: string | null
+  asin?: string | null
   publisher?: string | null
   tags?: string[] | null
 
@@ -66,6 +67,9 @@ export type Genre = Category
 export function getBookCoverSrc(book: Book): string {
     if (book.files != null && book.files.cover != null) {
         return book.files.cover
+    }
+    else if (book.id != null) {
+        return `/media/metadata/${book.id}.jpg`
     }
     return ""
 }

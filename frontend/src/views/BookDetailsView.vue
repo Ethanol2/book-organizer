@@ -331,7 +331,7 @@ onMounted(async () => {
     </div>
     <div v-else class="status-message">Book not found.</div>
 
-    <AddBookModal :show="showEditModal" :params="editParams" :showDeleteButton="true" :has-files="book?.files !== null && book?.files.root !== null"
+    <AddBookModal :show="showEditModal" :params="editParams" :isEditMode="true" :has-files="book?.files !== null && book?.files.root !== null"
      @close="closeEditModal" @add-book="submitEdit" @delete-book="deleteBook"/>
   </div>
 </template>
