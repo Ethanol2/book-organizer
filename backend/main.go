@@ -122,10 +122,11 @@ func main() {
 	mux.Handle("/", fHandler)
 
 	// Auth Endpoints
+	mux.HandleFunc("GET /api/auth/status", cfg.handlerGetAuthStatus)
 	mux.HandleFunc("POST /api/auth/login", cfg.handlerLogin)
 	mux.HandleFunc("POST /api/auth/register", cfg.handlerRegister)
-	mux.HandleFunc("POST /api/auth/count-users", cfg.handlerGetUsersCount)
-	mux.HandleFunc("PUT /api/auth/reset-password", cfg.handlerUpdatePassword)
+	mux.HandleFunc("DELETE /api/auth/users/{id}", cfg.uuidMiddleware(cfg.handlerDeleteUser))
+	mux.HandleFunc("PUT /api/auth/users/{id}/reset-password", cfg.uuidMiddleware(cfg.handlerUpdatePassword))
 	mux.HandleFunc("POST /api/auth/refresh", cfg.handlerRefresh)
 
 	// Downloads Endpoints

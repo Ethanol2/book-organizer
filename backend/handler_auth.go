@@ -9,9 +9,10 @@ import (
 
 	"github.com/Ethanol2/book-organizer/internal/auth"
 	"github.com/Ethanol2/book-organizer/internal/database"
+	"github.com/google/uuid"
 )
 
-func (cfg *apiConfig) handlerGetUsersCount(w http.ResponseWriter, r *http.Request) {
+func (cfg *apiConfig) handlerGetAuthStatus(w http.ResponseWriter, r *http.Request) {
 
 	err := cfg.db.Begin()
 	if err != nil {
@@ -32,9 +33,19 @@ func (cfg *apiConfig) handlerGetUsersCount(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
+	user := database.User{}
+	if id, err := authorize(true, r, cfg.tokenSecret); err == nil {
+		user, err = cfg.db.GetUser(id)
+		if err != nil {
+			respondWithError(w, http.StatusInternalServerError, DatabaseError, err)
+			return
+		}
+	}
+
 	respondWithJson(w, http.StatusOK, struct {
-		Count int `json:"count"`
-	}{Count: count})
+		database.User `json:"user,omitempty"`
+		Count         int `json:"user_count"`
+	}{Count: count, User: user})
 }
 
 func (cfg *apiConfig) handlerRegister(w http.ResponseWriter, r *http.Request) {
@@ -186,20 +197,38 @@ func (cfg *apiConfig) handlerRefresh(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	cfg.authRequired = true
+
 	addJWTCookie(w, token)
 	w.WriteHeader(http.StatusNoContent)
 }
 
-func (cfg *apiConfig) handlerUpdatePassword(w http.ResponseWriter, r *http.Request) {
+func (cfg *apiConfig) handlerDeleteUser(id uuid.UUID, w http.ResponseWriter, r *http.Request) {
 
-	userId, err := authorize(true, r, cfg.tokenSecret)
+	count, err := cfg.db.DeleteUser(id)
 	if err != nil {
-		respondWithError(w, http.StatusUnauthorized, AuthBadAuthorization, err)
+		if err == sql.ErrNoRows {
+			respondWithError(w, http.StatusNotFound, NotFoundError, err)
+			return
+		}
+		respondWithError(w, http.StatusInternalServerError, DatabaseError, err)
 		return
 	}
 
+	if count == 0 {
+		log.Println("ALL USERS HAVE BEEN DELETED. THE APP WILL NO LONGER USE AUTHENTICATION")
+		cfg.authRequired = false
+	}
+
+	respondWithJson(w, http.StatusOK, struct {
+		Count int `json:"user_count"`
+	}{Count: count})
+}
+
+func (cfg *apiConfig) handlerUpdatePassword(id uuid.UUID, w http.ResponseWriter, r *http.Request) {
+
 	var params database.UserParams
-	err = json.NewDecoder(r.Body).Decode(&params)
+	err := json.NewDecoder(r.Body).Decode(&params)
 	if err != nil {
 		respondWithError(w, http.StatusBadRequest, BodyDecodeError, err)
 		return
@@ -211,7 +240,7 @@ func (cfg *apiConfig) handlerUpdatePassword(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	user, err := cfg.db.UpdatePassword(userId, hash)
+	user, err := cfg.db.UpdatePassword(id, hash)
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, DatabaseError, err)
 		return

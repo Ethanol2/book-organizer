@@ -1,6 +1,7 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import LibraryView from '@/views/LibraryView.vue'
 import LoginView from '@/views/LoginView.vue'
+import { useAuthStore } from '@/stores/auth';
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -41,16 +42,24 @@ const router = createRouter({
   ],
 });
 
-router.beforeEach((to, from, next) => {
-  if (to.meta.requiresAuth) {
-    const token = localStorage.getItem('token');
-    if (token) {
-      next(); // Proceed to route if user is authenticated 
-    } else {
-      next('/login'); // Redirect to login if not authenticated
-    }
+router.beforeEach( async(to, from, next) => {
+  const authStore = useAuthStore();
+
+  if (!authStore.initialized) {
+    await authStore.checkCurrentStatus();
+  }
+
+  if (authStore.needsAuth && !!authStore.user) {
+
+  }
+
+
+  if (to.name === 'login' && authStore.isAuthenticated) {
+    next({ name: 'home' });
+  } else if (to.name !== 'login' && !authStore.isAuthenticated) {
+    next({ name: 'login' });
   } else {
-    next(); // Proceed to route if it's not protected
+    next();
   }
 });
 

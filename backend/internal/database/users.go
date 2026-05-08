@@ -157,6 +157,32 @@ func (c Client) AddRefreshToken(userId uuid.UUID, token string, expiresAt time.T
 	return c.GetRefreshToken(token)
 }
 
+func (c Client) DeleteUser(id uuid.UUID) (int, error) {
+
+	indyTx := c.tx == nil
+	if indyTx {
+		err := c.Begin()
+		if err != nil {
+			return -1, err
+		}
+		defer c.Rollback()
+	}
+
+	_, err := c.tx.Exec("DELETE FROM users WHERE id = ?", id)
+	if err != nil {
+		return -1, err
+	}
+
+	if indyTx {
+		err = c.Commit()
+		if err != nil {
+			return -1, err
+		}
+	}
+
+	return c.CountUsers()
+}
+
 func (c Client) GetRefreshToken(token string) (RefreshTokenInfo, error) {
 
 	var info RefreshTokenInfo
