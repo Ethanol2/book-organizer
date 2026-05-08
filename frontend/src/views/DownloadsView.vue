@@ -4,6 +4,7 @@ import type { Download } from '@/types/download';
 import DownloadItem from '@/components/DownloadItem.vue';
 import ImportDownloadModal from '@/components/ImportDownloadModal.vue';
 import { useNotificationsStore } from '@/stores/notifications';
+import api from '@/services/api';
 
 const downloads = ref<Download[]>([]);
 const lastRefresh = ref<string>("Never refreshed");
@@ -29,13 +30,9 @@ async function fetchDownloads() {
     downloads.value = [];
     try {
         loading.value = true;
-        const resp = await fetch("/api/downloads");
+        const resp = await api.get('/api/downloads');
 
-        if (!resp.ok) {
-            throw new Error(`HTTP error with status: ${resp.status}`);
-        }
-
-        downloads.value = await resp.json();
+        downloads.value = resp.data;
         lastRefreshParams.time = Date.now()
         updateLastRefresh()
 

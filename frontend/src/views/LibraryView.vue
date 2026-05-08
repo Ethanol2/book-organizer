@@ -4,6 +4,7 @@ import type { BookSummary } from '@/types/book';
 import { onMounted, ref } from 'vue';
 import { useRoute, useRouter, type LocationQueryValue } from 'vue-router';
 import { useNotificationsStore } from '@/stores/notifications';
+import api from '@/services/api';
 
 const route = useRoute();
 const router = useRouter();
@@ -150,13 +151,8 @@ async function fetchBooks(append = false) {
     isLoading.value = true;
     try {
         const queryString = buildQueryString();
-        const resp = await fetch(`api/books${queryString}`);
-        if (!resp.ok) {
-            throw new Error(`HTTP error with status: ${resp.status}`);
-        }
-
-        const data = await resp.json();
-        handleFetchData(data, append);       
+        const resp = await api.get(`/api/books${queryString}`);
+        handleFetchData(resp.data, append);       
 
     } catch (error) {
         console.error('Error fetching books list:', error);
@@ -169,11 +165,8 @@ async function scanLibrary() {
     isLoading.value = true;
     try {
         const queryString = buildQueryString();
-        const resp = await fetch(`/api/library/scan${queryString}`);
-        if (!resp.ok) {
-            throw new Error(`HTTP error with status: ${resp.status}`);
-        }
-        const data = await resp.json();
+        const resp = await api.get(`/api/library/scan${queryString}`);
+        const data = resp.data;
         handleFetchData(data.results);
         
         useNotificationsStore().notifySuccess('Scan Complete')

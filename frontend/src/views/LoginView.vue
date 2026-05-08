@@ -2,43 +2,29 @@
 import { ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { useNotificationsStore } from '@/stores/notifications';
+import { useAuthStore } from '@/stores/auth';
 
 const router = useRouter();
+const notificationsStore = useNotificationsStore();
+const authStore = useAuthStore();
 const username = ref('');
 const password = ref('');
 
 async function login() {
-
   if (username.value === '' || password.value === '') {
+    notificationsStore.notifyError('Username and password are required');
     return;
   }
 
   try {
-
-    const response = await fetch('/api/auth/login', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        username: username.value,
-        password: password.value,
-      }),
+    await authStore.login({
+      username: username.value,
+      password: password.value,
     });
 
-    const data = await response.json();
-
-    if (!response.ok) {
-      console.error('Error logging in:', data.error);
-      useNotificationsStore().notifyError(data.error);
-      return;
+    if (authStore.user) {
+      router.push('/');
     }
-
-    localStorage.setItem('token', data.token);
-    router.push('/');
-
-    cookieStore.set('token', data.token);
-
   } catch (error) {
     console.error('Error logging in:', error);
   }
@@ -57,18 +43,18 @@ async function login() {
         </p>
       </div>
 
-      <form class="login-form">
+      <form class="login-form" @submit.prevent="login">
         <div class="field">
           <label>Username</label>
-          <input type="username" />
+          <input type="text" v-model="username" autocomplete="username" />
         </div>
 
         <div class="field">
           <label>Password</label>
-          <input type="password" />
+          <input type="password" v-model="password" autocomplete="current-password" />
         </div>
 
-        <button class="search-button">
+        <button type="submit" class="search-button">
           Sign In
         </button>
       </form>

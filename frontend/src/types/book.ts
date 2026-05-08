@@ -1,3 +1,4 @@
+import api from '@/services/api';
 import { useNotificationsStore } from "@/stores/notifications";
 
 export type Book = {
@@ -141,22 +142,11 @@ export function getSeriesArray(series: string): Series[] {
 // Post book data to backend API
 export async function postBook(book: BookParams): Promise<Book | null> {
   try {
-    const resp = await fetch('/api/books', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(book),
-    })
+    const resp = await api.post('/api/books', book);
 
-    if (!resp.ok) {
-      const body = await resp.text()
-      throw new Error(`${resp.status} ${resp.statusText}: ${body}`)
-    }
+    useNotificationsStore().notifySuccess('Book added successfully!');
 
-    useNotificationsStore().notifySuccess('Book added successfully!')
-
-    const bookObj = (await resp.json()) as Book
+    const bookObj = resp.data as Book;
     return bookObj
 
   } catch (err) {

@@ -6,6 +6,7 @@ import type { Download } from '@/types/download';
 import { postBook, type BookSummary, type BookParams, getCategoriesString } from '@/types/book';
 import { getDownloadName } from '@/types/download';
 import { AudibleRegion, getMetadataDetails, MetadataType, searchMetadataSource } from '@/types/metadata';
+import api from '@/services/api';
 
 const router = useRouter();
 const notificationsStore = useNotificationsStore();
@@ -78,21 +79,10 @@ const associateDownload = async (book: BookSummary | BookParams, isSummary: bool
   notifId = notificationsStore.notifyInfo(`Associating "${book.title}" with the download...`);
   
   try {
-    const response = await fetch(`/api/downloads/${props.download.id}/associate`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        book_id: id,
-        use_downloaded_cover: useDownloadedCover.value,
-      }),
+    await api.post(`/api/downloads/${props.download.id}/associate`, {
+      book_id: id,
+      use_downloaded_cover: useDownloadedCover.value,
     });
-
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.error || 'Failed to associate download with book');
-    }
 
     notificationsStore.notifySuccess(`Successfully associated "${book.title}" with the download`);
     closeModal();
@@ -168,13 +158,17 @@ const performSearch = async () => {
       params.append('search', searchQuery.value.trim());
     }
 
-    const response = await fetch(`/api/books?${params.toString()}`);
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
+    const response = await api.get('/api/books', {
+      params: {
+        view: 'summary',
+        files: 'without_files',
+        page: libraryPage.value,
+        count: libraryPageSize,
+        ...(searchQuery.value.trim() ? { search: searchQuery.value.trim() } : {}),
+      },
+    });
 
-    const data = await response.json();
-    searchResults.value = data.items;
+    searchResults.value = response.data.items;
   } catch (error) {
     console.error('Error searching books:', error);
     searchResults.value = [];

@@ -6,6 +6,7 @@ import AddBookModal from '@/components/AddBookModal.vue';
 import BookDetailsCategoryListView from '@/components/BookDetailsCategoryListView.vue';
 import { useNotificationsStore } from '@/stores/notifications';
 import { basename } from '@/types/download';
+import api from '@/services/api';
 
 type CategoryList = {
   showAll: boolean;
@@ -96,20 +97,8 @@ async function submitEdit(newData: BookParams) {
   newData.cover = coverChanged ? newData.cover : undefined;
 
   try {
-    const resp = await fetch(`/api/books/${book.value.id}`, {
-      method: 'PATCH',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(newData),
-    });
-
-    if (!resp.ok) {
-      const body = await resp.text();
-      throw new Error(`${resp.status} ${resp.statusText}: ${body}`);
-    }
-
-    book.value = await resp.json();
+    const resp = await api.patch(`/api/books/${book.value.id}`, newData);
+    book.value = resp.data;
     closeEditModal();
     notifications.notifySuccess('Book updated successfully!');
 
@@ -130,17 +119,12 @@ async function deleteBook(payload: { deleteBook: boolean, deleteFiles: boolean }
   deleting.value = true;
 
   try {
-    const resp = await fetch(`/api/books/${book.value.id}?${(new URLSearchParams({ "book": payload.deleteBook.toString(), "files": payload.deleteFiles.toString() }))}`, {
-      method: 'DELETE',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-      }
+    await api.delete(`/api/books/${book.value.id}`, {
+      params: {
+        book: payload.deleteBook,
+        files: payload.deleteFiles,
+      },
     });
-
-    if (!resp.ok) {
-      const body = await resp.text();
-      throw new Error(`${resp.status} ${resp.statusText}: ${body}`);
-    }
 
     closeEditModal();
 
@@ -186,12 +170,8 @@ onMounted(async () => {
   error.value = null;
 
   try {
-    const resp = await fetch(`/api/books/${route.params.id}`);
-    if (!resp.ok) {
-      throw new Error(`HTTP error with status: ${resp.status}`);
-    }
-
-    book.value = await resp.json();
+    const resp = await api.get(`/api/books/${route.params.id}`);
+    book.value = resp.data;
 
   } catch (err) {
     console.error('Error fetching book details:', err);
