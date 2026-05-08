@@ -28,6 +28,7 @@ const menuOpen = ref(false)
           <RouterLink to="/add-book" @click="menuOpen = false">Add Book</RouterLink>
           <RouterLink to="/downloads" @click="menuOpen = false">Downloads</RouterLink>
           <RouterLink to="/about" @click="menuOpen = false">About</RouterLink>
+          <RouterLink to="/login" @click="menuOpen = false">Login</RouterLink>
         </nav>
       </aside>
 

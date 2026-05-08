@@ -56,44 +56,44 @@ func (cfg *apiConfig) handlerMetadataSearch(w http.ResponseWriter, r *http.Reque
 	switch r.URL.Query().Get("source") {
 
 	case "":
-		respondWithError(w, http.StatusBadRequest, "Missing source", fmt.Errorf("request missing source in url"))
+		respondWithError(w, http.StatusBadRequest, MetadataSourceError, fmt.Errorf(MetadataSourceError))
 		return
 
 	case "open library":
 		results, err = metadata.SearchOpenLibrary(searchParams, &cfg.mdCache)
 		if err != nil {
-			respondWithError(w, http.StatusInternalServerError, "something went wrong while querying openlibrary", err)
+			respondWithError(w, http.StatusInternalServerError, MetadataFetchError, err)
 			return
 		}
 
 	case "google books":
 		if cfg.googleBooksApiKey == "" {
-			respondWithError(w, http.StatusInternalServerError, "missing google books api key in backend setup", fmt.Errorf("missing google books api key in backend setup"))
+			respondWithError(w, http.StatusInternalServerError, MetadataApiKeyMissing, fmt.Errorf(MetadataApiKeyMissing))
 			return
 		}
 
 		results, err = metadata.SearchGoogleBooks(searchParams, cfg.googleBooksApiKey, &cfg.mdCache)
 		if err != nil {
-			respondWithError(w, http.StatusInternalServerError, "something went wrong while querying google books", err)
+			respondWithError(w, http.StatusInternalServerError, MetadataFetchError, err)
 			return
 		}
 
 	case "audible":
 		region := r.URL.Query().Get("region")
 		if region == "" || !metadata.IsValidAudibleRegion(region) {
-			respondWithError(w, http.StatusBadRequest, "querying audible requires a valid region. Valid regions are: co.au, ca, de, es, fr, co.in, it, co.jp, com, co.uk", fmt.Errorf("no valid region provided => %s", region))
+			respondWithError(w, http.StatusBadRequest, "Querying audible requires a valid region. Valid regions are: co.au, ca, de, es, fr, co.in, it, co.jp, com, co.uk", fmt.Errorf("no valid region provided => %s", region))
 			return
 		}
 
 		results, err = metadata.SearchAudible(searchParams, region, &cfg.mdCache)
 		if err != nil {
-			respondWithError(w, http.StatusInternalServerError, "something went wrong while querying audible", err)
+			respondWithError(w, http.StatusInternalServerError, MetadataFetchError, err)
 			return
 		}
 
 	default:
 		src := r.URL.Query().Get("source")
-		respondWithError(w, http.StatusBadRequest, "Unknown source: "+src, fmt.Errorf("unknown source"))
+		respondWithError(w, http.StatusBadRequest, MetadataSourceError, fmt.Errorf("Invalid source: %s", src))
 		return
 	}
 
@@ -112,44 +112,44 @@ func (cfg *apiConfig) handlerGetMetadataBookDetails(w http.ResponseWriter, r *ht
 	switch r.URL.Query().Get("source") {
 
 	case "":
-		respondWithError(w, http.StatusBadRequest, "Missing source", fmt.Errorf("request missing source in url"))
+		respondWithError(w, http.StatusBadRequest, MetadataSourceError, fmt.Errorf(MetadataSourceError))
 		return
 
 	case "open library":
 		result, err = metadata.GetFromOpenLibrary(id, &cfg.mdCache)
 		if err != nil {
-			respondWithError(w, http.StatusInternalServerError, "something went wrong while querying openlibrary", err)
+			respondWithError(w, http.StatusInternalServerError, MetadataFetchError, err)
 			return
 		}
 
 	case "google books":
 		if cfg.googleBooksApiKey == "" {
-			respondWithError(w, http.StatusInternalServerError, "missing google books api key in backend setup", fmt.Errorf("missing google books api key in backend setup"))
+			respondWithError(w, http.StatusInternalServerError, MetadataApiKeyMissing, fmt.Errorf(MetadataApiKeyMissing))
 			return
 		}
 
 		result, err = metadata.GetFromGoogleBooks(id, cfg.googleBooksApiKey, &cfg.mdCache)
 		if err != nil {
-			respondWithError(w, http.StatusInternalServerError, "something went wrong while querying google books", err)
+			respondWithError(w, http.StatusInternalServerError, MetadataFetchError, err)
 			return
 		}
 
 	case "audible":
 		region := r.URL.Query().Get("region")
 		if region == "" || !metadata.IsValidAudibleRegion(region) {
-			respondWithError(w, http.StatusBadRequest, "querying audible requires a valid region. Valid regions are: au, ca, de, es, fr, in, it, jp, us, uk", fmt.Errorf("no valid region provided"))
+			respondWithError(w, http.StatusBadRequest, "Querying audible requires a valid region. Valid regions are: au, ca, de, es, fr, in, it, jp, us, uk", fmt.Errorf("no valid region provided"))
 			return
 		}
 
 		result, err = metadata.GetFromAudible(id, region, &cfg.mdCache)
 		if err != nil {
-			respondWithError(w, http.StatusInternalServerError, "something went wrong while querying audible", err)
+			respondWithError(w, http.StatusInternalServerError, MetadataFetchError, err)
 			return
 		}
 
 	default:
 		src := r.URL.Query().Get("source")
-		respondWithError(w, http.StatusBadRequest, "Unknown source: "+src, fmt.Errorf("unknown source"))
+		respondWithError(w, http.StatusBadRequest, MetadataSourceError, fmt.Errorf("invalid source: %s", src))
 		return
 	}
 

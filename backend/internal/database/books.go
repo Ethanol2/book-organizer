@@ -3,7 +3,6 @@ package database
 import (
 	"database/sql"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"log"
 	"path"
@@ -213,9 +212,6 @@ func (c Client) GetBook(id uuid.UUID) (Book, error) {
 		&book.UpdatedAt,
 	)
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return Book{}, nil
-		}
 		return Book{}, err
 	}
 
@@ -348,9 +344,6 @@ func (c Client) GetBooksSummary(filters map[string][]string) (BookSearchResults[
 	countLimit, page, pageQuery := buildPageQuery(filters)
 	searchQuery, searchTerms := buildSearchQuery(filters)
 	query := "SELECT books.id, books.title, books.subtitle, books.cover, books.directory, (SELECT COUNT(*) FROM books) AS total_count  FROM books " + searchQuery + pageQuery
-
-	fmt.Println(query)
-	fmt.Println(searchTerms...)
 
 	rows, err := c.tx.Query(query, searchTerms...)
 	if err != nil {
@@ -578,6 +571,13 @@ func (c Client) UpdateBook(id uuid.UUID, update BookParams) (Book, bool, error) 
 		return Book{}, false, err
 	}
 
+	if indyTx {
+		err = c.Commit()
+		if err != nil {
+			return Book{}, false, err
+		}
+	}
+
 	book, err := c.GetBook(id)
 	if err != nil {
 		return Book{}, false, err
@@ -593,13 +593,6 @@ func (c Client) UpdateBook(id uuid.UUID, update BookParams) (Book, bool, error) 
 
 		book.Files.UpdateDirectory(path.Join(authorDir, seriesDir, bookDir))
 		err = book.ApplyBookFiles(c)
-		if err != nil {
-			return Book{}, false, err
-		}
-	}
-
-	if indyTx {
-		err = c.Commit()
 		if err != nil {
 			return Book{}, false, err
 		}

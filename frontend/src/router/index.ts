@@ -1,8 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
-import DownloadsView from '../views/DownloadsView.vue'
 import LibraryView from '@/views/LibraryView.vue'
-import BookDetailsView from '@/views/BookDetailsView.vue'
-import AddBookView from '@/views/AddBookView.vue'
+import LoginView from '@/views/LoginView.vue'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -11,6 +9,11 @@ const router = createRouter({
       path: '/',
       name: 'home',
       component: LibraryView,
+    },
+    {
+      path: '/login',
+      name: 'login',
+      component: LoginView
     },
     {
       path: '/about',
@@ -23,19 +26,32 @@ const router = createRouter({
     {
       path: '/add-book',
       name: 'add-book',
-      component: AddBookView
+      component: () => import('../views/AddBookView.vue'),
     },
     {
       path: '/downloads',
       name: 'downloads',
-      component: DownloadsView
+      component: () => import('../views/DownloadsView.vue'),
     },
     {
       path: '/books/:id',
       name: 'book-details',
-      component: BookDetailsView
+      component: () => import('../views/BookDetailsView.vue'),
     }
   ],
-})
+});
+
+router.beforeEach((to, from, next) => {
+  if (to.meta.requiresAuth) {
+    const token = localStorage.getItem('token');
+    if (token) {
+      next(); // Proceed to route if user is authenticated 
+    } else {
+      next('/login'); // Redirect to login if not authenticated
+    }
+  } else {
+    next(); // Proceed to route if it's not protected
+  }
+});
 
 export default router

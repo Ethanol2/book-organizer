@@ -38,7 +38,7 @@ func (cfg *apiConfig) handlerPutCategory(w http.ResponseWriter, r *http.Request)
 
 	err := json.NewDecoder(r.Body).Decode(&newCat)
 	if err != nil {
-		respondWithError(w, http.StatusBadRequest, "Couldn't read body", err)
+		respondWithError(w, http.StatusBadRequest, BodyDecodeError, err)
 	}
 
 	catType, err := getCategoryType(r)
@@ -50,7 +50,7 @@ func (cfg *apiConfig) handlerPutCategory(w http.ResponseWriter, r *http.Request)
 	category, err := cfg.db.AddCategory(catType, newCat.Value)
 	if err != nil {
 		log.Println(err)
-		respondWithError(w, http.StatusInternalServerError, fmt.Sprintf(`couldn't add the category " %s " to the %s database`, newCat.Value, catType), err)
+		respondWithError(w, http.StatusInternalServerError, DatabaseError, err)
 		return
 	}
 
@@ -67,7 +67,7 @@ func (cfg *apiConfig) handlerGetAllOfCategory(w http.ResponseWriter, r *http.Req
 
 	category, err := cfg.db.GetAllOfCategory(catType)
 	if err != nil {
-		respondWithError(w, http.StatusInternalServerError, "Couldn't retrieve category from database", err)
+		respondWithError(w, http.StatusInternalServerError, DatabaseError, err)
 		return
 	}
 

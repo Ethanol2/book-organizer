@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Ethanol2/book-organizer/internal/auth"
 	"github.com/Ethanol2/book-organizer/internal/cache"
 	"github.com/Ethanol2/book-organizer/internal/database"
 	"github.com/Ethanol2/book-organizer/internal/fileManagement"
@@ -85,6 +86,8 @@ type apiConfig struct {
 	// Other
 	port              string
 	googleBooksApiKey string
+	tokenSecret       string
+	authRequired      bool
 }
 
 type cliFlags struct {
@@ -118,29 +121,34 @@ func main() {
 	fHandler := http.FileServer(http.Dir(cfg.frontendPath))
 	mux.Handle("/", fHandler)
 
-	// Library Endpoints
-	mux.HandleFunc("GET /api/library/scan", cfg.handlerGetScanLibrary)
+	// Auth Endpoints
+	mux.HandleFunc("POST /api/auth/login", cfg.handlerLogin)
+	mux.HandleFunc("POST /api/auth/register", cfg.handlerRegister)
+	mux.HandleFunc("POST /api/auth/count-users", cfg.handlerGetUsersCount)
+	mux.HandleFunc("PUT /api/auth/reset-password", cfg.handlerUpdatePassword)
+	mux.HandleFunc("POST /api/auth/refresh", cfg.handlerRefresh)
 
 	// Downloads Endpoints
-	mux.HandleFunc("POST /api/downloads/{id}/associate", uuidMiddleware(cfg.handlerAssociateDownloadToBook))
-	mux.HandleFunc("GET /api/downloads", cfg.handlerGetDownloads)
-	mux.HandleFunc("GET /api/downloads/{id}", uuidMiddleware(cfg.handlerGetDownload))
-	mux.HandleFunc("GET /api/downloads/{id}/cover", uuidMiddleware(cfg.handlerGetDownloadCover))
+	mux.HandleFunc("POST /api/downloads/{id}/associate", cfg.uuidMiddleware(cfg.handlerAssociateDownloadToBook))
+	mux.HandleFunc("GET /api/downloads", cfg.authMiddleware(cfg.handlerGetDownloads))
+	mux.HandleFunc("GET /api/downloads/{id}", cfg.uuidMiddleware(cfg.handlerGetDownload))
+	mux.HandleFunc("GET /api/downloads/{id}/cover", cfg.uuidMiddleware(cfg.handlerGetDownloadCover))
 
 	// Category Endpoints
-	mux.HandleFunc("POST /api/categories/{categoryType}", cfg.handlerPutCategory)
-	mux.HandleFunc("GET /api/categories/{categoryType}", cfg.handlerGetAllOfCategory)
+	mux.HandleFunc("POST /api/categories/{categoryType}", cfg.authMiddleware(cfg.handlerPutCategory))
+	mux.HandleFunc("GET /api/categories/{categoryType}", cfg.authMiddleware(cfg.handlerGetAllOfCategory))
 
 	// Book Endpoints
-	mux.HandleFunc("POST /api/books", cfg.handlerPostBook)
-	mux.HandleFunc("GET /api/books", cfg.handlerGetBooks)
-	mux.HandleFunc("GET /api/books/{id}", uuidMiddleware(cfg.handlerGetBook))
-	mux.HandleFunc("PATCH /api/books/{id}", uuidMiddleware(cfg.handlerUpdateBook))
-	mux.HandleFunc("DELETE /api/books/{id}", uuidMiddleware(cfg.handlerDeleteBook))
+	mux.HandleFunc("GET /api/library/scan", cfg.authMiddleware(cfg.handlerGetScanLibrary))
+	mux.HandleFunc("POST /api/books", cfg.authMiddleware(cfg.handlerPostBook))
+	mux.HandleFunc("GET /api/books", cfg.authMiddleware(cfg.handlerGetBooks))
+	mux.HandleFunc("GET /api/books/{id}", cfg.uuidMiddleware(cfg.handlerGetBook))
+	mux.HandleFunc("PATCH /api/books/{id}", cfg.uuidMiddleware(cfg.handlerUpdateBook))
+	mux.HandleFunc("DELETE /api/books/{id}", cfg.uuidMiddleware(cfg.handlerDeleteBook))
 
 	// Metadata
-	mux.HandleFunc("GET /api/metadata/", cfg.handlerMetadataSearch)
-	mux.HandleFunc("GET /api/metadata/{id}", cfg.handlerGetMetadataBookDetails)
+	mux.HandleFunc("GET /api/metadata/", cfg.authMiddleware(cfg.handlerMetadataSearch))
+	mux.HandleFunc("GET /api/metadata/{id}", cfg.authMiddleware(cfg.handlerGetMetadataBookDetails))
 
 	// Media
 	mux.Handle("/media/downloads/", http.StripPrefix(cfg.downloadsName, http.FileServer(http.Dir(cfg.downloadsPath))))
@@ -314,6 +322,11 @@ func initConfig(flags cliFlags) (*apiConfig, error) {
 		fmt.Println("no google books api key in env variables. Google books search won't work")
 	}
 
+	secret := os.Getenv("TOKEN_SECRET")
+	if secret == "" {
+		return nil, fmt.Errorf("token secret must be set")
+	}
+
 	if flags.clearDownloads {
 		err = fileManagement.RemoveDirectoryContents(dPath)
 		if err != nil {
@@ -328,6 +341,20 @@ func initConfig(flags cliFlags) (*apiConfig, error) {
 			return nil, err
 		}
 	}
+
+	// Transaction needed for user count and test data entry
+	err = db.Begin()
+	if err != nil {
+		return nil, err
+	}
+	defer db.Rollback()
+
+	// If the admin account has been created the app uses authentication
+	count, err := db.CountUsers()
+	if err != nil {
+		return nil, err
+	}
+	authRequired := count > 0
 
 	if flags.dbTestData {
 
@@ -378,12 +405,6 @@ func initConfig(flags cliFlags) (*apiConfig, error) {
 				return bookPath, nil
 			}
 
-			err = db.Begin()
-			if err != nil {
-				return nil, err
-			}
-			defer db.Rollback()
-
 			// No metadata
 			for _, book := range testBooks[:7] {
 
@@ -426,10 +447,6 @@ func initConfig(flags cliFlags) (*apiConfig, error) {
 				}
 			}
 
-			err = db.Commit()
-			if err != nil {
-				return nil, err
-			}
 		}
 
 		// Insert downloads
@@ -497,22 +514,50 @@ func initConfig(flags cliFlags) (*apiConfig, error) {
 
 	}
 
+	err = db.Commit()
+	if err != nil {
+		return nil, err
+	}
+
 	return &apiConfig{
-		db:                db,
-		mdCache:           cache.NewCache(time.Minute * 5),
-		frontendPath:      fPath,
-		downloadsPath:     dPath,
-		downloadsName:     "/media/downloads",
-		libraryPath:       lPath,
-		libraryName:       "/media/library",
-		metadataPath:      metadataPath,
-		testDataPath:      tPath,
+		db:      db,
+		mdCache: cache.NewCache(time.Minute * 5),
+
+		frontendPath:  fPath,
+		downloadsPath: dPath,
+		libraryPath:   lPath,
+		metadataPath:  metadataPath,
+		testDataPath:  tPath,
+
+		libraryName:   "/media/library",
+		downloadsName: "/media/downloads",
+
 		port:              port,
 		googleBooksApiKey: gbApiKey,
+		tokenSecret:       secret,
+		authRequired:      authRequired,
 	}, nil
 }
 
-func uuidMiddleware(handler func(uuid.UUID, http.ResponseWriter, *http.Request)) func(http.ResponseWriter, *http.Request) {
+func authorize(required bool, r *http.Request, secret string) (uuid.UUID, error) {
+
+	if !required {
+		return uuid.Nil, nil
+	}
+
+	token, err := auth.GetBearerToken(r)
+	if err != nil {
+		return uuid.Nil, err
+	}
+
+	id, err := auth.ValidateJWT(token, secret)
+	if err != nil {
+		return uuid.Nil, err
+	}
+	return id, nil
+}
+
+func (cfg *apiConfig) uuidMiddleware(handler func(uuid.UUID, http.ResponseWriter, *http.Request)) func(http.ResponseWriter, *http.Request) {
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
@@ -523,7 +568,27 @@ func uuidMiddleware(handler func(uuid.UUID, http.ResponseWriter, *http.Request))
 			return
 		}
 
+		_, err = authorize(cfg.authRequired, r, cfg.tokenSecret)
+		if err != nil {
+			respondWithError(w, http.StatusUnauthorized, AuthBadAuthorization, err)
+			return
+		}
+
 		handler(id, w, r)
 	}
 
+}
+
+func (cfg *apiConfig) authMiddleware(handler func(http.ResponseWriter, *http.Request)) func(http.ResponseWriter, *http.Request) {
+
+	return func(w http.ResponseWriter, r *http.Request) {
+
+		_, err := authorize(cfg.authRequired, r, cfg.tokenSecret)
+		if err != nil {
+			respondWithError(w, http.StatusUnauthorized, AuthBadAuthorization, err)
+			return
+		}
+
+		handler(w, r)
+	}
 }

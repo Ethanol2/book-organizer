@@ -31,6 +31,41 @@ func NewClient(dbPath string) (Client, error) {
 }
 
 func (client *Client) handleMigration() error {
+
+	// Authentication
+
+	usersTable := `
+	CREATE TABLE IF NOT EXISTS users (
+		id TEXT PRIMARY KEY,
+		username TEXT UNIQUE NOT NULL,
+		password_hash TEXT UNIQUE NOT NULL,
+		created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+		updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+	);
+	`
+	_, err := client.db.Exec(usersTable)
+	if err != nil {
+		return err
+	}
+
+	refreshTokensTable := `
+	CREATE TABLE IF NOT EXISTS refresh_tokens (
+		token TEXT PRIMARY KEY,
+		created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+		updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+		user_id TEXT NOT NULL,
+		expires_at DATETIME NOT NULL,
+		revoked_at DATETIME,
+		FOREIGN KEY (user_id) REFERENCES users(id)
+	);
+	`
+	_, err = client.db.Exec(refreshTokensTable)
+	if err != nil {
+		return err
+	}
+
+	// Library
+
 	downloadsTable := `
 	CREATE TABLE IF NOT EXISTS downloads (
 		id TEXT PRIMARY KEY,
@@ -42,7 +77,7 @@ func (client *Client) handleMigration() error {
 		created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 	);	
 	`
-	_, err := client.db.Exec(downloadsTable)
+	_, err = client.db.Exec(downloadsTable)
 	if err != nil {
 		return err
 	}

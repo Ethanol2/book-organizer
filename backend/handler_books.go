@@ -1,6 +1,7 @@
 package main
 
 import (
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -20,7 +21,11 @@ func (cfg *apiConfig) handlerGetBook(id uuid.UUID, w http.ResponseWriter, r *htt
 
 	book, err := cfg.db.GetBook(id)
 	if err != nil {
-		respondWithError(w, http.StatusInternalServerError, "Database error", err)
+		if err == sql.ErrNoRows {
+			respondWithJson(w, http.StatusNotFound, struct{}{})
+			return
+		}
+		respondWithError(w, http.StatusInternalServerError, DatabaseError, err)
 		return
 	}
 
@@ -44,7 +49,7 @@ func (cfg *apiConfig) handlerGetBooks(w http.ResponseWriter, r *http.Request) {
 	case "full":
 		results, err := cfg.db.GetBooks(r.URL.Query())
 		if err != nil {
-			respondWithError(w, http.StatusInternalServerError, "Database error", err)
+			respondWithError(w, http.StatusInternalServerError, DatabaseError, err)
 			return
 		}
 
@@ -60,7 +65,7 @@ func (cfg *apiConfig) handlerGetBooks(w http.ResponseWriter, r *http.Request) {
 	case "summary":
 		results, err := cfg.db.GetBooksSummary(r.URL.Query())
 		if err != nil {
-			respondWithError(w, http.StatusInternalServerError, "Database error", err)
+			respondWithError(w, http.StatusInternalServerError, DatabaseError, err)
 			return
 		}
 
@@ -90,7 +95,7 @@ func (cfg *apiConfig) handlerPostBook(w http.ResponseWriter, r *http.Request) {
 	var params database.BookParams
 	err := json.NewDecoder(r.Body).Decode(&params)
 	if err != nil {
-		respondWithError(w, http.StatusBadRequest, "Couldn't read body", err)
+		respondWithError(w, http.StatusBadRequest, BodyDecodeError, err)
 		return
 	}
 
@@ -98,7 +103,7 @@ func (cfg *apiConfig) handlerPostBook(w http.ResponseWriter, r *http.Request) {
 	if params.Cover != nil {
 		coverFile, err = fileManagement.DownloadTempFile(*params.Cover)
 		if err != nil {
-			respondWithError(w, http.StatusBadRequest, "Failed to fetch cover from url. Only png and jpg are currently supported", err)
+			respondWithError(w, http.StatusBadRequest, CoverURLError, err)
 			log.Println("Image:", *params.Cover)
 			return
 		}
@@ -131,14 +136,14 @@ func (cfg *apiConfig) handlerPostBook(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 
-		respondWithError(w, http.StatusInternalServerError, "Couldn't add book to db", err)
+		respondWithError(w, http.StatusInternalServerError, DatabaseError, err)
 		return
 	}
 
 	if coverFile != nil {
 		err = fileManagement.MoveFilesWithPaths(coverFile.Name(), path.Join(cfg.metadataPath, book.Id.String()+path.Ext(coverFile.Name())))
 		if err != nil {
-			respondWithError(w, http.StatusInternalServerError, "failed to create cover file", err)
+			respondWithError(w, http.StatusInternalServerError, FileMoveError, err)
 			return
 		}
 	}
@@ -151,7 +156,7 @@ func (cfg *apiConfig) handlerUpdateBook(id uuid.UUID, w http.ResponseWriter, r *
 	var params database.BookParams
 	err := json.NewDecoder(r.Body).Decode(&params)
 	if err != nil {
-		respondWithError(w, http.StatusBadRequest, "Failed to read body", err)
+		respondWithError(w, http.StatusBadRequest, BodyDecodeError, err)
 		return
 	}
 
@@ -176,7 +181,7 @@ func (cfg *apiConfig) handlerUpdateBook(id uuid.UUID, w http.ResponseWriter, r *
 	if params.Cover != nil {
 		newCover, err = fileManagement.DownloadTempFile(*params.Cover)
 		if err != nil {
-			respondWithError(w, http.StatusBadRequest, "Failed to fetch cover from url. Only png and jpg are currently supported", err)
+			respondWithError(w, http.StatusBadRequest, CoverURLError, err)
 			log.Println("Image:", *params.Cover)
 			return
 		}
@@ -186,7 +191,7 @@ func (cfg *apiConfig) handlerUpdateBook(id uuid.UUID, w http.ResponseWriter, r *
 	// Begining db transaction here in case the file moving doesn't work
 	err = cfg.db.Begin()
 	if err != nil {
-		respondWithError(w, http.StatusInternalServerError, "Database start transaction error", err)
+		respondWithError(w, http.StatusInternalServerError, DatabaseError, err)
 		return
 	}
 	defer cfg.db.Rollback()
@@ -195,26 +200,26 @@ func (cfg *apiConfig) handlerUpdateBook(id uuid.UUID, w http.ResponseWriter, r *
 
 	book, needsFileUpdate, err := cfg.db.UpdateBook(id, params)
 	if err != nil {
-		respondWithError(w, http.StatusInternalServerError, "Failed to update database", err)
+		respondWithError(w, http.StatusInternalServerError, DatabaseError, err)
 		return
 	}
 
 	if needsFileUpdate {
 		authorDir, seriesDir, bookDir, err := cfg.db.GetPathComponents(id)
 		if err != nil {
-			respondWithError(w, http.StatusInternalServerError, "Error moving files", err)
+			respondWithError(w, http.StatusInternalServerError, FileMoveError, err)
 			return
 		}
 
 		err = fileManagement.CreateDirectory(path.Join(cfg.libraryPath, authorDir))
 		if err != nil {
-			respondWithError(w, http.StatusInternalServerError, "Error moving files", err)
+			respondWithError(w, http.StatusInternalServerError, FileMoveError, err)
 			return
 		}
 
 		err = fileManagement.CreateDirectory(path.Join(cfg.libraryPath, authorDir, seriesDir))
 		if err != nil {
-			respondWithError(w, http.StatusInternalServerError, "Error moving files", err)
+			respondWithError(w, http.StatusInternalServerError, FileMoveError, err)
 			return
 		}
 
@@ -223,7 +228,7 @@ func (cfg *apiConfig) handlerUpdateBook(id uuid.UUID, w http.ResponseWriter, r *
 		if book.Files.Root != &newPath {
 			err = fileManagement.MoveFilesWithPaths(path.Join(cfg.libraryPath, *oldPath), path.Join(cfg.libraryPath, newPath))
 			if err != nil {
-				respondWithError(w, http.StatusInternalServerError, "Error moving files", err)
+				respondWithError(w, http.StatusInternalServerError, FileMoveError, err)
 				return
 			}
 		}
@@ -242,25 +247,25 @@ func (cfg *apiConfig) handlerUpdateBook(id uuid.UUID, w http.ResponseWriter, r *
 
 		err = fileManagement.DeleteFiles(coverPath)
 		if err != nil {
-			respondWithError(w, http.StatusInternalServerError, "Error removing old cover", err)
+			respondWithError(w, http.StatusInternalServerError, FileDeleteError, err)
 			return
 		}
 
 		err = fileManagement.MoveFilesWithPaths(newCover.Name(), coverPath)
 		if err != nil {
-			respondWithError(w, http.StatusInternalServerError, "Error moving new cover", err)
+			respondWithError(w, http.StatusInternalServerError, FileMoveError, err)
 		}
 	}
 
 	err = cfg.db.Commit()
 	if err != nil {
-		respondWithError(w, http.StatusInternalServerError, "Database commit transaction error", err)
+		respondWithError(w, http.StatusInternalServerError, DatabaseError, err)
 		return
 	}
 
 	book, err = cfg.db.GetBook(id)
 	if err != nil {
-		respondWithError(w, http.StatusInternalServerError, "Failed to retrieve the updated book from the database", err)
+		respondWithError(w, http.StatusInternalServerError, DatabaseError, err)
 		return
 	}
 
@@ -275,7 +280,7 @@ func (cfg *apiConfig) handlerUpdateBook(id uuid.UUID, w http.ResponseWriter, r *
 func (cfg *apiConfig) handlerDeleteBook(id uuid.UUID, w http.ResponseWriter, r *http.Request) {
 
 	if exists, err := cfg.db.CheckBookExistsID(id); err != nil {
-		respondWithError(w, http.StatusInternalServerError, "Something went wrong while querying the database", err)
+		respondWithError(w, http.StatusInternalServerError, DatabaseError, err)
 		return
 	} else if !exists {
 		w.WriteHeader(http.StatusNotFound)
@@ -286,13 +291,13 @@ func (cfg *apiConfig) handlerDeleteBook(id uuid.UUID, w http.ResponseWriter, r *
 		log.Println("Deleting files for \"", id, "\"")
 		dir, err := cfg.db.GetBookDirectory(id)
 		if err != nil {
-			respondWithError(w, http.StatusInternalServerError, "Couldn't delete book files", err)
+			respondWithError(w, http.StatusInternalServerError, FileDeleteError, err)
 			return
 		}
 		if dir != nil {
 			err = fileManagement.DeleteFiles(path.Join(cfg.libraryPath, *dir))
 			if err != nil {
-				respondWithError(w, http.StatusInternalServerError, "Couldn't delete book files", err)
+				respondWithError(w, http.StatusInternalServerError, FileDeleteError, err)
 				return
 			}
 		}
@@ -309,7 +314,7 @@ func (cfg *apiConfig) handlerDeleteBook(id uuid.UUID, w http.ResponseWriter, r *
 
 		err = cfg.db.DeleteBook(id)
 		if err != nil {
-			respondWithError(w, http.StatusInternalServerError, "Failed to delete book from the database", err)
+			respondWithError(w, http.StatusInternalServerError, FileDeleteError, err)
 			return
 		}
 	}
@@ -525,7 +530,7 @@ func (cfg *apiConfig) handlerGetScanLibrary(w http.ResponseWriter, r *http.Reque
 
 	// Get existing library to prevent duplicates
 	if ids, knownDirsList, err := cfg.db.GetAllBooksDirectories(); err != nil {
-		respondWithError(w, http.StatusInternalServerError, "Something went wrong while preparing for the scan", err)
+		respondWithError(w, http.StatusInternalServerError, DatabaseError, err)
 		return
 	} else {
 		// Format known directories to be handled by the scan function
@@ -574,7 +579,7 @@ func (cfg *apiConfig) handlerGetScanLibrary(w http.ResponseWriter, r *http.Reque
 
 				err := updateExistingBook(id, params, files)
 				if err != nil {
-					respondWithError(w, http.StatusInternalServerError, "Error adding books to the database", err)
+					respondWithError(w, http.StatusInternalServerError, DatabaseError, err)
 					return
 				}
 				continue
@@ -585,14 +590,14 @@ func (cfg *apiConfig) handlerGetScanLibrary(w http.ResponseWriter, r *http.Reque
 		log.Println("Adding \"", *params.Title, "\" to the database")
 		book, err := cfg.db.AddBook(params)
 		if err != nil {
-			respondWithError(w, http.StatusInternalServerError, "Error adding books to the database", err)
+			respondWithError(w, http.StatusInternalServerError, DatabaseError, err)
 			return
 		}
 
 		// Add the book files to the book
 		err = applyBookFiles(book, files)
 		if err != nil {
-			respondWithError(w, http.StatusInternalServerError, "Error adding books to the database", err)
+			respondWithError(w, http.StatusInternalServerError, DatabaseError, err)
 			return
 		}
 	}
@@ -602,7 +607,7 @@ func (cfg *apiConfig) handlerGetScanLibrary(w http.ResponseWriter, r *http.Reque
 	// Return the book summaries using the search params
 	results, err := cfg.db.GetBooksSummary(r.URL.Query())
 	if err != nil {
-		respondWithError(w, http.StatusInternalServerError, "Error retrieving book summaries after scan", err)
+		respondWithError(w, http.StatusInternalServerError, DatabaseError, err)
 		return
 	}
 
@@ -617,7 +622,7 @@ func (cfg *apiConfig) handlerGetScanLibrary(w http.ResponseWriter, r *http.Reque
 
 	// Send response
 	respondWithJson(w, http.StatusOK, struct {
-		Results database.BookSearchResults[[]database.BookOverview] `json:"results"`
-		Errors  []string                                            `json:"errors"`
-	}{Results: results, Errors: scanErrors})
+		database.BookSearchResults[[]database.BookOverview] `json:"results"`
+		Errors                                              []string `json:"errors"`
+	}{BookSearchResults: results, Errors: scanErrors})
 }

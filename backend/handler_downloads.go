@@ -20,7 +20,7 @@ func (cfg *apiConfig) handlerGetDownloads(w http.ResponseWriter, r *http.Request
 	log.Println("Fetching downloads")
 	downloads, err := cfg.db.GetDownloads()
 	if err != nil {
-		respondWithError(w, http.StatusInternalServerError, "something went wrong retrieving downloads", err)
+		respondWithError(w, http.StatusInternalServerError, DatabaseError, err)
 		return
 	}
 
@@ -35,7 +35,11 @@ func (cfg *apiConfig) handlerGetDownload(id uuid.UUID, w http.ResponseWriter, r 
 
 	download, err := cfg.db.GetDownload(id)
 	if err != nil {
-		respondWithError(w, http.StatusInternalServerError, "Couldn't get download", err)
+		if err == sql.ErrNoRows {
+			respondWithError(w, http.StatusNotFound, NotFoundError, err)
+			return
+		}
+		respondWithError(w, http.StatusInternalServerError, DatabaseError, err)
 		return
 	}
 
@@ -49,10 +53,10 @@ func (cfg *apiConfig) handlerAssociateDownloadToBook(downloadId uuid.UUID, w htt
 	downloadDir, err := cfg.db.GetDownloadDir(downloadId)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			respondWithError(w, http.StatusBadRequest, "Download not found", err)
+			respondWithError(w, http.StatusBadRequest, "Download "+NotFoundError, err)
 			return
 		}
-		respondWithError(w, http.StatusInternalServerError, "Database error", err)
+		respondWithError(w, http.StatusInternalServerError, DatabaseError, err)
 		return
 	}
 
@@ -62,23 +66,23 @@ func (cfg *apiConfig) handlerAssociateDownloadToBook(downloadId uuid.UUID, w htt
 	}
 	err = json.NewDecoder(r.Body).Decode(&bookIdStruct)
 	if err != nil {
-		respondWithError(w, http.StatusBadRequest, "Couldn't read body", err)
+		respondWithError(w, http.StatusBadRequest, BodyDecodeError, err)
 		return
 	}
 
 	bookExists, err := cfg.db.CheckBookExistsID(bookIdStruct.BookId)
 	if err != nil {
-		respondWithError(w, http.StatusInternalServerError, "Database error", err)
+		respondWithError(w, http.StatusInternalServerError, DatabaseError, err)
 		return
 	}
 	if !bookExists {
-		respondWithError(w, http.StatusBadRequest, "Book not found", err)
+		respondWithError(w, http.StatusNotFound, "Book "+NotFoundError, err)
 		return
 	}
 
 	authorDir, seriesDir, bookDir, err := cfg.db.GetPathComponents(bookIdStruct.BookId)
 	if err != nil {
-		respondWithError(w, http.StatusInternalServerError, "Database error", err)
+		respondWithError(w, http.StatusInternalServerError, DatabaseError, err)
 		return
 	}
 
@@ -88,7 +92,7 @@ func (cfg *apiConfig) handlerAssociateDownloadToBook(downloadId uuid.UUID, w htt
 			respondWithError(w, http.StatusConflict, "The library already has files at the book's location", err)
 			return
 		}
-		respondWithError(w, http.StatusInternalServerError, "Something went wrong moving files", err)
+		respondWithError(w, http.StatusInternalServerError, FileMoveError, err)
 		return
 	}
 
@@ -163,11 +167,11 @@ func (cfg *apiConfig) handlerAssociateDownloadToBook(downloadId uuid.UUID, w htt
 func (cfg *apiConfig) handlerGetDownloadCover(id uuid.UUID, w http.ResponseWriter, r *http.Request) {
 	download, err := cfg.db.GetDownload(id)
 	if err != nil {
-		respondWithError(w, http.StatusInternalServerError, "Database error", err)
+		respondWithError(w, http.StatusInternalServerError, DatabaseError, err)
 		return
 	}
 	if download == nil {
-		respondWithError(w, http.StatusBadRequest, "Download not found", err)
+		respondWithError(w, http.StatusBadRequest, NotFoundError, err)
 		return
 	}
 
