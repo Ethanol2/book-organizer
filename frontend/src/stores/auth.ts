@@ -105,6 +105,7 @@ export const useAuthStore = defineStore('auth', {
                 await api.post('/api/auth/logout')
                 this.user = null;
                 useNotificationsStore().notifySuccess('Logged out successfully!')
+                window.location.reload();
             }
             catch (err) {
                 console.error('Error logging out:', err);

@@ -26,6 +26,7 @@ api.interceptors.response.use(
         return api(originalRequest);
       } catch (refreshError) {
         // Refresh failed (token truly expired/invalid)
+        window.location.reload();
         return Promise.reject(refreshError);
       }
     }

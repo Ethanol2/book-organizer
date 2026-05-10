@@ -231,8 +231,32 @@ func (c Client) GetRefreshToken(token string) (RefreshTokenInfo, error) {
 	return info, nil
 }
 
-func (c Client) DeleteRefreshToken(token string) error {
+func (c Client) RevokeRefreshToken(token string) error {
+	indyTx := c.tx == nil
+	if indyTx {
+		err := c.Begin()
+		if err != nil {
+			return err
+		}
+		defer c.Rollback()
+	}
 
+	_, err := c.tx.Exec("UPDATE request_tokens SET revoked_at = ? WHERE token = ?", time.Now().UTC(), token)
+	if err != nil {
+		return err
+	}
+
+	if indyTx {
+		err = c.Commit()
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (c Client) DeleteRefreshToken(token string) error {
 	indyTx := c.tx == nil
 	if indyTx {
 		err := c.Begin()
@@ -268,18 +292,19 @@ func (c Client) CullRefreshTokens(cutoff time.Time) error {
 		defer c.Rollback()
 	}
 
-	rows, err := c.tx.Query("SELECT token, expires_at FROM refresh_tokens")
+	rows, err := c.tx.Query("SELECT token, expires_at, revoked_at FROM refresh_tokens")
 	if err != nil {
 		return err
 	}
 
 	var id string
 	var expiry time.Time
+	var revokation time.Time
 	toRemove := []string{}
 	for rows.Next() {
-		err = rows.Scan(&id, &expiry)
+		err = rows.Scan(&id, &expiry, &revokation)
 
-		if expiry.Before(cutoff) {
+		if expiry.Before(cutoff) || revokation.Before(cutoff) {
 			toRemove = append(toRemove, "'"+id+"'")
 		}
 	}

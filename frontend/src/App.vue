@@ -27,7 +27,7 @@ const authStore = useAuthStore();
       <div v-if="menuOpen" class="backdrop" @click="menuOpen = false"></div>
       <aside class="sidebar" :class="{ open: menuOpen }">
         <nav>
-          <template class="login" v-if="!authStore.isAuthenticated">
+          <template v-if="!authStore.isAuthenticated">
             <RouterLink to="/login" @click="menuOpen = false">Login</RouterLink>
           </template>
           <template v-else>
@@ -35,6 +35,7 @@ const authStore = useAuthStore();
             <RouterLink to="/add-book" @click="menuOpen = false">Add Book</RouterLink>
             <RouterLink to="/downloads" @click="menuOpen = false">Downloads</RouterLink>
             <RouterLink to="/settings" @click="menuOpen = false">Settings</RouterLink>
+            <span v-if="authStore.isAuthenticated && authStore.needsAuth" class="logout-button" @click="authStore.logout">Logout</span>
           </template>
           <RouterLink to="/about" @click="menuOpen = false">About</RouterLink>
         </nav>
@@ -107,10 +108,6 @@ const authStore = useAuthStore();
   box-shadow: 5px 5px 5px rgba(0, 0, 0, 0.4);
 }
 
-.sidebar.login {
-  padding-bottom: 2rem;
-}
-
 .content {
   padding: 1.5rem;
   overflow-y: auto;
@@ -134,11 +131,20 @@ nav {
 nav a {
   padding: 1rem 0;
   text-decoration: none;
-  color: var(--color-text)
+  color: var(--color-text);
 }
 
 nav a.router-link-exact-active {
   font-weight: 600;
+}
+
+.logout-button {
+  margin-top: 1rem;
+  cursor: pointer;
+}
+
+.logout-button:hover {
+    background-color: var(--vt-c-nav-hover-bg);
 }
 
 .backdrop {

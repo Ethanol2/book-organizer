@@ -85,3 +85,22 @@ func addRefreshCookie(w http.ResponseWriter, refreshToken string, expirationTime
 	})
 
 }
+
+func clearAuthCookies(w http.ResponseWriter) {
+	http.SetCookie(w, &http.Cookie{
+		Name:     "access_token",
+		Path:     "/",
+		HttpOnly: true,
+		Secure:   SecureCookies,
+		SameSite: http.SameSiteLaxMode,
+		MaxAge:   -1,
+	})
+	http.SetCookie(w, &http.Cookie{
+		Name:     "refresh_token",
+		Path:     "/api/auth/refresh",
+		HttpOnly: true,
+		Secure:   SecureCookies,
+		SameSite: http.SameSiteLaxMode,
+		MaxAge:   -1,
+	})
+}

@@ -51,7 +51,7 @@ func (cfg *apiConfig) handlerGetAuthStatus(w http.ResponseWriter, r *http.Reques
 	}
 
 	var user *database.User
-	if id, err := authorize(true, r, cfg.tokenSecret); err == nil {
+	if id, err := authenticate(true, r, cfg.tokenSecret); err == nil {
 		usr, err := cfg.db.GetUser(id)
 		if err != nil {
 			respondWithError(w, http.StatusInternalServerError, DatabaseError, err)
@@ -83,7 +83,7 @@ func (cfg *apiConfig) handlerRegister(w http.ResponseWriter, r *http.Request) {
 
 	// If there aren't any users, assume the first user is the admin
 	if count > 0 {
-		_, err := authorize(true, r, cfg.tokenSecret)
+		_, err := authenticate(true, r, cfg.tokenSecret)
 		if err != nil {
 			respondWithError(w, http.StatusUnauthorized, AuthBadAuthorization, err)
 			return
@@ -174,6 +174,21 @@ func (cfg *apiConfig) handlerLogin(w http.ResponseWriter, r *http.Request) {
 
 	user.Password = ""
 	respondWithJson(w, http.StatusOK, user)
+}
+
+func (cfg *apiConfig) handlerLogout(w http.ResponseWriter, r *http.Request) {
+
+	if refresh, err := r.Cookie("refresh_token"); err == nil {
+		err = cfg.db.RevokeRefreshToken(refresh.Value)
+		if err != nil {
+			clearAuthCookies(w)
+			respondWithError(w, http.StatusInternalServerError, DatabaseError, err)
+			return
+		}
+	}
+
+	clearAuthCookies(w)
+	w.WriteHeader(http.StatusOK)
 }
 
 func (cfg *apiConfig) handlerRefresh(w http.ResponseWriter, r *http.Request) {

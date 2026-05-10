@@ -81,6 +81,7 @@ func main() {
 	// Auth Endpoints
 	mux.HandleFunc("GET /api/auth/status", cfg.handlerGetAuthStatus)
 	mux.HandleFunc("POST /api/auth/login", cfg.handlerLogin)
+	mux.HandleFunc("POST /api/auth/logout", cfg.handlerLogout)
 	mux.HandleFunc("POST /api/auth/register", cfg.handlerRegister)
 	mux.HandleFunc("DELETE /api/auth/users/{id}", cfg.uuidMiddleware(cfg.handlerDeleteUser))
 	mux.HandleFunc("PUT /api/auth/users/{id}/reset-password", cfg.uuidMiddleware(cfg.handlerUpdatePassword))
@@ -596,7 +597,7 @@ func (cfg *apiConfig) refreshTokenCulling(frequency time.Duration) {
 
 // #region Utility
 
-func authorize(required bool, r *http.Request, secret string) (uuid.UUID, error) {
+func authenticate(required bool, r *http.Request, secret string) (uuid.UUID, error) {
 
 	if !required {
 		return uuid.Nil, nil
@@ -627,7 +628,7 @@ func (cfg *apiConfig) uuidMiddleware(handler func(uuid.UUID, http.ResponseWriter
 			return
 		}
 
-		_, err = authorize(cfg.authRequired, r, cfg.tokenSecret)
+		_, err = authenticate(cfg.authRequired, r, cfg.tokenSecret)
 		if err != nil {
 			respondWithError(w, http.StatusUnauthorized, AuthBadAuthorization, err)
 			return
@@ -642,7 +643,7 @@ func (cfg *apiConfig) authMiddleware(handler func(http.ResponseWriter, *http.Req
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		_, err := authorize(cfg.authRequired, r, cfg.tokenSecret)
+		_, err := authenticate(cfg.authRequired, r, cfg.tokenSecret)
 		if err != nil {
 			respondWithError(w, http.StatusUnauthorized, AuthBadAuthorization, err)
 			return
