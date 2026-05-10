@@ -38,29 +38,32 @@ const router = createRouter({
       path: '/books/:id',
       name: 'book-details',
       component: () => import('../views/BookDetailsView.vue'),
+    },
+    {
+      path: '/settings',
+      name: 'settings',
+      component: () => import('../views/SettingsView.vue'),
     }
   ],
 });
 
-router.beforeEach( async(to, from, next) => {
+router.beforeEach( async(to, from) => {
   const authStore = useAuthStore();
 
   if (!authStore.initialized) {
     await authStore.checkCurrentStatus();
   }
 
-  if (authStore.needsAuth && !!authStore.user) {
-
+  if (!authStore.isAuthenticated) {
+    if (to.name !== 'login' && to.name !== 'about') {
+      return { name: 'login' };
+    }
+  }
+  else if (to.name === 'login') {
+    return { name: 'home' };
   }
 
-
-  if (to.name === 'login' && authStore.isAuthenticated) {
-    next({ name: 'home' });
-  } else if (to.name !== 'login' && !authStore.isAuthenticated) {
-    next({ name: 'login' });
-  } else {
-    next();
-  }
+  return true;
 });
 
 export default router

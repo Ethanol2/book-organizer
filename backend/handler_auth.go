@@ -3,14 +3,31 @@ package main
 import (
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"log"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/Ethanol2/book-organizer/internal/auth"
 	"github.com/Ethanol2/book-organizer/internal/database"
 	"github.com/google/uuid"
 )
+
+func (cfg *apiConfig) createRefreshToken(userId uuid.UUID) (string, int, error) {
+	refresh := auth.MakeRefreshToken()
+	// Lifetime is 60 days
+	refreshLifetime := time.Now().UTC().Add(time.Hour * 24 * 60)
+	_, err := cfg.db.AddRefreshToken(
+		userId,
+		refresh,
+		refreshLifetime,
+	)
+	if err != nil {
+		return "", -1, err
+	}
+	return refresh, int(refreshLifetime.Second()), nil
+}
 
 func (cfg *apiConfig) handlerGetAuthStatus(w http.ResponseWriter, r *http.Request) {
 
@@ -33,18 +50,19 @@ func (cfg *apiConfig) handlerGetAuthStatus(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	user := database.User{}
+	var user *database.User
 	if id, err := authorize(true, r, cfg.tokenSecret); err == nil {
-		user, err = cfg.db.GetUser(id)
+		usr, err := cfg.db.GetUser(id)
 		if err != nil {
 			respondWithError(w, http.StatusInternalServerError, DatabaseError, err)
 			return
 		}
+		user = &usr
 	}
 
 	respondWithJson(w, http.StatusOK, struct {
-		database.User `json:"user,omitempty"`
-		Count         int `json:"user_count"`
+		User  *database.User `json:"user,omitempty"`
+		Count int            `json:"user_count"`
 	}{Count: count, User: user})
 }
 
@@ -71,7 +89,10 @@ func (cfg *apiConfig) handlerRegister(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	} else {
-		log.Println("REGISTERING FIRST USER WITHOUT AUTH. Reset the backend (-r) immediately if unexpected")
+		log.Println("THE FIRST USER HAS BEEN REGISTERED. AUTHENTICATION NOW REQUIRED")
+		log.Println(`If this was not intentional or wasn't caused by you, restart the backend using -u flag. 
+		This will clear all users and remove the need for authentication. Consider using anthentication to 
+		protect your information.`)
 	}
 
 	var params database.UserParams
@@ -81,19 +102,26 @@ func (cfg *apiConfig) handlerRegister(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	params.Username = strings.TrimSpace(params.Username)
+
+	if params.Username == "" {
+		respondWithError(w, http.StatusBadRequest, "Username can't be empty", errors.New("username can't be empty"))
+		return
+	}
+
 	params.Password, err = auth.HashPassword(params.Password)
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, GenericError, err)
 		return
 	}
 
-	user, err := cfg.db.AddUser(params)
+	err = cfg.db.Commit()
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, DatabaseError, err)
 		return
 	}
 
-	err = cfg.db.Commit()
+	user, err := cfg.db.AddUser(params)
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, DatabaseError, err)
 		return
@@ -135,20 +163,14 @@ func (cfg *apiConfig) handlerLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	refresh := auth.MakeRefreshToken()
-	refreshLifetime := time.Now().UTC().Add(time.Hour * 24 * 60)
-	_, err = cfg.db.AddRefreshToken(
-		user.Id,
-		refresh,
-		refreshLifetime,
-	)
+	refresh, refreshLifetime, err := cfg.createRefreshToken(user.Id)
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, DatabaseError, err)
 		return
 	}
 
 	addJWTCookie(w, token)
-	addRefreshCookie(w, refresh, int(time.Until(refreshLifetime).Seconds()))
+	addRefreshCookie(w, refresh, refreshLifetime)
 
 	user.Password = ""
 	respondWithJson(w, http.StatusOK, user)
@@ -191,6 +213,18 @@ func (cfg *apiConfig) handlerRefresh(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	err = cfg.db.DeleteRefreshToken(refresh)
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, DatabaseError, nil)
+		return
+	}
+
+	refresh, refreshLifetime, err := cfg.createRefreshToken(user.Id)
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, DatabaseError, err)
+		return
+	}
+
 	token, err := auth.MakeJWT(user.Id, cfg.tokenSecret, time.Hour)
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, GenericError, err)
@@ -200,6 +234,7 @@ func (cfg *apiConfig) handlerRefresh(w http.ResponseWriter, r *http.Request) {
 	cfg.authRequired = true
 
 	addJWTCookie(w, token)
+	addRefreshCookie(w, refresh, refreshLifetime)
 	w.WriteHeader(http.StatusNoContent)
 }
 

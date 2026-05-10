@@ -56,7 +56,7 @@ func (client *Client) handleMigration() error {
 		user_id TEXT NOT NULL,
 		expires_at DATETIME NOT NULL,
 		revoked_at DATETIME,
-		FOREIGN KEY (user_id) REFERENCES users(id)
+		FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 	);
 	`
 	_, err = client.db.Exec(refreshTokensTable)

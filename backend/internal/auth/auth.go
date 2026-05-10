@@ -85,7 +85,7 @@ func GetBearerToken(r *http.Request) (string, error) {
 }
 
 func MakeRefreshToken() string {
-	bytes := []byte{}
+	bytes := make([]byte, 32)
 	_, err := rand.Read(bytes)
 	if err != nil {
 		return ""

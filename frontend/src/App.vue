@@ -2,8 +2,11 @@
 import { ref } from 'vue'
 import { RouterLink, RouterView } from 'vue-router'
 import Notifications from '@/components/Notifications.vue'
+import { useAuthStore } from './stores/auth';
 
 const menuOpen = ref(false)
+const authStore = useAuthStore();
+
 </script>
 
 <template>
@@ -24,11 +27,16 @@ const menuOpen = ref(false)
       <div v-if="menuOpen" class="backdrop" @click="menuOpen = false"></div>
       <aside class="sidebar" :class="{ open: menuOpen }">
         <nav>
-          <RouterLink to="/" @click="menuOpen = false">Library</RouterLink>
-          <RouterLink to="/add-book" @click="menuOpen = false">Add Book</RouterLink>
-          <RouterLink to="/downloads" @click="menuOpen = false">Downloads</RouterLink>
+          <template class="login" v-if="!authStore.isAuthenticated">
+            <RouterLink to="/login" @click="menuOpen = false">Login</RouterLink>
+          </template>
+          <template v-else>
+            <RouterLink to="/" @click="menuOpen = false">Library</RouterLink>
+            <RouterLink to="/add-book" @click="menuOpen = false">Add Book</RouterLink>
+            <RouterLink to="/downloads" @click="menuOpen = false">Downloads</RouterLink>
+            <RouterLink to="/settings" @click="menuOpen = false">Settings</RouterLink>
+          </template>
           <RouterLink to="/about" @click="menuOpen = false">About</RouterLink>
-          <RouterLink to="/login" @click="menuOpen = false">Login</RouterLink>
         </nav>
       </aside>
 
@@ -97,6 +105,10 @@ const menuOpen = ref(false)
   background-color: var(--vt-c-nav);
   padding: 1rem;
   box-shadow: 5px 5px 5px rgba(0, 0, 0, 0.4);
+}
+
+.sidebar.login {
+  padding-bottom: 2rem;
 }
 
 .content {

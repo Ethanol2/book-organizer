@@ -21,52 +21,6 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 )
 
-const helpMsg string = `
-
-Book Organizer Backend
-An app written by Ethan Colucci for organizing your digital book library.
-
-Project Repo	https://github.com/Ethanol2/book-organizer
-
-My Website:		https://ethanasc.ca
-My GitHub:		https://github.com/Ethanol2
-My LinkedIn:	https://www.linkedin.com/in/ethan-colucci/
-
-[-h, --help]:
-	Displays this message and exits. All other commands run the app.
-
-[-r, --reset]:
-	Deletes the appData.db file, reseting the database, and empties the metadata folder.
-
-[-l, --clear-library]:
-	Clears the contents of the library, defined in the .env as LIBRARY_PATH
-
-[-d, --clear-downloads]:
-	Clears the contents of the downloads, defined in the .env as DOWNLOAD_PATH
-
-[-t, --test-dataset] <l, test-library> <d, test-downloads>:
-	Deletes the appData.db file, reseting the database, empties the metadata folder, 
-	and adds a test dataset defined in ./backend/internal/database/testdata.go
-
-	<l, test-library>:
-		Clears the library and creates a test library structure using the test dataset.
-		Inserts 15 books with random text and audio files. All books will have a cover.
-		Half will have a metadata file.
-	
-	<d, test-downloads>:
-		Clears the downloads and creates a test download structure using the test dataset.
-		Inserts 10 total downloads: 
-			Count | Has Cover | Has Metadata | Audio Files | Text Files
-			-----------------------------------------------------------
-			  1   |    true   |     false    |      1      |     1
-			  1   |    false  |     false    |      1      |     1
-			  1   |    true   |     false    |      10     |     1
-			  1   |    false  |     false    |      1      |     10
-			  3   |    true   |     true     |      5      |     1
-			  3   |    false  |     true     |      1      |     5
-
-`
-
 type apiConfig struct {
 	// System Structs
 	db      database.Client
@@ -98,11 +52,14 @@ type cliFlags struct {
 
 	clearLibrary   bool
 	clearDownloads bool
+
+	usersReset    bool
+	clearSessions bool
 }
 
 func main() {
 
-	flags, err := getFlags()
+	flags, err := getFlags(os.Args[1:])
 	if err != nil {
 		fmt.Println(err)
 		return
@@ -175,6 +132,9 @@ func main() {
 		log.Fatal(err)
 	}
 
+	// Cull refresh tokens once a week
+	cfg.refreshTokenCulling(time.Hour * 168)
+
 	log.Println("File scanning started")
 	log.Println("Starting server")
 
@@ -182,57 +142,114 @@ func main() {
 	log.Fatal(srv.ListenAndServe())
 }
 
-func getFlags() (cliFlags, error) {
+// #region Initialization
+
+func getFlags(args []string) (cliFlags, error) {
+
+	const helpMsg string = `
+
+Book Organizer Backend
+An app written by Ethan Colucci for organizing your digital book library.
+
+Project Repo	https://github.com/Ethanol2/book-organizer
+
+My Website:		https://ethanasc.ca
+My GitHub:		https://github.com/Ethanol2
+My LinkedIn:	https://www.linkedin.com/in/ethan-colucci/
+
+[-h, --help]:
+	Displays this message and exits. All other commands run the app.
+
+[-r, --reset]:
+	Deletes the appData.db file, reseting the database, and empties the metadata folder.
+	This also deletes all users, and disables authentication.
+
+[-ru, --reset-users]:
+	Clears the users table, which also removes any authentication in the app. Use with caution.
+
+[-rs, --reset-sessions]
+	Clears the refresh tokens, effectively logging out every user with an expired session.
+
+[-cl, --clear-library]:
+	Clears the contents of the library, defined in the .env as LIBRARY_PATH.
+
+[-cd, --clear-downloads]:
+	Clears the contents of the downloads, defined in the .env as DOWNLOAD_PATH.
+
+[-t, --test-dataset] <l, test-library> <d, test-downloads>:
+	Does everything reset does and inserts the test dataset (./backend/internal/database/testData.go).
+
+	<l, test-library>:
+		Clears the library and creates a test library structure using the test dataset.
+		Inserts 15 books with random text and audio files. All books will have a cover.
+		Half will have a metadata file.
+	
+	<d, test-downloads>:
+		Clears the downloads and creates a test download structure using the test dataset.
+		Inserts 10 total downloads: 
+			Count | Has Cover | Has Metadata | Audio Files | Text Files
+			-----------------------------------------------------------
+			  1   |    true   |     false    |      1      |     1
+			  1   |    false  |     false    |      1      |     1
+			  1   |    true   |     false    |      10     |     1
+			  1   |    false  |     false    |      1      |     10
+			  3   |    true   |     true     |      5      |     1
+			  3   |    false  |     true     |      1      |     5
+`
 
 	flags := cliFlags{}
-	tArgs := false
 
-	for _, arg := range os.Args[1:] {
+	for i := 0; i < len(args); i++ {
 
-		arg = strings.ToLower(arg)
+		arg := strings.ToLower(args[i])
 
 		if arg == "--help" || arg == "-h" {
 			return cliFlags{}, fmt.Errorf(helpMsg)
 		}
 
-		if tArgs {
-			switch arg {
-			case "l", "test-library":
-				fmt.Println("Test library creation arg (-t l)")
-				flags.libTestData = true
-				continue
-
-			case "d", "test-downloads":
-				fmt.Println("Test downloads creation arg (-t d)")
-				flags.downTestData = true
-				continue
-			}
-		}
-
 		switch arg {
-		case "--reset", "-r":
+		case "-r", "--reset":
 			fmt.Println("Reset flag (-r)")
 			flags.dbReset = true
-			tArgs = false
 
-		case "-l", "--clear-library":
+		case "-cl", "--clear-library":
 			fmt.Println("Clear library flag (-l)")
 			flags.clearLibrary = true
-			tArgs = false
 
-		case "-d", "--clear-downloads":
+		case "-cd", "--clear-downloads":
 			fmt.Println("Clear downloads flag (-d)")
 			flags.clearDownloads = true
-			tArgs = false
 
-		case "--test-dataset", "-t":
+		case "-t", "--test-dataset":
 			fmt.Println("Test Data Insertion flag (Resets db) (-t)")
 			flags.dbReset = true
 			flags.dbTestData = true
-			tArgs = true
+
+			for k := i + 1; k < len(args); k++ {
+				if args[k][0] == '-' {
+					i = k - 1
+					break
+				}
+
+				switch args[k] {
+				case "l", "test-library":
+					flags.libTestData = true
+				case "d", "test-downloads":
+					flags.downTestData = true
+				}
+				i = k
+			}
+
+		case "-ru", "--reset-users":
+			fmt.Println("Reseting users. This removes all authentication from the app! (-u)")
+			flags.usersReset = true
+
+		case "-rs", "--reset-sessions":
+			fmt.Println("Reseting user sessions. (-rs)")
+			flags.clearSessions = true
 
 		default:
-			return cliFlags{}, fmt.Errorf("unknown command. Use -h for a list of commands")
+			return cliFlags{}, fmt.Errorf("unknown command: \"%s\". Use -h for a list of commands", arg)
 		}
 	}
 
@@ -349,6 +366,20 @@ func initConfig(flags cliFlags) (*apiConfig, error) {
 		return nil, err
 	}
 	defer db.Rollback()
+
+	// Reset users, otherwise reset sessions if the flag is enabled. Clearing users resets the sessions as well, by default
+	if flags.usersReset {
+		err = db.RemoveAllUsers()
+		if err != nil {
+			return nil, err
+		}
+	} else if flags.clearSessions {
+		// Clear tokens by culling using a date 61 days in the future
+		err = db.CullRefreshTokens(time.Now().UTC().Add(time.Hour * 24 * 61))
+		if err != nil {
+			return nil, err
+		}
+	}
 
 	// If the admin account has been created the app uses authentication
 	count, err := db.CountUsers()
@@ -540,6 +571,31 @@ func initConfig(flags cliFlags) (*apiConfig, error) {
 	}, nil
 }
 
+// #region Routines
+
+func (cfg *apiConfig) refreshTokenCulling(frequency time.Duration) {
+	go func(ctx context.Context) {
+		for {
+			log.Println("Removing expired refresh tokens...")
+
+			select {
+			case <-ctx.Done():
+				return
+
+			default:
+				err := cfg.db.CullRefreshTokens(time.Now().UTC())
+				if err != nil {
+					log.Println(err)
+				}
+			}
+
+			time.Sleep(frequency)
+		}
+	}(context.Background())
+}
+
+// #region Utility
+
 func authorize(required bool, r *http.Request, secret string) (uuid.UUID, error) {
 
 	if !required {
@@ -557,6 +613,8 @@ func authorize(required bool, r *http.Request, secret string) (uuid.UUID, error)
 	}
 	return id, nil
 }
+
+// #region Middleware
 
 func (cfg *apiConfig) uuidMiddleware(handler func(uuid.UUID, http.ResponseWriter, *http.Request)) func(http.ResponseWriter, *http.Request) {
 

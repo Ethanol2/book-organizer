@@ -17,13 +17,14 @@ async function login() {
   }
 
   try {
-    await authStore.login({
+    const ok = await authStore.login({
       username: username.value,
       password: password.value,
     });
 
-    if (authStore.user) {
+    if (ok) {
       router.push('/');
+      window.location.reload();
     }
   } catch (error) {
     console.error('Error logging in:', error);

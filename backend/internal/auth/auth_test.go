@@ -2,6 +2,7 @@ package auth
 
 import (
 	"net/http"
+	"strings"
 	"testing"
 	"time"
 
@@ -194,4 +195,23 @@ func TestBearerToken(t *testing.T) {
 			}
 		})
 	}
+}
+
+// This one as well
+func TestRefreshToken(t *testing.T) {
+
+	var firstToken string
+	t.Run("Generation Test", func(t *testing.T) {
+		firstToken = MakeRefreshToken()
+		if len(strings.TrimSpace(firstToken)) == 0 {
+			t.Error("Nothing was generated")
+		}
+	})
+
+	t.Run("Deplicate Test", func(t *testing.T) {
+		secondToken := MakeRefreshToken()
+		if firstToken == secondToken {
+			t.Error("Generated duplicates")
+		}
+	})
 }
