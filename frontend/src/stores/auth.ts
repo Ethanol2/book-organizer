@@ -112,20 +112,50 @@ export const useAuthStore = defineStore('auth', {
                 useNotificationsStore().notifyError("Something went wrong with the authentication server")
             }
         },
-        async changePassword(password: string) {
+        async changePassword(oldPassword: string, newPassword: string) {
 
             if (this.user === null) {
                 return;
             }
 
             try {
-                await api.post('/api/auth/users/' + this.user.id + '/reset-password', {
-                    password: password
+                await api.put('/api/auth/users/' + this.user.id + '/reset-password', {
+                    old_password: oldPassword,
+                    new_password: newPassword
                 });
+
+                useNotificationsStore().notifySuccess('Password changed successfully!');
             }
             catch (err) {
+
+                if (!isAxiosError(err)) {
+                    console.error('Error logging in:', err);
+                    useNotificationsStore().notifyError("Something went wrong with the authentication server");
+                    return false;
+                }
+
+                if (err.response) {
+                    if (err.response.status === 400) {
+                        useNotificationsStore().notifyError(err.response.data.error);
+                        return;
+                    }
+                }
+
                 console.error('Error changing password:', err);
                 useNotificationsStore().notifyError("Something went wrong with the authentication server")
+            }
+        },
+        async deleteUser() {
+            if (this.user === null) {
+                return;
+            }
+            try {
+                await api.delete('/api/auth/users/' + this.user.id);
+                useNotificationsStore().notifySuccess('User deleted successfully!');
+            }
+            catch (err) {
+                console.error('Error deleting user:', err);
+                useNotificationsStore().notifyError("Something went wrong with the authentication server");
             }
         }
     }

@@ -186,7 +186,7 @@ watch(
         </div>
 
         <div v-if="props.params && props.isEditMode" class="modal-delete-wrap">
-          <button type="button" class="delete-book-button" @click="handleDeleteClick">{{ deleteBookText }}</button>
+          <button type="button" class="delete-button" @click="handleDeleteClick">{{ deleteBookText }}</button>
 
           <div v-if="showDeleteConfirm" class="delete-confirmation">
             <div class="delete-confirmation-row">
@@ -278,7 +278,7 @@ watch(
   padding-top: 1rem;
 }
 
-.delete-book-button {
+.delete-button {
   padding: 0.5rem 1rem;
   border: 1px solid var(--color-error-border);
   border-radius: 4px;
@@ -289,7 +289,7 @@ watch(
   transition: background-color 0.2s;
 }
 
-.delete-book-button:hover {
+.delete-button:hover {
   background: var(--color-error-background-dark);
 }
 
@@ -328,31 +328,6 @@ watch(
   width: auto;
   margin: 0;
   flex-shrink: 0;
-}
-
-.delete-book-button,
-.confirm-delete-button {
-  padding: 0.5rem 1rem;
-  border-radius: 4px;
-  color: white;
-  cursor: pointer;
-  font-size: 0.95rem;
-  transition: background-color 0.2s;
-}
-
-.delete-book-button {
-  border: 1px solid #d43f3a;
-  background: #d9534f;
-}
-
-.delete-book-button:hover,
-.confirm-delete-button:hover {
-  background: #c9302c;
-}
-
-.confirm-delete-button {
-  border: 1px solid #d43f3a;
-  background: #d9534f;
 }
 
 .cover img{

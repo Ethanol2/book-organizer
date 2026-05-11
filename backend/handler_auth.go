@@ -277,20 +277,37 @@ func (cfg *apiConfig) handlerDeleteUser(id uuid.UUID, w http.ResponseWriter, r *
 
 func (cfg *apiConfig) handlerUpdatePassword(id uuid.UUID, w http.ResponseWriter, r *http.Request) {
 
-	var params database.UserParams
+	var params struct {
+		OldPassword string `json:"old_password"`
+		NewPassword string `json:"new_password"`
+	}
 	err := json.NewDecoder(r.Body).Decode(&params)
 	if err != nil {
 		respondWithError(w, http.StatusBadRequest, BodyDecodeError, err)
 		return
 	}
 
-	hash, err := auth.HashPassword(params.Password)
+	user, err := cfg.db.GetUser(id)
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, DatabaseError, err)
+		return
+	}
+
+	if ok, err := auth.CheckPassword(params.OldPassword, user.Password); err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Authentication error", err)
+		return
+	} else if !ok {
+		respondWithError(w, http.StatusBadRequest, "Old password doesn't match", nil)
+		return
+	}
+
+	hash, err := auth.HashPassword(params.NewPassword)
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, GenericError, err)
 		return
 	}
 
-	user, err := cfg.db.UpdatePassword(id, hash)
+	user, err = cfg.db.UpdatePassword(id, hash)
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, DatabaseError, err)
 		return

@@ -125,6 +125,31 @@
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
 }
 
+.delete-button,
+.confirm-delete-button {
+  padding: 0.5rem 1rem;
+  border-radius: 4px;
+  color: white;
+  cursor: pointer;
+  font-size: 0.95rem;
+  transition: background-color 0.2s;
+}
+
+.delete-button {
+  border: 1px solid #d43f3a;
+  background: #d9534f;
+}
+
+.delete-button:hover,
+.confirm-delete-button:hover {
+  background: #c9302c;
+}
+
+.confirm-delete-button {
+  border: 1px solid #d43f3a;
+  background: #d9534f;
+}
+
 @media (max-width: 900px) {
   .search-row {
     grid-template-columns: 1fr;
