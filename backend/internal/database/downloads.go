@@ -19,17 +19,8 @@ type Download struct {
 
 //#region Setters
 
-func (c Client) AddDownload(tx *sql.Tx, files fileManagement.Files) error {
+func (c *Client) AddDownload(files fileManagement.Files) error {
 	var err error
-
-	indyTx := tx == nil
-	if indyTx {
-		tx, err = c.db.Begin()
-		if err != nil {
-			return err
-		}
-		defer tx.Rollback()
-	}
 
 	id := uuid.New()
 
@@ -44,16 +35,9 @@ func (c Client) AddDownload(tx *sql.Tx, files fileManagement.Files) error {
 	VALUES
 		(?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
 	`
-	_, err = tx.Exec(query, id, files.Root, audio, text, files.Cover, files.HasMetadata)
+	_, err = c.handler.Exec(query, id, files.Root, audio, text, files.Cover, files.HasMetadata)
 	if err != nil {
 		return err
-	}
-
-	if indyTx {
-		err = tx.Commit()
-		if err != nil {
-			return err
-		}
 	}
 
 	log.Println("Added \"", *files.Root, "\" to downloads")
@@ -61,107 +45,71 @@ func (c Client) AddDownload(tx *sql.Tx, files fileManagement.Files) error {
 	return nil
 }
 
-func (c Client) AddDownloads(downloads []fileManagement.Files) error {
+// Handles the transaction internallly
+func (c *Client) AddDownloads(downloads []fileManagement.Files) error {
 
-	tx, err := c.db.Begin()
-	if err != nil {
-		return err
-	}
-
-	for name := range downloads {
-		err = c.AddDownload(tx, downloads[name])
-		if err != nil {
-			return err
+	return c.HandleTransaction(func(c *Client) error {
+		for name := range downloads {
+			err := c.AddDownload(downloads[name])
+			if err != nil {
+				return err
+			}
 		}
-	}
-
-	tx.Commit()
-
-	return nil
+		return nil
+	})
 }
 
-func (c Client) UpdateDownloadFiles(id uuid.UUID, files fileManagement.Files) error {
-	var err error
-	indyTx := c.tx == nil
-	if indyTx {
-		err = c.Begin()
+// Handles the transaction internally
+func (c *Client) UpdateDownloadFiles(id uuid.UUID, files fileManagement.Files) error {
+
+	return c.HandleTransaction(func(c *Client) error {
+		audio, text, err := files.FileListsToJson()
 		if err != nil {
 			return err
 		}
-		defer c.Rollback()
-	}
 
-	audio, text, err := files.FileListsToJson()
-	if err != nil {
-		return err
-	}
-
-	query := `
+		query := `
 		UPDATE downloads
 		SET
-			audio_files = ?,
-			text_files = ?,
+		audio_files = ?,
+		text_files = ?,
 			cover = ?
-		WHERE id = ?
-	`
-	_, err = c.tx.Exec(query, audio, text, files.Cover, id)
-	if err != nil {
-		return err
-	}
-
-	if indyTx {
-		err = c.Commit()
+			WHERE id = ?
+			`
+		_, err = c.handler.Exec(query, audio, text, files.Cover, id)
 		if err != nil {
 			return err
 		}
-	}
 
-	return nil
+		return nil
+	})
+
 }
 
-func (c Client) UpdateDownloadsFiles(files map[uuid.UUID]fileManagement.Files) error {
+// Handles the transaction internally
+func (c *Client) DeleteDownload(id uuid.UUID) error {
 
-	tx, err := c.db.Begin()
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback()
-
-	for id := range files {
-		err = c.UpdateDownloadFiles(id, files[id])
+	return c.HandleTransaction(func(c *Client) error {
+		_, err := c.handler.Exec("DELETE FROM downloads WHERE id = ?", id)
 		if err != nil {
 			return err
 		}
-	}
-
-	err = tx.Commit()
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func (c Client) DeleteDownload(id uuid.UUID) error {
-	_, err := c.db.Exec("DELETE FROM downloads WHERE id = ?", id)
-	if err != nil {
-		return err
-	}
-	return nil
+		return nil
+	})
 }
 
 //#region Getters
 
-func (c Client) GetDownload(id uuid.UUID) (*Download, error) {
+func (c *Client) GetDownload(id uuid.UUID) (*Download, error) {
 
 	query := `
-		SELECT * FROM downloads WHERE id = ?;	
+	SELECT * FROM downloads WHERE id = ?;	
 	`
 
 	return c.getDownloadWithQuery(query, id.String())
 }
 
-func (c Client) GetDownloadByDirectory(dir string) (*Download, error) {
+func (c *Client) GetDownloadByDirectory(dir string) (*Download, error) {
 
 	query := `
 		SELECT * FROM downloads WHERE dir_name = ?;	
@@ -171,45 +119,51 @@ func (c Client) GetDownloadByDirectory(dir string) (*Download, error) {
 
 }
 
-func (c Client) GetAllDownloadsIdsAndDirs() ([]uuid.UUID, []string, error) {
-
-	query := `
-		SELECT id, dir_name FROM downloads
-	`
-
-	rows, err := c.db.Query(query)
-	if err != nil {
-		return []uuid.UUID{}, []string{}, err
-	}
-	defer rows.Close()
+// Handles the transaction internally
+func (c *Client) GetAllDownloadsIdsAndDirs() ([]uuid.UUID, []string, error) {
 
 	var ids []uuid.UUID
 	var dirs []string
+	err := c.HandleTransaction(func(c *Client) error {
+		query := `
+		SELECT id, dir_name FROM downloads
+	`
 
-	for rows.Next() {
-		var idStr string
-		var dir string
-
-		if err := rows.Scan(&idStr, &dir); err != nil {
-			return []uuid.UUID{}, []string{}, err
-		}
-
-		id, err := uuid.Parse(idStr)
+		rows, err := c.handler.Query(query)
 		if err != nil {
-			log.Println(err)
-			continue
+			return err
 		}
+		defer rows.Close()
 
-		ids = append(ids, id)
-		dirs = append(dirs, dir)
+		for rows.Next() {
+			var idStr string
+			var dir string
+
+			if err := rows.Scan(&idStr, &dir); err != nil {
+				return err
+			}
+
+			id, err := uuid.Parse(idStr)
+			if err != nil {
+				log.Println(err)
+				continue
+			}
+
+			ids = append(ids, id)
+			dirs = append(dirs, dir)
+		}
+		return nil
+	})
+	if err != nil {
+		return []uuid.UUID{}, []string{}, err
 	}
 
 	return ids, dirs, nil
 }
 
-func (c Client) GetDownloads() ([]Download, error) {
+func (c *Client) GetDownloads() ([]Download, error) {
 
-	rows, err := c.db.Query("SELECT * FROM downloads")
+	rows, err := c.handler.Query("SELECT * FROM downloads")
 	if err != nil {
 		return []Download{}, err
 	}
@@ -251,9 +205,9 @@ func (c Client) GetDownloads() ([]Download, error) {
 	return downloads, nil
 }
 
-func (c Client) GetDownloadDir(id uuid.UUID) (string, error) {
+func (c *Client) GetDownloadDir(id uuid.UUID) (string, error) {
 	var dir string
-	err := c.db.QueryRow("SELECT dir_name FROM downloads WHERE id = ?", id).Scan(&dir)
+	err := c.handler.QueryRow("SELECT dir_name FROM downloads WHERE id = ?", id).Scan(&dir)
 	if err != nil {
 		return "", err
 	}
@@ -263,14 +217,14 @@ func (c Client) GetDownloadDir(id uuid.UUID) (string, error) {
 
 //#region Helpers
 
-func (c Client) getDownloadWithQuery(query string, args ...any) (*Download, error) {
+func (c *Client) getDownloadWithQuery(query string, args ...any) (*Download, error) {
 
 	var download Download
 	var idStr string
 	var audioJson string
 	var textJson string
 
-	err := c.db.QueryRow(query, args...).Scan(&idStr, &download.Files.Root, &audioJson, &textJson, &download.Files.Cover, &download.Files.HasMetadata, &download.CreatedAt)
+	err := c.handler.QueryRow(query, args...).Scan(&idStr, &download.Files.Root, &audioJson, &textJson, &download.Files.Cover, &download.Files.HasMetadata, &download.CreatedAt)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, nil
@@ -295,4 +249,13 @@ func (c Client) getDownloadWithQuery(query string, args ...any) (*Download, erro
 
 	return &download, err
 
+}
+
+func (c *Client) RemoveAllDownloads() error {
+
+	_, err := c.handler.Exec("DELETE FROM downloads")
+	if err != nil {
+		return err
+	}
+	return nil
 }

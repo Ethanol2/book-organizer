@@ -73,17 +73,17 @@ type BookParams struct {
 	Key   *string `json:"key"`
 }
 
-func (c Client) CheckBookExistsID(id uuid.UUID) (bool, error) {
+func (c *Client) CheckBookExistsID(id uuid.UUID) (bool, error) {
 	var exists bool
-	err := c.db.QueryRow("SELECT EXISTS(SELECT 1 FROM books WHERE id = ?)", id).Scan(&exists)
+	err := c.handler.QueryRow("SELECT EXISTS(SELECT 1 FROM books WHERE id = ?)", id).Scan(&exists)
 	if err != nil {
 		return false, err
 	}
 	return exists, nil
 }
-func (c Client) CheckBookExistsISBN(isbn string) (bool, uuid.UUID, error) {
+func (c *Client) CheckBookExistsISBN(isbn string) (bool, uuid.UUID, error) {
 	var id uuid.UUID
-	err := c.db.QueryRow("SELECT id FROM books WHERE isbn = ? LIMIT 1", isbn).Scan(&id)
+	err := c.handler.QueryRow("SELECT id FROM books WHERE isbn = ? LIMIT 1", isbn).Scan(&id)
 	if err == sql.ErrNoRows {
 		return false, uuid.Nil, nil
 	} else if err != nil {
@@ -92,9 +92,9 @@ func (c Client) CheckBookExistsISBN(isbn string) (bool, uuid.UUID, error) {
 
 	return true, id, nil
 }
-func (c Client) CheckBookExistsASIN(asin string) (bool, uuid.UUID, error) {
+func (c *Client) CheckBookExistsASIN(asin string) (bool, uuid.UUID, error) {
 	var id uuid.UUID
-	err := c.db.QueryRow("SELECT id FROM books WHERE asin = ? LIMIT 1", asin).Scan(&id)
+	err := c.handler.QueryRow("SELECT id FROM books WHERE asin = ? LIMIT 1", asin).Scan(&id)
 	if err == sql.ErrNoRows {
 		return false, uuid.Nil, nil
 	} else if err != nil {
@@ -103,22 +103,16 @@ func (c Client) CheckBookExistsASIN(asin string) (bool, uuid.UUID, error) {
 
 	return true, id, nil
 }
-func (c Client) CheckBookHasFiles(id uuid.UUID) (bool, error) {
+func (c *Client) CheckBookHasFiles(id uuid.UUID) (bool, error) {
 	var hasFiles bool
-	err := c.db.QueryRow("SELECT EXISTS(SELECT 1 FROM books WHERE id = ? AND directory NOT NULL)", id).Scan(&hasFiles)
+	err := c.handler.QueryRow("SELECT EXISTS(SELECT 1 FROM books WHERE id = ? AND directory NOT NULL)", id).Scan(&hasFiles)
 	if err != nil {
 		return false, err
 	}
 	return hasFiles, nil
 }
 
-func (c Client) AddBook(params BookParams) (Book, error) {
-
-	err := c.Begin()
-	if err != nil {
-		return Book{}, err
-	}
-	defer c.Rollback()
+func (c *Client) AddBook(params BookParams) (Book, error) {
 
 	id := uuid.New()
 
@@ -134,7 +128,7 @@ func (c Client) AddBook(params BookParams) (Book, error) {
 		(?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, NULL, NULL, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)	
 	`
 
-	_, err = c.tx.Exec(query, id, params.Title, params.Subtitle, params.Year, params.Description, string(tagsJson), params.ISBN, params.ASIN, params.Publisher)
+	_, err = c.handler.Exec(query, id, params.Title, params.Subtitle, params.Year, params.Description, string(tagsJson), params.ISBN, params.ASIN, params.Publisher)
 	if err != nil {
 		return Book{}, err
 	}
@@ -178,23 +172,19 @@ func (c Client) AddBook(params BookParams) (Book, error) {
 		return Book{}, err
 	}
 
-	err = c.Commit()
-	if err != nil {
-		return Book{}, err
-	}
 	log.Println("Added \"", *params.Title, "\" to books")
 
 	return c.GetBook(id)
 }
 
-func (c Client) GetBook(id uuid.UUID) (Book, error) {
+func (c *Client) GetBook(id uuid.UUID) (Book, error) {
 
 	var book Book
 	var tagsStr *string
 	var audioStr *string
 	var textStr *string
 
-	err := c.db.QueryRow("SELECT * FROM books WHERE id = ?", id).Scan(
+	err := c.handler.QueryRow("SELECT * FROM books WHERE id = ?", id).Scan(
 		&book.Id,
 		&book.Title,
 		&book.Subtitle,
@@ -246,13 +236,7 @@ func (c Client) GetBook(id uuid.UUID) (Book, error) {
 	return book, nil
 }
 
-func (c Client) GetBooks(filters map[string][]string) (BookSearchResults[[]Book], error) {
-
-	err := c.Begin()
-	if err != nil {
-		return BookSearchResults[[]Book]{}, err
-	}
-	defer c.Rollback()
+func (c *Client) GetBooks(filters map[string][]string) (BookSearchResults[[]Book], error) {
 
 	books := []Book{}
 
@@ -260,7 +244,7 @@ func (c Client) GetBooks(filters map[string][]string) (BookSearchResults[[]Book]
 	searchQuery, searchTerms := buildSearchQuery(filters)
 
 	query := "SELECT *, (SELECT COUNT(*) FROM books) AS total_count FROM books " + searchQuery + pageQuery
-	rows, err := c.tx.Query(query, searchTerms...)
+	rows, err := c.handler.Query(query, searchTerms...)
 	if err != nil {
 		log.Println("Query:\n", query)
 		return BookSearchResults[[]Book]{}, err
@@ -320,11 +304,6 @@ func (c Client) GetBooks(filters map[string][]string) (BookSearchResults[[]Book]
 		books = append(books, book)
 	}
 
-	err = c.Commit()
-	if err != nil {
-		return BookSearchResults[[]Book]{}, err
-	}
-
 	return BookSearchResults[[]Book]{
 		ResultsCount: totalCount,
 		Count:        count,
@@ -333,19 +312,13 @@ func (c Client) GetBooks(filters map[string][]string) (BookSearchResults[[]Book]
 	}, nil
 }
 
-func (c Client) GetBooksSummary(filters map[string][]string) (BookSearchResults[[]BookOverview], error) {
-
-	err := c.Begin()
-	if err != nil {
-		return BookSearchResults[[]BookOverview]{}, err
-	}
-	defer c.Rollback()
+func (c *Client) GetBooksSummary(filters map[string][]string) (BookSearchResults[[]BookOverview], error) {
 
 	countLimit, page, pageQuery := buildPageQuery(filters)
 	searchQuery, searchTerms := buildSearchQuery(filters)
 	query := "SELECT books.id, books.title, books.subtitle, books.cover, books.directory, (SELECT COUNT(*) FROM books) AS total_count  FROM books " + searchQuery + pageQuery
 
-	rows, err := c.tx.Query(query, searchTerms...)
+	rows, err := c.handler.Query(query, searchTerms...)
 	if err != nil {
 		log.Println("Query:\n", query)
 		return BookSearchResults[[]BookOverview]{}, err
@@ -380,19 +353,13 @@ func (c Client) GetBooksSummary(filters map[string][]string) (BookSearchResults[
 	}, nil
 }
 
-func (c Client) AssociateBookAndDownload(bookId, downloadId uuid.UUID, author, series, bookDir string) (Book, error) {
-
-	err := c.Begin()
-	if err != nil {
-		return Book{}, err
-	}
-	defer c.Rollback()
+func (c *Client) AssociateBookAndDownload(bookId, downloadId uuid.UUID, author, series, bookDir string) (Book, error) {
 
 	var files fileManagement.Files
 	var Audio *string
 	var Text *string
 
-	err = c.tx.QueryRow(`
+	err := c.handler.QueryRow(`
 	SELECT dir_name, audio_files, text_files, cover FROM downloads WHERE id = ?
 	`, downloadId).Scan(&files.Root, &Audio, &Text, &files.Cover)
 	if err != nil {
@@ -415,25 +382,11 @@ func (c Client) AssociateBookAndDownload(bookId, downloadId uuid.UUID, author, s
 		return Book{}, err
 	}
 
-	err = c.Commit()
-	if err != nil {
-		return Book{}, err
-	}
-
 	return c.GetBook(bookId)
 }
 
 // Returns the updated book and a bool that says whether the file path has updated
-func (c Client) UpdateBook(id uuid.UUID, update BookParams) (Book, bool, error) {
-
-	indyTx := c.tx == nil
-	if indyTx {
-		err := c.Begin()
-		if err != nil {
-			return Book{}, false, err
-		}
-		defer c.Rollback()
-	}
+func (c *Client) UpdateBook(id uuid.UUID, update BookParams) (Book, bool, error) {
 
 	setParts := []string{"updated_at = CURRENT_TIMESTAMP"}
 	args := []interface{}{}
@@ -474,7 +427,7 @@ func (c Client) UpdateBook(id uuid.UUID, update BookParams) (Book, bool, error) 
 	if len(setParts) > 0 {
 		query := "UPDATE books SET " + strings.Join(setParts, ", ") + " WHERE id = ?"
 		args = append(args, id)
-		_, err := c.tx.Exec(query, args...)
+		_, err := c.handler.Exec(query, args...)
 		if err != nil {
 			return Book{}, false, err
 		}
@@ -501,7 +454,7 @@ func (c Client) UpdateBook(id uuid.UUID, update BookParams) (Book, bool, error) 
 
 		for _, cat := range removed {
 			log.Println("Removing", cat.Name)
-			_, err := c.tx.Exec(deleteQuery, id, cat.Id)
+			_, err := c.handler.Exec(deleteQuery, id, cat.Id)
 			if err != nil {
 				return err
 			}
@@ -571,13 +524,6 @@ func (c Client) UpdateBook(id uuid.UUID, update BookParams) (Book, bool, error) 
 		return Book{}, false, err
 	}
 
-	if indyTx {
-		err = c.Commit()
-		if err != nil {
-			return Book{}, false, err
-		}
-	}
-
 	book, err := c.GetBook(id)
 	if err != nil {
 		return Book{}, false, err
@@ -603,18 +549,12 @@ func (c Client) UpdateBook(id uuid.UUID, update BookParams) (Book, bool, error) 
 	return book, needsFileUpdate, nil
 }
 
-func (c Client) UpdateBookCover(id uuid.UUID, ext string) (string, string, error) {
-
-	err := c.Begin()
-	if err != nil {
-		return "", "", err
-	}
-	defer c.Rollback()
+func (c *Client) UpdateBookCover(id uuid.UUID, ext string) (string, string, error) {
 
 	var dir *string
 	var cover *string
 
-	err = c.tx.QueryRow("SELECT directory, cover FROM books WHERE id = ?", id).Scan(&dir, &cover)
+	err := c.handler.QueryRow("SELECT directory, cover FROM books WHERE id = ?", id).Scan(&dir, &cover)
 	if err != nil {
 		return "", "", err
 	}
@@ -628,12 +568,7 @@ func (c Client) UpdateBookCover(id uuid.UUID, ext string) (string, string, error
 	}
 
 	newCover := path.Join(*dir, "cover."+ext)
-	_, err = c.tx.Exec("UPDATE books SET cover = ? WHERE id = ?", newCover, id)
-	if err != nil {
-		return "", "", err
-	}
-
-	err = c.Commit()
+	_, err = c.handler.Exec("UPDATE books SET cover = ? WHERE id = ?", newCover, id)
 	if err != nil {
 		return "", "", err
 	}
@@ -642,16 +577,7 @@ func (c Client) UpdateBookCover(id uuid.UUID, ext string) (string, string, error
 }
 
 // Author -> Series -> Book Title
-func (c Client) GetPathComponents(id uuid.UUID) (string, string, string, error) {
-
-	indyTx := c.tx == nil
-	if indyTx {
-		err := c.Begin()
-		if err != nil {
-			return "", "", "", err
-		}
-		defer c.Rollback()
-	}
+func (c *Client) GetPathComponents(id uuid.UUID) (string, string, string, error) {
 
 	authorDir := "Unknown"
 	authors, err := c.GetCategoryTypesAssociatedWithBook(id.String(), Authors)
@@ -676,31 +602,18 @@ func (c Client) GetPathComponents(id uuid.UUID) (string, string, string, error) 
 	}
 
 	title := ""
-	err = c.tx.QueryRow("SELECT title FROM books WHERE id = ?", id).Scan(&title)
+	err = c.handler.QueryRow("SELECT title FROM books WHERE id = ?", id).Scan(&title)
 	if err != nil {
 		return "", "", "", err
 	}
 	title = indexStr + title
 
-	if indyTx {
-		err := c.Commit()
-		if err != nil {
-			return "", "", "", err
-		}
-	}
-
 	return authorDir, seriesDir, title, nil
 }
 
-func (c Client) DeleteBook(id uuid.UUID) error {
+func (c *Client) DeleteBook(id uuid.UUID) error {
 
-	err := c.Begin()
-	if err != nil {
-		return err
-	}
-	defer c.Rollback()
-
-	_, err = c.tx.Exec("DELETE FROM books WHERE id = ?", id)
+	_, err := c.handler.Exec("DELETE FROM books WHERE id = ?", id)
 	if err != nil {
 		return err
 	}
@@ -710,46 +623,25 @@ func (c Client) DeleteBook(id uuid.UUID) error {
 		return err
 	}
 
-	err = c.Commit()
-	if err != nil {
-		return err
-	}
-
 	log.Println("Removed the book with the id \"", id, "\" from the database")
 
 	return nil
 }
 
-func (c Client) GetBookDirectory(id uuid.UUID) (*string, error) {
-
-	indyTx := c.tx == nil
-	if indyTx {
-		err := c.Begin()
-		if err != nil {
-			return nil, err
-		}
-		defer c.Rollback()
-	}
+func (c *Client) GetBookDirectory(id uuid.UUID) (*string, error) {
 
 	var dir *string
-	err := c.tx.QueryRow("SELECT directory FROM books WHERE id = ?", id).Scan(&dir)
+	err := c.handler.QueryRow("SELECT directory FROM books WHERE id = ?", id).Scan(&dir)
 	if err != nil {
 		return nil, err
-	}
-
-	if indyTx {
-		err := c.Commit()
-		if err != nil {
-			return nil, err
-		}
 	}
 
 	return dir, nil
 }
 
-func (c Client) GetAllBooksDirectories() ([]uuid.UUID, []string, error) {
+func (c *Client) GetAllBooksDirectories() ([]uuid.UUID, []string, error) {
 
-	rows, err := c.db.Query("SELECT id, directory FROM books WHERE directory IS NOT NULL")
+	rows, err := c.handler.Query("SELECT id, directory FROM books WHERE directory IS NOT NULL")
 	if err != nil {
 		return []uuid.UUID{}, []string{}, err
 	}
@@ -773,49 +665,24 @@ func (c Client) GetAllBooksDirectories() ([]uuid.UUID, []string, error) {
 	return ids, dirs, nil
 }
 
-func (c Client) DeleteBookFilesFromDatabase(id uuid.UUID) error {
+func (c *Client) DeleteBookFilesFromDatabase(id uuid.UUID) error {
 
-	indyTx := c.tx == nil
-	if indyTx {
-		err := c.Begin()
-		if err != nil {
-			return err
-		}
-		defer c.Rollback()
-	}
-
-	_, err := c.tx.Exec("UPDATE books SET directory = NULL, audio_files = NULL, text_files = NULL, cover = NULL WHERE id = ? ", id)
+	_, err := c.handler.Exec("UPDATE books SET directory = NULL, audio_files = NULL, text_files = NULL, cover = NULL WHERE id = ? ", id)
 	if err != nil {
 		return err
-	}
-
-	if indyTx {
-		err = c.Commit()
-		if err != nil {
-			return err
-		}
 	}
 
 	return nil
 }
 
-func (c Client) UpdateBookFiles(id uuid.UUID, files fileManagement.Files) error {
-
-	indyTx := c.tx == nil
-	if indyTx {
-		err := c.Begin()
-		if err != nil {
-			return err
-		}
-		defer c.Rollback()
-	}
+func (c *Client) UpdateBookFiles(id uuid.UUID, files fileManagement.Files) error {
 
 	audio, text, err := files.FileListsToJson()
 	if err != nil {
 		return err
 	}
 
-	_, err = c.tx.Exec(`
+	_, err = c.handler.Exec(`
 	UPDATE books 
 	SET 
 		updated_at = CURRENT_TIMESTAMP,
@@ -828,26 +695,10 @@ func (c Client) UpdateBookFiles(id uuid.UUID, files fileManagement.Files) error 
 		return err
 	}
 
-	if indyTx {
-		err = c.Commit()
-		if err != nil {
-			return err
-		}
-	}
-
 	return nil
 }
 
-func (c Client) UpdateBooksFiles(idsFiles map[uuid.UUID]fileManagement.Files) error {
-
-	indyTx := c.tx == nil
-	if indyTx {
-		err := c.Begin()
-		if err != nil {
-			return err
-		}
-		defer c.Rollback()
-	}
+func (c *Client) UpdateBooksFiles(idsFiles map[uuid.UUID]fileManagement.Files) error {
 
 	for id, files := range idsFiles {
 
@@ -857,11 +708,18 @@ func (c Client) UpdateBooksFiles(idsFiles map[uuid.UUID]fileManagement.Files) er
 		}
 	}
 
-	if indyTx {
-		err := c.Commit()
-		if err != nil {
-			return err
-		}
+	return nil
+}
+
+func (c *Client) RemoveAllBooks() error {
+
+	_, err := c.handler.Exec("DELETE FROM books")
+	if err != nil {
+		return err
+	}
+	err = c.CleanupCategories()
+	if err != nil {
+		return err
 	}
 
 	return nil
@@ -869,7 +727,7 @@ func (c Client) UpdateBooksFiles(idsFiles map[uuid.UUID]fileManagement.Files) er
 
 // #region Book Methods
 
-func (book *Book) getBookCategories(c Client) error {
+func (book *Book) getBookCategories(c *Client) error {
 
 	var err error
 
@@ -897,7 +755,7 @@ func (book *Book) getBookCategories(c Client) error {
 }
 
 // Inserts files into a book directly, bypassing the update or association functions. Don't use this unless you have a good reason. Requires an active db transaction.
-func (book *Book) ApplyBookFiles(c Client) error {
+func (book *Book) ApplyBookFiles(c *Client) error {
 
 	if book.Id == nil {
 		return fmt.Errorf("id required to apply book files")

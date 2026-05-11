@@ -1,7 +1,6 @@
 package database
 
 import (
-	"errors"
 	"strings"
 	"time"
 
@@ -32,14 +31,10 @@ type RefreshTokenInfo struct {
 // #region Users
 
 // Requires an active db transaction
-func (c Client) CountUsers() (int, error) {
-
-	if c.tx == nil {
-		return 0, errors.New("count users requires an active transaction")
-	}
+func (c *Client) CountUsers() (int, error) {
 
 	var count int
-	err := c.tx.QueryRow("SELECT COUNT(*) FROM users").Scan(&count)
+	err := c.handler.QueryRow("SELECT COUNT(*) FROM users").Scan(&count)
 	if err != nil {
 		return 0, err
 	}
@@ -47,18 +42,9 @@ func (c Client) CountUsers() (int, error) {
 	return count, nil
 }
 
-func (c Client) AddUser(params UserParams) (User, error) {
+func (c *Client) AddUser(params UserParams) (User, error) {
 
-	indyTx := c.tx == nil
-	if indyTx {
-		err := c.Begin()
-		if err != nil {
-			return User{}, err
-		}
-		defer c.Rollback()
-	}
-
-	_, err := c.tx.Exec(
+	_, err := c.handler.Exec(
 		"INSERT INTO users (id, username, password_hash, created_at, updated_at) VALUES (?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)",
 		uuid.New(),
 		params.Username,
@@ -68,46 +54,23 @@ func (c Client) AddUser(params UserParams) (User, error) {
 		return User{}, err
 	}
 
-	if indyTx {
-		err = c.Commit()
-		if err != nil {
-			return User{}, err
-		}
-	}
-
 	return c.GetUserWithUsername(params.Username)
 }
 
-func (c Client) UpdatePassword(id uuid.UUID, password string) (User, error) {
+func (c *Client) UpdatePassword(id uuid.UUID, password string) (User, error) {
 
-	indyTx := c.tx == nil
-	if indyTx {
-		err := c.Begin()
-		if err != nil {
-			return User{}, err
-		}
-		defer c.Rollback()
-	}
-
-	_, err := c.tx.Exec("UPDATE users SET password_hash = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?", password, id)
+	_, err := c.handler.Exec("UPDATE users SET password_hash = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?", password, id)
 	if err != nil {
 		return User{}, err
-	}
-
-	if indyTx {
-		err = c.Commit()
-		if err != nil {
-			return User{}, err
-		}
 	}
 
 	return c.GetUser(id)
 }
 
-func (c Client) GetUser(id uuid.UUID) (User, error) {
+func (c *Client) GetUser(id uuid.UUID) (User, error) {
 
 	var user User
-	err := c.db.QueryRow("SELECT * FROM users WHERE id = ?", id).Scan(&user.Id, &user.Username, &user.Password, &user.CreatedAt, &user.UpdatedAt)
+	err := c.handler.QueryRow("SELECT * FROM users WHERE id = ?", id).Scan(&user.Id, &user.Username, &user.Password, &user.CreatedAt, &user.UpdatedAt)
 	if err != nil {
 		return User{}, err
 	}
@@ -115,86 +78,46 @@ func (c Client) GetUser(id uuid.UUID) (User, error) {
 
 }
 
-func (c Client) GetUserWithUsername(username string) (User, error) {
+func (c *Client) GetUserWithUsername(username string) (User, error) {
 
 	var user User
-	err := c.db.QueryRow("SELECT * FROM users WHERE username = ?", username).Scan(&user.Id, &user.Username, &user.Password, &user.CreatedAt, &user.UpdatedAt)
+	err := c.handler.QueryRow("SELECT * FROM users WHERE username = ?", username).Scan(&user.Id, &user.Username, &user.Password, &user.CreatedAt, &user.UpdatedAt)
 	if err != nil {
 		return User{}, err
 	}
 	return user, nil
 }
 
-func (c Client) DeleteUser(id uuid.UUID) (int, error) {
+func (c *Client) DeleteUser(id uuid.UUID) (int, error) {
 
-	indyTx := c.tx == nil
-	if indyTx {
-		err := c.Begin()
-		if err != nil {
-			return -1, err
-		}
-		defer c.Rollback()
-	}
-
-	_, err := c.tx.Exec("DELETE FROM users WHERE id = ?", id)
+	_, err := c.handler.Exec("DELETE FROM users WHERE id = ?", id)
 	if err != nil {
 		return -1, err
-	}
-
-	if indyTx {
-		err = c.Commit()
-		if err != nil {
-			return -1, err
-		}
 	}
 
 	return c.CountUsers()
 }
 
-func (c Client) RemoveAllUsers() error {
+func (c *Client) RemoveAllUsers() error {
 
-	indyTx := c.tx == nil
-	if indyTx {
-		err := c.Begin()
-		if err != nil {
-			return err
-		}
-		defer c.Rollback()
-	}
-
-	_, err := c.tx.Exec("DELETE FROM users")
+	_, err := c.handler.Exec("DELETE FROM users")
 	if err != nil {
 		return err
 	}
 
-	_, err = c.tx.Exec("DELETE FROM refresh_tokens")
+	_, err = c.handler.Exec("DELETE FROM refresh_tokens")
 	if err != nil {
 		return err
 	}
 
-	if indyTx {
-		err = c.Commit()
-		if err != nil {
-			return err
-		}
-	}
 	return nil
 }
 
 // #region Refresh Tokens
 
-func (c Client) AddRefreshToken(userId uuid.UUID, token string, expiresAt time.Time) (RefreshTokenInfo, error) {
+func (c *Client) AddRefreshToken(userId uuid.UUID, token string, expiresAt time.Time) (RefreshTokenInfo, error) {
 
-	indyTx := c.tx == nil
-	if indyTx {
-		err := c.Begin()
-		if err != nil {
-			return RefreshTokenInfo{}, err
-		}
-		defer c.Rollback()
-	}
-
-	_, err := c.tx.Exec(`
+	_, err := c.handler.Exec(`
 	INSERT INTO refresh_tokens (token, created_at, updated_at, user_id, expires_at, revoked_at)
 	SELECT ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, users.id, ?, NULL
 	FROM users WHERE users.id = ?
@@ -204,20 +127,13 @@ func (c Client) AddRefreshToken(userId uuid.UUID, token string, expiresAt time.T
 		return RefreshTokenInfo{}, err
 	}
 
-	if indyTx {
-		err = c.Commit()
-		if err != nil {
-			return RefreshTokenInfo{}, err
-		}
-	}
-
 	return c.GetRefreshToken(token)
 }
 
-func (c Client) GetRefreshToken(token string) (RefreshTokenInfo, error) {
+func (c *Client) GetRefreshToken(token string) (RefreshTokenInfo, error) {
 
 	var info RefreshTokenInfo
-	err := c.db.QueryRow("SELECT * FROM refresh_tokens WHERE token = ?", token).Scan(
+	err := c.handler.QueryRow("SELECT * FROM refresh_tokens WHERE token = ?", token).Scan(
 		&info.Token,
 		&info.CreatedAt,
 		&info.UpdatedAt,
@@ -231,68 +147,29 @@ func (c Client) GetRefreshToken(token string) (RefreshTokenInfo, error) {
 	return info, nil
 }
 
-func (c Client) RevokeRefreshToken(token string) error {
-	indyTx := c.tx == nil
-	if indyTx {
-		err := c.Begin()
-		if err != nil {
-			return err
-		}
-		defer c.Rollback()
-	}
+func (c *Client) RevokeRefreshToken(token string) error {
 
-	_, err := c.tx.Exec("UPDATE request_tokens SET revoked_at = ? WHERE token = ?", time.Now().UTC(), token)
+	_, err := c.handler.Exec("UPDATE request_tokens SET revoked_at = ? WHERE token = ?", time.Now().UTC(), token)
 	if err != nil {
 		return err
-	}
-
-	if indyTx {
-		err = c.Commit()
-		if err != nil {
-			return err
-		}
 	}
 
 	return nil
 }
 
-func (c Client) DeleteRefreshToken(token string) error {
-	indyTx := c.tx == nil
-	if indyTx {
-		err := c.Begin()
-		if err != nil {
-			return err
-		}
-		defer c.Rollback()
-	}
+func (c *Client) DeleteRefreshToken(token string) error {
 
-	_, err := c.tx.Exec("DELETE FROM request_tokens WHERE token = ?", token)
+	_, err := c.handler.Exec("DELETE FROM request_tokens WHERE token = ?", token)
 	if err != nil {
 		return err
-	}
-
-	if indyTx {
-		err = c.Commit()
-		if err != nil {
-			return err
-		}
 	}
 
 	return nil
 }
 
-func (c Client) CullRefreshTokens(cutoff time.Time) error {
+func (c *Client) CullRefreshTokens(cutoff time.Time) error {
 
-	indyTx := c.tx == nil
-	if indyTx {
-		err := c.Begin()
-		if err != nil {
-			return err
-		}
-		defer c.Rollback()
-	}
-
-	rows, err := c.tx.Query("SELECT token, expires_at, revoked_at FROM refresh_tokens")
+	rows, err := c.handler.Query("SELECT token, expires_at, revoked_at FROM refresh_tokens")
 	if err != nil {
 		return err
 	}
@@ -310,17 +187,11 @@ func (c Client) CullRefreshTokens(cutoff time.Time) error {
 	}
 
 	if len(toRemove) > 0 {
-		_, err = c.tx.Exec("DELETE FROM refresh_tokens WHERE token IN (" + strings.Join(toRemove, ",") + ")")
+		_, err = c.handler.Exec("DELETE FROM refresh_tokens WHERE token IN (" + strings.Join(toRemove, ",") + ")")
 		if err != nil {
 			return err
 		}
 	}
 
-	if indyTx {
-		err = c.Commit()
-		if err != nil {
-			return err
-		}
-	}
 	return nil
 }

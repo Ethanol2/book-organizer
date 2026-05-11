@@ -31,20 +31,13 @@ func (cfg *apiConfig) createRefreshToken(userId uuid.UUID) (string, int, error) 
 
 func (cfg *apiConfig) handlerGetAuthStatus(w http.ResponseWriter, r *http.Request) {
 
-	err := cfg.db.Begin()
-	if err != nil {
-		respondWithError(w, http.StatusInternalServerError, DatabaseError, err)
-		return
-	}
-	defer cfg.db.Rollback()
+	var err error
+	count := -1
 
-	count, err := cfg.db.CountUsers()
-	if err != nil {
-		respondWithError(w, http.StatusInternalServerError, DatabaseError, err)
-		return
-	}
-
-	err = cfg.db.Commit()
+	err = cfg.db.HandleTransaction(func(c *database.Client) error {
+		count, err = c.CountUsers()
+		return err
+	})
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, DatabaseError, err)
 		return
@@ -67,13 +60,6 @@ func (cfg *apiConfig) handlerGetAuthStatus(w http.ResponseWriter, r *http.Reques
 }
 
 func (cfg *apiConfig) handlerRegister(w http.ResponseWriter, r *http.Request) {
-
-	err := cfg.db.Begin()
-	if err != nil {
-		respondWithError(w, http.StatusInternalServerError, DatabaseError, err)
-		return
-	}
-	defer cfg.db.Rollback()
 
 	count, err := cfg.db.CountUsers()
 	if err != nil {
@@ -115,13 +101,11 @@ func (cfg *apiConfig) handlerRegister(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = cfg.db.Commit()
-	if err != nil {
-		respondWithError(w, http.StatusInternalServerError, DatabaseError, err)
-		return
-	}
-
-	user, err := cfg.db.AddUser(params)
+	var user database.User
+	err = cfg.db.HandleTransaction(func(c *database.Client) error {
+		user, err = cfg.db.AddUser(params)
+		return err
+	})
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, DatabaseError, err)
 		return

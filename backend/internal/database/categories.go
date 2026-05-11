@@ -32,15 +32,6 @@ var categorySingular = map[CategoryType]string{
 }
 
 func (c Client) AddCategory(categoryType CategoryType, name string) (Category, error) {
-	var err error
-	indyTx := c.tx == nil
-	if indyTx {
-		err = c.Begin()
-		if err != nil {
-			return Category{}, err
-		}
-		defer c.Rollback()
-	}
 
 	query := fmt.Sprintf(`
 	INSERT INTO %s
@@ -53,19 +44,12 @@ func (c Client) AddCategory(categoryType CategoryType, name string) (Category, e
 	`, categoryType)
 
 	var id int
-	err = c.tx.QueryRow(query, name).Scan(&id)
+	err := c.handler.QueryRow(query, name).Scan(&id)
 	if err != nil {
 		return Category{}, err
 	}
 
 	log.Println("Added \"", name, "\" to", categoryType)
-
-	if indyTx {
-		err = c.Commit()
-		if err != nil {
-			return Category{}, err
-		}
-	}
 
 	return Category{
 		Id:   &id,
@@ -85,7 +69,7 @@ func (c Client) DeleteCategoryWithID(categoryType CategoryType, id int) error {
 	REMOVE FROM %s WHERE id = ?;
 	`, categoryType, categoryType)
 
-	row, err := c.db.Query(query, id)
+	row, err := c.handler.Query(query, id)
 	if err != nil {
 		return err
 	}
@@ -102,34 +86,18 @@ func (c Client) DeleteCategoryWithID(categoryType CategoryType, id int) error {
 }
 
 func (c Client) GetCategory(categoryType CategoryType, id int) (Category, error) {
-	var err error
-	indyTx := c.tx == nil
-	if indyTx {
-		err = c.Begin()
-		if err != nil {
-			return Category{}, err
-		}
-		defer c.Rollback()
-	}
 
 	query := fmt.Sprintf(`
 	SELECT * FROM %s WHERE id = ?
 	`, categoryType)
 
 	cat := Category{Type: categoryType}
-	err = c.tx.QueryRow(query, id).Scan(&cat.Id, &cat.Name)
+	err := c.handler.QueryRow(query, id).Scan(&cat.Id, &cat.Name)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return Category{}, nil
 		}
 		return Category{}, err
-	}
-
-	if indyTx {
-		err = c.Commit()
-		if err != nil {
-			return Category{}, err
-		}
 	}
 
 	defer log.Println("Retrieved \"", cat.Name, "\" from", categoryType)
@@ -139,7 +107,7 @@ func (c Client) GetCategory(categoryType CategoryType, id int) (Category, error)
 
 func (c Client) GetAllOfCategory(categoryType CategoryType) ([]Category, error) {
 
-	rows, err := c.db.Query(fmt.Sprintf("SELECT * FROM %s", categoryType))
+	rows, err := c.handler.Query(fmt.Sprintf("SELECT * FROM %s", categoryType))
 	if err != nil {
 		return []Category{}, err
 	}
@@ -163,7 +131,7 @@ func (c Client) GetAllOfCategory(categoryType CategoryType) ([]Category, error) 
 func (c Client) associateBookAndCategoryType(bookId string, category Category, rank int) error {
 
 	if category.Id == nil {
-		if ok, err := category.GetID(c.tx); err != nil {
+		if ok, err := category.GetID(c.handler); err != nil {
 			return err
 		} else if !ok {
 			cat, err := c.AddCategory(category.Type, category.Name)
@@ -192,14 +160,14 @@ func (c Client) associateBookAndCategoryType(bookId string, category Category, r
 	WHERE b.id = ? AND c.id = ?
 	`, insertLine, category.Type)
 
-	_, err := c.tx.Exec(query, args...)
+	_, err := c.handler.Exec(query, args...)
 	if err != nil {
 		fmt.Println(query)
 		return err
 	}
 
 	if category.Type == Series {
-		_, err := c.tx.Exec("UPDATE books_series SET series_index = ? WHERE book_id = ? AND series_id = ?", category.Index, bookId, category.Id)
+		_, err := c.handler.Exec("UPDATE books_series SET series_index = ? WHERE book_id = ? AND series_id = ?", category.Index, bookId, category.Id)
 		if err != nil {
 			return err
 		}
@@ -209,15 +177,6 @@ func (c Client) associateBookAndCategoryType(bookId string, category Category, r
 }
 
 func (c Client) GetCategoryTypesAssociatedWithBook(bookId string, categoryType CategoryType) ([]Category, error) {
-	var err error
-	indyTx := c.tx == nil
-	if indyTx {
-		err = c.Begin()
-		if err != nil {
-			return []Category{}, err
-		}
-		defer c.Rollback()
-	}
 
 	selectLine := ""
 	if categoryType == Series {
@@ -234,7 +193,7 @@ func (c Client) GetCategoryTypesAssociatedWithBook(bookId string, categoryType C
 	ORDER BY jn.rank ASC;
 	`, selectLine, categoryType, categorySingular[categoryType])
 
-	rows, err := c.tx.Query(query, bookId)
+	rows, err := c.handler.Query(query, bookId)
 	if err != nil {
 		//fmt.Println(query)
 		return []Category{}, err
@@ -254,13 +213,6 @@ func (c Client) GetCategoryTypesAssociatedWithBook(bookId string, categoryType C
 			return []Category{}, err
 		}
 		cats = append(cats, cat)
-	}
-
-	if indyTx {
-		err = c.Commit()
-		if err != nil {
-			return []Category{}, err
-		}
 	}
 
 	return cats, nil
@@ -301,14 +253,6 @@ func stringToCategoryType(str string) CategoryType {
 }
 
 func (c Client) CleanupCategories() error {
-	indyTx := c.tx == nil
-	if indyTx {
-		err := c.Commit()
-		if err != nil {
-			return err
-		}
-		defer c.Rollback()
-	}
 
 	cleanup := func(catType CategoryType) error {
 
@@ -318,7 +262,7 @@ func (c Client) CleanupCategories() error {
 
 		//log.Println(query)
 
-		results, err := c.tx.Exec(query)
+		results, err := c.handler.Exec(query)
 		if err != nil {
 			return err
 		}
@@ -352,17 +296,10 @@ func (c Client) CleanupCategories() error {
 		return err
 	}
 
-	if indyTx {
-		err = c.Commit()
-		if err != nil {
-			return err
-		}
-	}
-
 	return nil
 }
 
-func (cat *Category) GetID(tx *sql.Tx) (bool, error) {
+func (cat *Category) GetID(handler Handler) (bool, error) {
 
 	if cat.Type == NoType {
 		return false, fmt.Errorf("category must have a type to find id")
@@ -375,7 +312,7 @@ func (cat *Category) GetID(tx *sql.Tx) (bool, error) {
 	SELECT id FROM %s WHERE name = ?
 	`, cat.Type)
 
-	err := tx.QueryRow(query, cat.Name).Scan(&cat.Id)
+	err := handler.QueryRow(query, cat.Name).Scan(&cat.Id)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return false, nil

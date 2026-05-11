@@ -34,3 +34,5 @@ go.work.sum
 data/
 out
 appData.db
+appData.db-shm
+appData.db-wal

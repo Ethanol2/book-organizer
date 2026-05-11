@@ -7,8 +7,10 @@ import (
 	"math/rand"
 	"net/http"
 	"os"
+	"os/signal"
 	"path"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/Ethanol2/book-organizer/internal/auth"
@@ -45,10 +47,12 @@ type apiConfig struct {
 }
 
 type cliFlags struct {
-	dbReset      bool
-	dbTestData   bool
-	libTestData  bool
-	downTestData bool
+	dbReset        bool
+	booksReset     bool
+	downloadsReset bool
+	dbTestData     bool
+	libTestData    bool
+	downTestData   bool
 
 	clearLibrary   bool
 	clearDownloads bool
@@ -132,15 +136,36 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	log.Println("File scanning started")
 
 	// Cull refresh tokens once a week
 	cfg.refreshTokenCulling(time.Hour * 168)
 
-	log.Println("File scanning started")
-	log.Println("Starting server")
+	// Start server in a goroutine to allow a controlled shutdown
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
 
-	log.Printf("Serving on: http://localhost:%s/\n", cfg.port)
-	log.Fatal(srv.ListenAndServe())
+	go func() {
+		log.Printf("Serving on: http://localhost:%s/\n", cfg.port)
+		log.Println("Starting server")
+		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Fatalf("listen: %s\n", err)
+		}
+	}()
+
+	<-sigChan // Wait for shutdown
+
+	fmt.Println("\nShutting down...")
+
+	// Give the HTTP server 5 seconds to finish active requests
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	srv.Shutdown(ctx)
+
+	// FINALLY: Close the DB
+	cfg.db.Close()
+	fmt.Println("Database closed. Goodbye!")
+	os.Exit(0)
 }
 
 // #region Initialization
@@ -164,6 +189,12 @@ My LinkedIn:	https://www.linkedin.com/in/ethan-colucci/
 [-r, --reset]:
 	Deletes the appData.db file, reseting the database, and empties the metadata folder.
 	This also deletes all users, and disables authentication.
+
+[-rb, --reset-books]
+	Clears the books table, which will also clear all the category tables.
+
+[-rd, --reset-downloads]
+	Clears the downloads table
 
 [-ru, --reset-users]:
 	Clears the users table, which also removes any authentication in the app. Use with caution.
@@ -212,6 +243,14 @@ My LinkedIn:	https://www.linkedin.com/in/ethan-colucci/
 		case "-r", "--reset":
 			fmt.Println("Reset flag (-r)")
 			flags.dbReset = true
+
+		case "-rb", "--reset-books":
+			fmt.Println("Reset books flag (-rb)")
+			flags.booksReset = true
+
+		case "-rd", "--reset-downloads":
+			fmt.Println("Reset downloads flag (-rd)")
+			flags.downloadsReset = true
 
 		case "-cl", "--clear-library":
 			fmt.Println("Clear library flag (-l)")
@@ -270,15 +309,7 @@ func initConfig(flags cliFlags) (*apiConfig, error) {
 
 	metadataPath := "./data/metadata"
 
-	if flags.dbReset {
-
-		// Remove the database file
-		err := os.Remove(dbPath)
-		if err != nil {
-			fmt.Println(err)
-		}
-
-		// Clear the metadata folder
+	clearMetadata := func() error {
 		if _, err := os.Stat(metadataPath); err == nil {
 			files, err := os.ReadDir(metadataPath)
 			if err == nil {
@@ -298,8 +329,24 @@ func initConfig(flags cliFlags) (*apiConfig, error) {
 			err = os.Mkdir(metadataPath, 0644)
 			if err != nil {
 				fmt.Println("Error while creating the metadata directory")
-				return nil, err
+				return err
 			}
+		}
+		return nil
+	}
+
+	if flags.dbReset {
+
+		// Remove the database file
+		err := os.Remove(dbPath)
+		if err != nil {
+			fmt.Println(err)
+		}
+
+		// Clear the metadata folder
+		err = clearMetadata()
+		if err != nil {
+			return nil, err
 		}
 	}
 
@@ -361,193 +408,211 @@ func initConfig(flags cliFlags) (*apiConfig, error) {
 		}
 	}
 
-	// Transaction needed for user count and test data entry
-	err = db.Begin()
-	if err != nil {
-		return nil, err
-	}
-	defer db.Rollback()
+	authRequired := false
+	err = db.HandleTransaction(func(c *database.Client) error {
 
-	// Reset users, otherwise reset sessions if the flag is enabled. Clearing users resets the sessions as well, by default
-	if flags.usersReset {
-		err = db.RemoveAllUsers()
-		if err != nil {
-			return nil, err
-		}
-	} else if flags.clearSessions {
-		// Clear tokens by culling using a date 61 days in the future
-		err = db.CullRefreshTokens(time.Now().UTC().Add(time.Hour * 24 * 61))
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	// If the admin account has been created the app uses authentication
-	count, err := db.CountUsers()
-	if err != nil {
-		return nil, err
-	}
-	authRequired := count > 0
-
-	if flags.dbTestData {
-
-		fmt.Println("Creating test data path")
-		err = fileManagement.CreateDirectory(tPath)
-		if err != nil {
-			return nil, err
+		// Reset users, otherwise reset sessions if the flag is enabled. Clearing users resets the sessions as well, by default
+		if flags.usersReset {
+			err = c.RemoveAllUsers()
+			if err != nil {
+				return err
+			}
+		} else if flags.clearSessions {
+			// Clear tokens by culling using a date 61 days in the future
+			err = c.CullRefreshTokens(time.Now().UTC().Add(time.Hour * 24 * 61))
+			if err != nil {
+				return err
+			}
 		}
 
-		testBooks, err := db.InsertTestData(metadataPath, tPath)
-		if err != nil {
-			return nil, err
-		}
-
-		// Insert Library
-		if flags.libTestData {
-
-			// Inserts 15 books with random text and audio files. All books will have a cover.
-			// Half will have a metadata file.
-
-			fmt.Println()
-			fmt.Println("======= Creating test library =======")
-
-			handleDirs := func(book database.Book) (string, error) {
-				bookPath := book.Authors[0].Name
-
-				err = fileManagement.CreateDirectory(path.Join(lPath, bookPath))
+		// Prevent redundant work
+		if !flags.dbReset {
+			if flags.booksReset {
+				err = c.RemoveAllBooks()
 				if err != nil {
-					return "", err
+					return err
 				}
+				err = clearMetadata()
+				if err != nil {
+					return err
+				}
+			}
 
-				bookDir := book.Title
-				if len(book.Series) > 0 {
+			if flags.downloadsReset {
+				err = c.RemoveAllDownloads()
+				if err != nil {
+					return err
+				}
+			}
+		}
 
-					bookPath = path.Join(bookPath, book.Series[0].Name)
+		// If the admin account has been created the app uses authentication
+		count, err := c.CountUsers()
+		if err != nil {
+			return err
+		}
+		authRequired = count > 0
 
-					if book.Series[0].Index != nil {
-						bookDir = *book.Series[0].Index + " - " + bookDir
-					}
+		if flags.dbTestData {
+
+			fmt.Println("Creating test data path")
+			err = fileManagement.CreateDirectory(tPath)
+			if err != nil {
+				return err
+			}
+
+			testBooks, err := c.InsertTestData(metadataPath, tPath)
+			if err != nil {
+				return err
+			}
+
+			// Insert Library
+			if flags.libTestData {
+
+				// Inserts 15 books with random text and audio files. All books will have a cover.
+				// Half will have a metadata file.
+
+				fmt.Println()
+				fmt.Println("======= Creating test library =======")
+
+				handleDirs := func(book database.Book) (string, error) {
+					bookPath := book.Authors[0].Name
 
 					err = fileManagement.CreateDirectory(path.Join(lPath, bookPath))
 					if err != nil {
 						return "", err
 					}
+
+					bookDir := book.Title
+					if len(book.Series) > 0 {
+
+						bookPath = path.Join(bookPath, book.Series[0].Name)
+
+						if book.Series[0].Index != nil {
+							bookDir = *book.Series[0].Index + " - " + bookDir
+						}
+
+						err = fileManagement.CreateDirectory(path.Join(lPath, bookPath))
+						if err != nil {
+							return "", err
+						}
+					}
+
+					bookPath = path.Join(bookPath, bookDir)
+					return bookPath, nil
 				}
 
-				bookPath = path.Join(bookPath, bookDir)
-				return bookPath, nil
+				// No metadata
+				for _, book := range testBooks[:7] {
+
+					bookPath, err := handleDirs(book)
+					if err != nil {
+						return err
+					}
+
+					book.Files, err = fileManagement.CreateTestDirectory(
+						bookPath,
+						lPath,
+						nil,
+						path.Join(metadataPath, book.Id.String()+".jpg"), rand.Intn(10)+1, rand.Intn(10)+1,
+					)
+
+					err = book.ApplyBookFiles(&db)
+					if err != nil {
+						return err
+					}
+				}
+
+				// With metadata
+				for _, book := range testBooks[8:15] {
+
+					bookPath, err := handleDirs(book)
+					if err != nil {
+						return err
+					}
+
+					book.Files, err = fileManagement.CreateTestDirectory(
+						bookPath,
+						lPath,
+						metadata.BookToMetadata(book),
+						path.Join(metadataPath, book.Id.String()+".jpg"), rand.Intn(10)+1, rand.Intn(10)+1,
+					)
+
+					err = book.ApplyBookFiles(&db)
+					if err != nil {
+						return err
+					}
+				}
+
 			}
 
-			// No metadata
-			for _, book := range testBooks[:7] {
+			// Insert downloads
+			if flags.downTestData {
+				// Count | Has Cover | Has Metadata | Audio Files | Text Files
+				// 	-----------------------------------------------------------
+				// 	  1   |    true   |     false    |      1      |     1
+				// 	  1   |    false  |     false    |      1      |     1
+				// 	  1   |    true   |     false    |      10     |     1
+				// 	  1   |    false  |     false    |      1      |     10
+				// 	  3   |    true   |     true     |      5      |     1
+				// 	  3   |    false  |     true     |      1      |     5
 
-				bookPath, err := handleDirs(book)
-				if err != nil {
-					return nil, err
+				fmt.Println()
+				fmt.Println("======= Creating test downloads =======")
+
+				testDownloads := []struct {
+					title, cover string
+					md           *fileManagement.MetadataFile
+					audio        int
+					text         int
+				}{
+					{
+						title: testBooks[0].Title, cover: testBooks[0].Id.String() + ".jpg", md: nil, audio: 1, text: 1,
+					}, {
+						title: testBooks[1].Title, cover: "", md: nil, audio: 1, text: 1,
+					}, {
+						title: testBooks[2].Title, cover: testBooks[2].Id.String() + ".jpg", md: nil, audio: 10, text: 1,
+					}, {
+						title: testBooks[3].Title, cover: "", md: nil, audio: 1, text: 10,
+					}, {
+						title: testBooks[4].Title, cover: testBooks[4].Id.String() + ".jpg", md: metadata.BookToMetadata(testBooks[4]), audio: 5, text: 1,
+					}, {
+						title: testBooks[5].Title, cover: testBooks[5].Id.String() + ".jpg", md: metadata.BookToMetadata(testBooks[5]), audio: 5, text: 1,
+					}, {
+						title: testBooks[6].Title, cover: testBooks[6].Id.String() + ".jpg", md: metadata.BookToMetadata(testBooks[6]), audio: 5, text: 1,
+					}, {
+						title: testBooks[7].Title, cover: "", md: metadata.BookToMetadata(testBooks[7]), audio: 1, text: 5,
+					}, {
+						title: testBooks[8].Title, cover: "", md: metadata.BookToMetadata(testBooks[8]), audio: 1, text: 5,
+					}, {
+						title: testBooks[9].Title, cover: "", md: metadata.BookToMetadata(testBooks[9]), audio: 1, text: 5,
+					},
 				}
 
-				book.Files, err = fileManagement.CreateTestDirectory(
-					bookPath,
-					lPath,
-					nil,
-					path.Join(metadataPath, book.Id.String()+".jpg"), rand.Intn(10)+1, rand.Intn(10)+1,
-				)
+				for _, d := range testDownloads {
 
-				err = book.ApplyBookFiles(db)
-				if err != nil {
-					return nil, err
-				}
-			}
+					if d.cover != "" {
+						d.cover = path.Join(metadataPath, d.cover)
+					}
 
-			// With metadata
-			for _, book := range testBooks[8:15] {
-
-				bookPath, err := handleDirs(book)
-				if err != nil {
-					return nil, err
+					_, err = fileManagement.CreateTestDirectory(
+						path.Join(d.title),
+						dPath,
+						d.md,
+						d.cover,
+						d.audio, d.text,
+					)
+					if err != nil {
+						return err
+					}
 				}
 
-				book.Files, err = fileManagement.CreateTestDirectory(
-					bookPath,
-					lPath,
-					metadata.BookToMetadata(book),
-					path.Join(metadataPath, book.Id.String()+".jpg"), rand.Intn(10)+1, rand.Intn(10)+1,
-				)
-
-				err = book.ApplyBookFiles(db)
-				if err != nil {
-					return nil, err
-				}
 			}
 
 		}
 
-		// Insert downloads
-		if flags.downTestData {
-			// Count | Has Cover | Has Metadata | Audio Files | Text Files
-			// 	-----------------------------------------------------------
-			// 	  1   |    true   |     false    |      1      |     1
-			// 	  1   |    false  |     false    |      1      |     1
-			// 	  1   |    true   |     false    |      10     |     1
-			// 	  1   |    false  |     false    |      1      |     10
-			// 	  3   |    true   |     true     |      5      |     1
-			// 	  3   |    false  |     true     |      1      |     5
-
-			fmt.Println()
-			fmt.Println("======= Creating test downloads =======")
-
-			testDownloads := []struct {
-				title, cover string
-				md           *fileManagement.MetadataFile
-				audio        int
-				text         int
-			}{
-				{
-					title: testBooks[0].Title, cover: testBooks[0].Id.String() + ".jpg", md: nil, audio: 1, text: 1,
-				}, {
-					title: testBooks[1].Title, cover: "", md: nil, audio: 1, text: 1,
-				}, {
-					title: testBooks[2].Title, cover: testBooks[2].Id.String() + ".jpg", md: nil, audio: 10, text: 1,
-				}, {
-					title: testBooks[3].Title, cover: "", md: nil, audio: 1, text: 10,
-				}, {
-					title: testBooks[4].Title, cover: testBooks[4].Id.String() + ".jpg", md: metadata.BookToMetadata(testBooks[4]), audio: 5, text: 1,
-				}, {
-					title: testBooks[5].Title, cover: testBooks[5].Id.String() + ".jpg", md: metadata.BookToMetadata(testBooks[5]), audio: 5, text: 1,
-				}, {
-					title: testBooks[6].Title, cover: testBooks[6].Id.String() + ".jpg", md: metadata.BookToMetadata(testBooks[6]), audio: 5, text: 1,
-				}, {
-					title: testBooks[7].Title, cover: "", md: metadata.BookToMetadata(testBooks[7]), audio: 1, text: 5,
-				}, {
-					title: testBooks[8].Title, cover: "", md: metadata.BookToMetadata(testBooks[8]), audio: 1, text: 5,
-				}, {
-					title: testBooks[9].Title, cover: "", md: metadata.BookToMetadata(testBooks[9]), audio: 1, text: 5,
-				},
-			}
-
-			for _, d := range testDownloads {
-
-				if d.cover != "" {
-					d.cover = path.Join(metadataPath, d.cover)
-				}
-
-				_, err = fileManagement.CreateTestDirectory(
-					path.Join(d.title),
-					dPath,
-					d.md,
-					d.cover,
-					d.audio, d.text,
-				)
-				if err != nil {
-					return nil, err
-				}
-			}
-
-		}
-
-	}
-
-	err = db.Commit()
+		return nil
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -584,7 +649,7 @@ func (cfg *apiConfig) refreshTokenCulling(frequency time.Duration) {
 				return
 
 			default:
-				err := cfg.db.CullRefreshTokens(time.Now().UTC())
+				err := cfg.db.HandleTransaction(func(c *database.Client) error { return c.CullRefreshTokens(time.Now().UTC()) })
 				if err != nil {
 					log.Println(err)
 				}

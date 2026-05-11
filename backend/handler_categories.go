@@ -47,7 +47,11 @@ func (cfg *apiConfig) handlerPutCategory(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	category, err := cfg.db.AddCategory(catType, newCat.Value)
+	var category database.Category
+	err = cfg.db.HandleTransaction(func(c *database.Client) error {
+		category, err = cfg.db.AddCategory(catType, newCat.Value)
+		return err
+	})
 	if err != nil {
 		log.Println(err)
 		respondWithError(w, http.StatusInternalServerError, DatabaseError, err)

@@ -8,21 +8,36 @@ import (
 	"path"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/Ethanol2/book-organizer/internal/fileManagement"
 )
 
+type Handler interface {
+	Exec(query string, args ...any) (sql.Result, error)
+	Query(query string, args ...any) (*sql.Rows, error)
+	QueryRow(query string, args ...any) *sql.Row
+}
+
 type Client struct {
-	db *sql.DB
-	tx *sql.Tx
+	db      *sql.DB
+	handler Handler
 }
 
 func NewClient(dbPath string) (Client, error) {
-	db, err := sql.Open("sqlite3", dbPath+"?_foreign_keys=on")
+
+	// Add _journal_mode=WAL and _busy_timeout=5000
+	dsn := dbPath + "?_foreign_keys=on&_journal_mode=WAL&_busy_timeout=5000"
+	db, err := sql.Open("sqlite3", dsn)
+
+	db.SetMaxOpenConns(10)           // Allow multiple concurrent reads
+	db.SetMaxIdleConns(10)           // Keep connections warm for speed
+	db.SetConnMaxLifetime(time.Hour) // Standard cleanup
+
 	if err != nil {
 		return Client{}, err
 	}
-	c := Client{db: db}
+	c := Client{db: db, handler: db}
 	err = c.handleMigration()
 	if err != nil {
 		return Client{}, err
@@ -30,7 +45,7 @@ func NewClient(dbPath string) (Client, error) {
 	return c, nil
 }
 
-func (client *Client) handleMigration() error {
+func (c *Client) handleMigration() error {
 
 	// Authentication
 
@@ -43,7 +58,7 @@ func (client *Client) handleMigration() error {
 		updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 	);
 	`
-	_, err := client.db.Exec(usersTable)
+	_, err := c.db.Exec(usersTable)
 	if err != nil {
 		return err
 	}
@@ -59,7 +74,7 @@ func (client *Client) handleMigration() error {
 		FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 	);
 	`
-	_, err = client.db.Exec(refreshTokensTable)
+	_, err = c.db.Exec(refreshTokensTable)
 	if err != nil {
 		return err
 	}
@@ -77,7 +92,7 @@ func (client *Client) handleMigration() error {
 		created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 	);	
 	`
-	_, err = client.db.Exec(downloadsTable)
+	_, err = c.db.Exec(downloadsTable)
 	if err != nil {
 		return err
 	}
@@ -101,7 +116,7 @@ func (client *Client) handleMigration() error {
 		updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 	);
 	`
-	_, err = client.db.Exec(booksTable)
+	_, err = c.db.Exec(booksTable)
 	if err != nil {
 		return err
 	}
@@ -112,7 +127,7 @@ func (client *Client) handleMigration() error {
 		name TEXT UNIQUE NOT NULL	
 	);	
 	`
-	_, err = client.db.Exec(authorsTable)
+	_, err = c.db.Exec(authorsTable)
 	if err != nil {
 		return err
 	}
@@ -123,7 +138,7 @@ func (client *Client) handleMigration() error {
 		name TEXT UNIQUE NOT NULL
 	);
 	`
-	_, err = client.db.Exec(narratorsTable)
+	_, err = c.db.Exec(narratorsTable)
 	if err != nil {
 		return err
 	}
@@ -134,7 +149,7 @@ func (client *Client) handleMigration() error {
 		name TEXT UNIQUE NOT NULL
 	);
 	`
-	_, err = client.db.Exec(seriesTable)
+	_, err = c.db.Exec(seriesTable)
 	if err != nil {
 		return err
 	}
@@ -145,7 +160,7 @@ func (client *Client) handleMigration() error {
 		name TEXT UNIQUE NOT NULL
 	);
 	`
-	_, err = client.db.Exec(genresTable)
+	_, err = c.db.Exec(genresTable)
 	if err != nil {
 		return err
 	}
@@ -164,22 +179,22 @@ func (client *Client) handleMigration() error {
 			FOREIGN KEY (series_id) REFERENCES series(id) ON DELETE CASCADE
 		);
 		`
-	_, err = client.db.Exec(booksSeriestable)
+	_, err = c.db.Exec(booksSeriestable)
 	if err != nil {
 		return err
 	}
 
-	err = client.generateJoiningTable("book", "books", categorySingular[Authors], string(Authors))
+	err = c.generateJoiningTable("book", "books", categorySingular[Authors], string(Authors))
 	if err != nil {
 		return err
 	}
 
-	err = client.generateJoiningTable("book", "books", categorySingular[Narrators], string(Narrators))
+	err = c.generateJoiningTable("book", "books", categorySingular[Narrators], string(Narrators))
 	if err != nil {
 		return err
 	}
 
-	err = client.generateJoiningTable("book", "books", categorySingular[Genres], string(Genres))
+	err = c.generateJoiningTable("book", "books", categorySingular[Genres], string(Genres))
 	if err != nil {
 		return err
 	}
@@ -187,7 +202,7 @@ func (client *Client) handleMigration() error {
 	return nil
 }
 
-func (c Client) generateJoiningTable(type1, type1Table, type2, type2Table string) error {
+func (c *Client) generateJoiningTable(type1, type1Table, type2, type2Table string) error {
 	table := fmt.Sprintf(
 		`
 		CREATE TABLE IF NOT EXISTS %s_%s (
@@ -205,7 +220,7 @@ func (c Client) generateJoiningTable(type1, type1Table, type2, type2Table string
 	return err
 }
 
-func (c Client) InsertTestData(metadataPath, coversPath string) ([]Book, error) {
+func (c *Client) InsertTestData(metadataPath, coversPath string) ([]Book, error) {
 
 	fmt.Println()
 	fmt.Print("======= Inserting Test Data =======")
@@ -251,37 +266,37 @@ func (c Client) InsertTestData(metadataPath, coversPath string) ([]Book, error) 
 	return insertedBooks, nil
 }
 
-func (c *Client) Begin() error {
+func (c *Client) HandleTransaction(transaction func(c *Client) error) error {
+
+	if c.db == nil {
+		return fmt.Errorf("can't handle a transaction without a db. Is there already an active transaction?")
+	}
+
 	tx, err := c.db.Begin()
 	if err != nil {
 		return err
 	}
-	c.tx = tx
-	return nil
-}
+	defer tx.Rollback()
 
-func (c *Client) Rollback() error {
-	if c.tx == nil {
-		return nil
-	}
-	err := c.tx.Rollback()
+	err = transaction(&Client{
+		handler: tx,
+	})
 	if err != nil {
 		return err
 	}
-	c.tx = nil
-	return nil
-}
 
-func (c *Client) Commit() error {
-	if c.tx == nil {
-		return nil
-	}
-	err := c.tx.Commit()
+	err = tx.Commit()
 	if err != nil {
 		return err
 	}
-	c.tx = nil
+
 	return nil
+}
+func (c *Client) Close() {
+	err := c.db.Close()
+	if err != nil {
+		log.Fatal(err)
+	}
 }
 
 func buildSearchQuery(filters map[string][]string) (string, []any) {
