@@ -81,7 +81,7 @@ onUnmounted(() => {
 
 <template>
     <section class="downloads-view">
-        <header class="toolbar">
+        <header class="vue-heading">
             <h2>Downloads</h2>
             <div class="refresh">
                 <small>{{ lastRefresh }}</small>
@@ -103,15 +103,8 @@ onUnmounted(() => {
 .downloads-view {
     display: block;
     overflow-y: auto;
-    padding: 1rem;
     padding-bottom: 10rem;
     box-sizing: border-box;
-}
-
-.toolbar {
-    display: flex;
-    padding-bottom: 0.5rem;
-    justify-content: space-between;
 }
 
 .refresh {

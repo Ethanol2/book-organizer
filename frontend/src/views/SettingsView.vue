@@ -65,8 +65,8 @@ async function changePassword() {
 </script>
 
 <template>
-    <div class="settings-view">
-        <h2>Settings</h2>
+    <section class="settings-view">
+        <h2 class="vue-heading">Settings</h2>
 
         <h3>Authentication</h3>
         <section id="authentication"">
@@ -74,12 +74,12 @@ async function changePassword() {
             <div v-if="authStore.needsAuth && authStore.user">
                 <h4>Change Password</h4>
                 <form @submit.prevent="changePassword" @keypress="checkUserParams(false, false)">
-                    <input class="search-input" v-model="oldPassword" type="password" placeholder="Old Password"
+                    <input class="text-input" v-model="oldPassword" type="password" placeholder="Old Password"
                         name="password" required />
                     <small>Password must be at least 3 characters long</small>
-                    <input class="search-input" v-model="newPassword" type="password" placeholder="New Password"
+                    <input class="text-input" v-model="newPassword" type="password" placeholder="New Password"
                         name="password" required />
-                    <input class="search-input" v-model="passwordConfirm" type="password" placeholder="Confirm Password"
+                    <input class="text-input" v-model="passwordConfirm" type="password" placeholder="Confirm Password"
                         name="passwordConfirm" required />
                     <button class="search-button" type="submit" :disabled="!userParamsOk">Change Password</button>
                 </form>
@@ -91,12 +91,12 @@ async function changePassword() {
                 app be publically accessible.
                 <form @submit.prevent="registerUser" @keyup="checkUserParams(true, false)">
                     <small>Username must be at least 3 characters long</small>
-                    <input class="search-input" v-model="username" type="text" placeholder="Username" name="username"
+                    <input class="text-input" v-model="username" type="text" placeholder="Username" name="username"
                         required />
                     <small>Password must be at least 3 characters long</small>
-                    <input class="search-input" v-model="newPassword" type="password" placeholder="Password"
+                    <input class="text-input" v-model="newPassword" type="password" placeholder="Password"
                         name="password" required />
-                    <input class="search-input" v-model="passwordConfirm" type="password" placeholder="Confirm Password"
+                    <input class="text-input" v-model="passwordConfirm" type="password" placeholder="Confirm Password"
                         name="passwordConfirm" required />
                     <button class="search-button" type="submit" :disabled="!userParamsOk">Create User</button>
                 </form>
@@ -115,14 +115,13 @@ async function changePassword() {
         </div>
     </div>
     </section>
-    </div>
+    </section>
 </template>
 
 <style scoped>
 .settings-view {
     display: block;
     overflow-y: auto;
-    padding: 1rem;
     padding-bottom: 10rem;
     box-sizing: border-box;
 }

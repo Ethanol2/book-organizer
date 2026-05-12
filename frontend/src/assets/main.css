@@ -1,5 +1,36 @@
 @import './base.css';
 
+/* #region Vue Heading */
+
+.vue-heading {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.5rem;
+}
+
+.vue-heading button {
+    height: 100%;
+    padding: 0.75rem 1rem;
+    border-radius: 6px;
+    font-size: 0.95rem;
+    border: 1px solid var(--vt-c-divider-light-1);
+    box-sizing: border-box;
+    background: var(--vt-c-white);
+    color: var(--vt-c-text-light-1);
+    cursor: pointer;
+}
+
+.vue-heading button:hover {
+    background: var(--vt-c-white-soft);
+    border-color: var(--vt-c-brand);
+    color: var(--vt-c-brand);
+}
+
+/* #endregion */
+
+/* #region Modal styles */
+
 /* Modal overlay background */
 .modal-overlay {
   position: fixed;
@@ -44,31 +75,9 @@
   font-weight: 500;
 }
 
-/* Shared search tool styling for add book and library views */
-.search-panel {
-  display: grid;
-  gap: 1rem;
-}
+/* #endregion */
 
-.search-row {
-  display: grid;
-  grid-template-columns: minmax(220px, 1fr) minmax(170px, 180px) minmax(150px, 150px) auto auto;
-  gap: 0.75rem;
-  align-items: center;
-}
-
-.search-field {
-  display: flex;
-  flex-direction: row;
-  gap: 0.35rem;
-  font-size: 0.95rem;
-}
-
-.search-field span {
-  font-size: 0.82rem;
-}
-
-.search-input,
+.text-input,
 .search-select,
 .search-button,
 .toggle-button {
@@ -83,10 +92,7 @@
   color: var(--vt-c-text-light-1);
 }
 
-.search-select {
-  background: var(--vt-c-white);
-  color: var(--vt-c-text-light-1);
-}
+/* #region Buttons */
 
 .search-button {
   background: var(--color-primary-blue);
@@ -121,10 +127,6 @@
   gap: 1rem;
 }
 
-.advanced-panel .search-row {
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-}
-
 .delete-button,
 .confirm-delete-button {
   padding: 0.5rem 1rem;
@@ -154,6 +156,30 @@
 .confirm-delete-button:disabled {
   opacity: 0.65;
   cursor: not-allowed;
+}
+
+/* #endregion */
+
+.advanced-panel .search-row {
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+}
+
+/* Shared search tool styling for add book and library views */
+.search-panel {
+  display: grid;
+  gap: 1rem;
+}
+
+.search-row {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) minmax(170px, 180px) minmax(150px, 150px) auto auto;
+  gap: 0.75rem;
+  align-items: center;
+}
+
+.search-select {
+  background: var(--vt-c-white);
+  color: var(--vt-c-text-light-1);
 }
 
 @media (max-width: 900px) {

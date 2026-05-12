@@ -129,7 +129,7 @@ function closeModal() {
 
 <template>
   <section class="add-book">
-    <h2>Add Book</h2>
+    <h2 class="vue-heading">Add Book</h2>
 
     <div class="search-panel">
       <div class="search-row">
@@ -163,7 +163,7 @@ function closeModal() {
       </div>
 
       <div v-if="showAdvanced" class="advanced-panel">
-        <label class="search-field" v-if="metadataSearchFields.get(source)?.author">
+        <label class="search-field" v-if="metadataSearchFields.get(source)?.authors">
           <span>Author</span>
           <input
             class="search-input"
@@ -295,7 +295,6 @@ function closeModal() {
 .add-book {
   display: block;
   overflow-y: auto;
-  padding: 1rem;
   padding-bottom: 10rem;
   box-sizing: border-box;
 }

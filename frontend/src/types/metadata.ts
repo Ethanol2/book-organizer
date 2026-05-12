@@ -1,3 +1,4 @@
+import type { AdvancedSearchFields } from "@/types/advancedSearch.ts"
 import type { BookParams } from "./book"
 import { useNotificationsStore } from "@/stores/notifications"
 
@@ -23,22 +24,11 @@ export enum AudibleRegion {
   AU = "com.au"
 }
 
-export type MetadataSearchFields = {
-  title: boolean
-  author: boolean
-  year: boolean
-  publisher: boolean
-  isbn: boolean
-  asin: boolean
-  genres: boolean
-  languages: boolean
-  keywords: boolean
-}
-
-export const metadataSearchFields = new Map<MetadataType, MetadataSearchFields>()
+export const metadataSearchFields = new Map<MetadataType, AdvancedSearchFields>()
 metadataSearchFields.set(MetadataType.OpenLibrary, {
-  title: true,
-  author: true,
+  authors: true,
+  narrators: false,
+  tags: false,
   year: true,
   publisher: true,
   isbn: true,
@@ -46,10 +36,12 @@ metadataSearchFields.set(MetadataType.OpenLibrary, {
   languages: true,
   asin: false,
   keywords: false,
+  series: false
 })
 metadataSearchFields.set(MetadataType.GoogleBooks, {
-  title: true,
-  author: true,
+  authors: true,
+  narrators: false,
+  tags: false,
   year: true,
   publisher: true,
   isbn: true,
@@ -57,10 +49,12 @@ metadataSearchFields.set(MetadataType.GoogleBooks, {
   languages: true,
   asin: false,
   keywords: false,
+  series: false
 })
 metadataSearchFields.set(MetadataType.Audible, {
-  title: true,
-  author: true,
+  authors: true,
+  narrators: false,
+  tags: false,
   year: false,
   publisher: true,
   isbn: false,
@@ -68,6 +62,7 @@ metadataSearchFields.set(MetadataType.Audible, {
   languages: false,
   asin: true,
   keywords: true,
+  series: true
 })
 
 export type MetadataSearchParams = {
