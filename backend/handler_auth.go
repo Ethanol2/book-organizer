@@ -254,6 +254,7 @@ func (cfg *apiConfig) handlerDeleteUser(id uuid.UUID, w http.ResponseWriter, r *
 		cfg.authRequired = false
 	}
 
+	clearAuthCookies(w)
 	respondWithJson(w, http.StatusOK, struct {
 		Count int `json:"user_count"`
 	}{Count: count})

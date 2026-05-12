@@ -9,28 +9,40 @@ const username = ref('');
 const oldPassword = ref('');
 const newPassword = ref('');
 const passwordConfirm = ref('');
+const userParamsOk = ref(false);
 
-const confirmDeleteUser = ref(false);
+const deleterUserConfirm = ref(false);
 
-function checkUserParams(checkUsername: boolean = true): boolean {
+const usernameOk = () => username.value.length >= 3;
+const passwordOk = () => newPassword.value.length >= 3;
+const passwordConfirmOk = () => newPassword.value === passwordConfirm.value;
 
-    if (checkUsername) {
-        if (username.value.length < 3) {
-            useNotificationsStore().notifyError('Username must be at least 3 characters long');
-            return false;
+function checkUserParams(isRegistering: boolean = true, notifications: boolean = false): boolean {
+
+    //console.log("Checking params:", username.value, oldPassword.value, newPassword.value, passwordConfirm.value);
+
+    if (isRegistering) {
+        if (!usernameOk()) {
+            if (notifications) useNotificationsStore().notifyError('Username must be at least 3 characters long');
+            return userParamsOk.value = false;
         }
     }
-
-    if (newPassword.value.length < 3) {
-        useNotificationsStore().notifyError('Password must be at least 3 characters long');
-        return false;
+    else if (oldPassword.value === '') {
+        if (notifications) useNotificationsStore().notifyError('You must enter your old password to change it');
+        return userParamsOk.value = false;
     }
 
-    if (newPassword.value !== passwordConfirm.value) {
-        useNotificationsStore().notifyError('Passwords do not match');
-        return false;
+    if (!passwordOk()) {
+        if (notifications) useNotificationsStore().notifyError('Password must be at least 3 characters long');
+        return userParamsOk.value = false;
     }
-    return true;
+
+    if (!passwordConfirmOk()) {
+        if (notifications) useNotificationsStore().notifyError('Passwords do not match');
+        return userParamsOk.value = false;
+    }
+
+    return userParamsOk.value = true;
 }
 
 async function registerUser() {
@@ -56,38 +68,53 @@ async function changePassword() {
     <div class="settings-view">
         <h2>Settings</h2>
 
-        <section id="Users">
-            <h3>Users</h3>
-            <div class="card">
-                <div v-if="authStore.needsAuth && authStore.user">
-                    <h4>Change Password</h4>
-                    <form @submit.prevent="changePassword">
-                        <input class="search-input" v-model="oldPassword" type="password" placeholder="Old Password" />
-                        <input class="search-input" v-model="newPassword" type="password" placeholder="New Password" />
-                        <input class="search-input" v-model="passwordConfirm" type="password"
-                            placeholder="Confirm Password" />
-                        <button class="search-button" type="submit">Change Password</button>
-                    </form>
-                </div>
-                <div v-else>
-                    <h4>Create User</h4>
-                    Creating a user will force you to be logged in to use the app. Recommended if you plan on having the
-                    app be publically accessible.
-                    <form @submit.prevent="registerUser">
-                        <input v-model="username" type="text" placeholder="Username" />
-                        <input v-model="newPassword" type="password" placeholder="Password" />
-                        <input v-model="passwordConfirm" type="password" placeholder="Confirm Password" />
-                        <button type="submit">Create User</button>
-                    </form>
-                </div>
+        <h3>Authentication</h3>
+        <section id="authentication"">
+            <div class=" card">
+            <div v-if="authStore.needsAuth && authStore.user">
+                <h4>Change Password</h4>
+                <form @submit.prevent="changePassword" @keypress="checkUserParams(false, false)">
+                    <input class="search-input" v-model="oldPassword" type="password" placeholder="Old Password"
+                        name="password" required />
+                    <small>Password must be at least 3 characters long</small>
+                    <input class="search-input" v-model="newPassword" type="password" placeholder="New Password"
+                        name="password" required />
+                    <input class="search-input" v-model="passwordConfirm" type="password" placeholder="Confirm Password"
+                        name="passwordConfirm" required />
+                    <button class="search-button" type="submit" :disabled="!userParamsOk">Change Password</button>
+                </form>
             </div>
-            <div class="card" v-if="authStore.needsAuth && authStore.user">
-                <h4>Remove User</h4>
-                <button class="delete-button" type="button" @click="() => confirmDeleteUser = true">Delete User</button>
-                <button v-if="confirmDeleteUser" class="delete-button" type="button"
-                    @click="confirmDeleteUser = true">Delete Account</button>
+            <div v-else>
+                <h4>Create User</h4>
+                Creating a user will enable authentication, meaning you will need to log in before using the app.
+                Recommended if you plan on having the
+                app be publically accessible.
+                <form @submit.prevent="registerUser" @keyup="checkUserParams(true, false)">
+                    <small>Username must be at least 3 characters long</small>
+                    <input class="search-input" v-model="username" type="text" placeholder="Username" name="username"
+                        required />
+                    <small>Password must be at least 3 characters long</small>
+                    <input class="search-input" v-model="newPassword" type="password" placeholder="Password"
+                        name="password" required />
+                    <input class="search-input" v-model="passwordConfirm" type="password" placeholder="Confirm Password"
+                        name="passwordConfirm" required />
+                    <button class="search-button" type="submit" :disabled="!userParamsOk">Create User</button>
+                </form>
             </div>
-        </section>
+    </div>
+    <div class="card" v-if="authStore.needsAuth && authStore.user">
+        <h4>Remove User</h4>
+        <p>Removing the user will remove all authentication from the app. You should not remove the user if your
+            app is publically accessible.</p>
+        <div class="warning-box">
+            <label for="deleterUserConfirm">I understand <input type="checkbox" v-model="deleterUserConfirm"
+                    id="deleterUserConfirm"></label>
+
+            <button class="delete-button" :disabled="!deleterUserConfirm" @click="authStore.deleteUser">Remove
+                User</button>
+        </div>
+    </div>
+    </section>
     </div>
 </template>
 
@@ -100,11 +127,21 @@ async function changePassword() {
     box-sizing: border-box;
 }
 
+.settings-view section {
+    display: flex;
+    gap: 0.8rem;
+    margin-top: 0.8rem;
+    height: 100%;
+}
+
 .card {
-    width: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    width: -webkit-fill-available;
     border: 1px solid var(--color-gray-700);
     border-radius: 6px;
-    padding: 6px;
+    padding: 1rem;
     margin-bottom: 1rem;
 }
 
@@ -112,6 +149,13 @@ async function changePassword() {
     display: flex;
     flex-direction: column;
     gap: 0.5rem;
+    margin-top: 1rem;
+}
+
+.card h4 {
+    margin: 0;
+    margin-bottom: 0.5rem;
+    font-size: 1rem;
 }
 
 .settings-view h3 {
@@ -120,9 +164,35 @@ async function changePassword() {
     font-size: 1.2rem;
 }
 
-.card h4 {
-    margin: 0;
-    margin-bottom: 0.5rem;
-    font-size: 1rem;
+.warning-box {
+    display: flex;
+    justify-content: space-between;
+    background: var(--color-warning-background);
+    border: 1px solid var(--color-warning-border);
+    border-radius: 6px;
+    padding: 1rem;
+    margin-top: 1rem;
+}
+
+.warning-box label {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+@media (max-width: 768px) {
+    .settings-view section {
+        display: flex;
+        flex-direction: column;
+        gap: 0.8rem;
+        margin-bottom: 0.8rem;
+        height: 100%;
+    }
+
+    .warning-box {
+        flex-direction: column;
+        align-content: center;
+        gap: 1rem;
+    }
 }
 </style>

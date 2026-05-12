@@ -140,14 +140,20 @@
   background: #d9534f;
 }
 
+.confirm-delete-button {
+  border: 1px solid #d43f3a;
+  background: #d9534f;
+}
+
 .delete-button:hover,
 .confirm-delete-button:hover {
   background: #c9302c;
 }
 
-.confirm-delete-button {
-  border: 1px solid #d43f3a;
-  background: #d9534f;
+.delete-button:disabled,
+.confirm-delete-button:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
 }
 
 @media (max-width: 900px) {

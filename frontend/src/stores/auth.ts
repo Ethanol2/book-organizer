@@ -1,5 +1,5 @@
 import { defineStore } from "pinia";
-import { useNotificationsStore } from "./notifications";
+import { useNotificationsStore, type NotificationType } from "./notifications";
 import api from "@/services/api";
 import { isAxiosError } from "axios";
 
@@ -54,12 +54,14 @@ export const useAuthStore = defineStore('auth', {
             catch (err) {
                 console.error('Error refreshing session:', err);
                 useNotificationsStore().notifyError("The session could not be refreshed")
+                await waitAndRefresh();
             }
         },
         async register(params: UserParams) {
             try {
                 await api.post('/api/auth/register', params)
                 useNotificationsStore().notifySuccess('User registered successfully!')
+                await waitAndRefresh();
             }
             catch (err) {
                 console.error('Error registering user:', err);
@@ -104,8 +106,8 @@ export const useAuthStore = defineStore('auth', {
             try {
                 await api.post('/api/auth/logout')
                 this.user = null;
-                useNotificationsStore().notifySuccess('Logged out successfully!')
-                window.location.reload();
+                useNotificationsStore().notifySuccess('You have been logged out');
+                await waitAndRefresh(1, false);
             }
             catch (err) {
                 console.error('Error logging out:', err);
@@ -150,8 +152,18 @@ export const useAuthStore = defineStore('auth', {
                 return;
             }
             try {
-                await api.delete('/api/auth/users/' + this.user.id);
+                const resp = await api.delete('/api/auth/users/' + this.user.id);
                 useNotificationsStore().notifySuccess('User deleted successfully!');
+
+                this.user = null;
+                if (resp.data.user_count === 0) {
+                    this.needsAuth = false;
+                    useNotificationsStore().notifyInfo('Authentication has been disabled');
+                    await waitAndRefresh(2, true);
+                } else {
+                    useNotificationsStore().notifyInfo('You have been logged out');
+                    await waitAndRefresh(2, true);                    
+                }
             }
             catch (err) {
                 console.error('Error deleting user:', err);
@@ -160,3 +172,15 @@ export const useAuthStore = defineStore('auth', {
         }
     }
 });
+
+async function waitAndRefresh(seconds: number = 2, countdown: boolean = true) {
+    const notifId = countdown ? useNotificationsStore().notifyInfo("Refreshing in " + seconds + " seconds...", seconds * 1000) : '';
+    while (seconds > 0) {
+        if (countdown) {
+            useNotificationsStore().updateNotification(notifId, "Refreshing in " + seconds + " seconds...");
+        }
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        seconds--;
+    }
+    window.location.reload();
+}

@@ -27,6 +27,10 @@
   --vt-c-text-dark-1: #f4efe6;
   --vt-c-text-dark-2: rgba(244, 239, 230, 0.7);
   --vt-c-text-subtle: #8f8577;
+
+  /* Screen Sizes */
+  --screen-mobile-max: 768px;
+  --screen-desktop-min: 769px;
 }
 
 /* semantic color variables */

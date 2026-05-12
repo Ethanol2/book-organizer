@@ -27,16 +27,16 @@ const authStore = useAuthStore();
       <div v-if="menuOpen" class="backdrop" @click="menuOpen = false"></div>
       <aside class="sidebar" :class="{ open: menuOpen }">
         <nav>
-          <template v-if="!authStore.isAuthenticated">
+          <div v-if="!authStore.isAuthenticated">
             <RouterLink to="/login" @click="menuOpen = false">Login</RouterLink>
-          </template>
-          <template v-else>
+          </div>
+          <div v-else>
             <RouterLink to="/" @click="menuOpen = false">Library</RouterLink>
             <RouterLink to="/add-book" @click="menuOpen = false">Add Book</RouterLink>
             <RouterLink to="/downloads" @click="menuOpen = false">Downloads</RouterLink>
             <RouterLink to="/settings" @click="menuOpen = false">Settings</RouterLink>
             <span v-if="authStore.isAuthenticated && authStore.needsAuth" class="logout-button" @click="authStore.logout">Logout</span>
-          </template>
+          </div>
           <RouterLink to="/about" @click="menuOpen = false">About</RouterLink>
         </nav>
       </aside>
@@ -108,6 +108,12 @@ const authStore = useAuthStore();
   box-shadow: 5px 5px 5px rgba(0, 0, 0, 0.4);
 }
 
+.sidebar div {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
 .content {
   padding: 1.5rem;
   overflow-y: auto;
@@ -125,7 +131,9 @@ const authStore = useAuthStore();
 nav {
   display: flex;
   flex-direction: column;
-  margin-top: 1rem;
+  justify-content: space-between;
+  height: 100%;
+  padding: 1rem 0 1rem 0;
 }
 
 nav a {
@@ -139,6 +147,8 @@ nav a.router-link-exact-active {
 }
 
 .logout-button {
+  display:inline-block;
+  height:24px;
   margin-top: 1rem;
   cursor: pointer;
 }

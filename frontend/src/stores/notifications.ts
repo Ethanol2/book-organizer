@@ -1,7 +1,7 @@
 import { ref } from 'vue'
 import { defineStore } from 'pinia'
 
-type NotificationType = 'success' | 'error' | 'info'
+export type NotificationType = 'success' | 'error' | 'info'
 
 export type Notification = {
   id: string
@@ -14,6 +14,15 @@ export const useNotificationsStore = defineStore('notifications', () => {
 
   function removeNotification(id: string) {
     notifications.value = notifications.value.filter((notification) => notification.id !== id)
+  }
+
+  function updateNotification(id: string, message: string) {
+    notifications.value = notifications.value.map((notification) => {
+      if (notification.id === id) {
+        return { ...notification, message }
+      }
+      return notification
+    })
   }
 
   function notify(message: string, type: NotificationType = 'success', timeout = 4000) {
@@ -43,5 +52,6 @@ export const useNotificationsStore = defineStore('notifications', () => {
     notifyError,
     notifyInfo,
     removeNotification,
+    updateNotification,
   }
 })
