@@ -101,20 +101,20 @@ async function changePassword() {
                     <button class="search-button" type="submit" :disabled="!userParamsOk">Create User</button>
                 </form>
             </div>
-    </div>
-    <div class="card" v-if="authStore.needsAuth && authStore.user">
-        <h4>Remove User</h4>
-        <p>Removing the user will remove all authentication from the app. You should not remove the user if your
-            app is publically accessible.</p>
-        <div class="warning-box">
-            <label for="deleterUserConfirm">I understand <input type="checkbox" v-model="deleterUserConfirm"
-                    id="deleterUserConfirm"></label>
+            </div>
+            <div class="card" v-if="authStore.needsAuth && authStore.user">
+                <h4>Remove User</h4>
+                <p>Removing the user will remove all authentication from the app. You should not remove the user if your
+                    app is publically accessible.</p>
+                <div class="warning-box">
+                    <label for="deleterUserConfirm">I understand <input type="checkbox" v-model="deleterUserConfirm"
+                            id="deleterUserConfirm"></label>
 
-            <button class="delete-button" :disabled="!deleterUserConfirm" @click="authStore.deleteUser">Remove
-                User</button>
-        </div>
-    </div>
-    </section>
+                    <button class="delete-button" :disabled="!deleterUserConfirm" @click="authStore.deleteUser">Remove
+                        User</button>
+                </div>
+            </div>
+        </section>
     </section>
 </template>
 
@@ -128,6 +128,7 @@ async function changePassword() {
 
 .settings-view section {
     display: flex;
+    justify-content: center;
     gap: 0.8rem;
     margin-top: 0.8rem;
     height: 100%;
@@ -138,6 +139,7 @@ async function changePassword() {
     flex-direction: column;
     justify-content: space-between;
     width: -webkit-fill-available;
+    max-width: 600px;
     border: 1px solid var(--color-gray-700);
     border-radius: 6px;
     padding: 1rem;
