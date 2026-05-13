@@ -46,6 +46,9 @@ func (cfg *apiConfig) handlerMetadataSearch(w http.ResponseWriter, r *http.Reque
 	if genres := r.URL.Query()["genre"]; len(genres) > 0 {
 		searchParams.Genres = &genres
 	}
+	if keywords := r.URL.Query()["keywords"]; len(keywords) > 0 {
+		searchParams.Keywords = &keywords
+	}
 	if langs := r.URL.Query()["language"]; len(langs) > 0 {
 		searchParams.Languages = &langs
 	}

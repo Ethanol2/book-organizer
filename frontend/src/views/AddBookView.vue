@@ -4,25 +4,16 @@ import { useRoute, useRouter } from 'vue-router'
 import type { BookParams } from '@/types/book'
 import AddBookModal from '../components/AddBookModal.vue'
 import ResultItem from '../components/ResultItem.vue'
-import { MetadataType, searchMetadataSource, getMetadataDetails, metadataSearchFields, AudibleRegion } from '@/types/metadata'
+import { searchMetadataSource, getMetadataDetails } from '@/types/metadata'
 import { postBook } from '@/types/book'
+import { NewSearchTerms, type SearchTerms } from '@/types/search'
+import SearchControls from '@/components/SearchControls.vue'
 
 // Router utilities for URL parameter management
 const route = useRoute()
 
-// Search filter state
-const source = ref<MetadataType>(MetadataType.OpenLibrary)
-const title = ref('')
-const author = ref('')
-const year = ref('')
-const publisher = ref('')
-const isbn = ref('')
-const asin = ref('')
-const genres = ref('')
-const languages = ref('')
-const keywords = ref('')
-
-const region = ref<AudibleRegion>(AudibleRegion.US)
+// Search Terms
+const searchTerms = ref<SearchTerms>(NewSearchTerms())
 
 // Pagination and result state
 const page = ref(1)
@@ -35,7 +26,6 @@ const count = ref(0)
 // UI state
 const loading = ref(false)
 const error = ref('')
-const showAdvanced = ref(false)
 const showModal = ref(false)
 const selectedItem = ref<BookParams | null>(null)
 
@@ -44,42 +34,26 @@ const hasMultiplePages = computed(() => totalCount.value > limit)
 const isFirstPage = computed(() => page.value === 1)
 const isLastPage = computed(() => (page.value - 1) * limit + count.value >= totalCount.value)
 
-function resetSearch() {
-  title.value = ''
-  author.value = ''
-  year.value = ''
-  publisher.value = ''
-  isbn.value = ''
-  genres.value = ''
-  languages.value = ''
-  page.value = 1
-  results.value = []
-  totalCount.value = 0
-  offset.value = 0
-  count.value = 0
-}
-
 async function addBook(book: BookParams) {
   const ok = await postBook(book)
   if (ok != null) closeModal()
 }
 
+function setTermsAndSearch(terms: SearchTerms) {
+  searchTerms.value = terms
+  page.value = 1
+  searchBooks()
+}
+function clearSearch() {
+  searchTerms.value = NewSearchTerms()
+  page.value = 1
+  searchBooks()
+}
+
 async function searchBooks() {
   loading.value = true
 
-  const searchResults = await searchMetadataSource({
-    source: source.value,
-    title: title.value,
-    author: author.value,
-    year: year.value,
-    publisher: publisher.value,
-    isbn: isbn.value,
-    genres: source.value === MetadataType.Audible ? keywords.value : genres.value,
-    languages: languages.value,
-    page: page.value,
-    pageLimit: limit,
-    region: region.value
-  })
+  const searchResults = await searchMetadataSource(searchTerms.value, limit, page.value)
 
   //console.log(searchResults)
 
@@ -92,10 +66,6 @@ async function searchBooks() {
 }
 
 // Fetch search results from metadata API
-async function searchBooksAndResetPage() {
-  page.value = 1
-  await searchBooks()
-}
 
 // Pagination handlers
 function prevPage() {
@@ -131,128 +101,7 @@ function closeModal() {
   <section class="add-book">
     <h2 class="vue-heading">Add Book</h2>
 
-    <div class="search-panel">
-      <div class="search-row">
-        <div class="source-region">
-          <select class="search-select" v-model="source" aria-label="Metadata source">
-            <option v-for="(type, value) in MetadataType" :key="value" :value="type">
-              {{ type }}
-            </option>
-          </select>
-          <select class="search-select region" v-model="region" aria-label="Audible Region" v-show="source == MetadataType.Audible">
-            <option v-for="(type, value) in AudibleRegion" :key="value" :value="type">
-              .{{ type }}
-            </option>
-          </select>
-        </div>
-        <input
-          class="search-input"
-          v-model="title"
-          type="text"
-          placeholder="Enter title"
-          @keyup.enter="searchBooksAndResetPage"
-          aria-label="Book title"
-        />
-        <button class="search-button" type="button" @click="searchBooksAndResetPage" :disabled="loading">Search</button>
-        <div class="source-region">
-          <button class="toggle-button" type="button" @click="showAdvanced = !showAdvanced">
-            {{ showAdvanced ? 'Hide' : 'Advanced' }}
-          </button>
-          <button class="toggle-button" type="button" @click="resetSearch">Reset</button>
-        </div>
-      </div>
-
-      <div v-if="showAdvanced" class="advanced-panel">
-        <label class="search-field" v-if="metadataSearchFields.get(source)?.authors">
-          <span>Author</span>
-          <input
-            class="search-input"
-            v-model="author"
-            type="text"
-            placeholder="Author"
-            aria-label="Author"
-            @keyup.enter="searchBooksAndResetPage"
-          />
-        </label>
-        <label class="search-field" v-if="metadataSearchFields.get(source)?.year">
-          <span>Year</span>
-          <input
-            class="search-input"
-            v-model="year"
-            type="text"
-            placeholder="Year"
-            aria-label="Year"
-            @keyup.enter="searchBooksAndResetPage"
-          />
-        </label>
-        <label class="search-field" v-if="metadataSearchFields.get(source)?.publisher">
-          <span>Publisher</span>
-          <input
-            class="search-input"
-            v-model="publisher"
-            type="text"
-            placeholder="Publisher"
-            aria-label="Publisher"
-            @keyup.enter="searchBooksAndResetPage"
-          />
-        </label>
-        <label class="search-field" v-if="metadataSearchFields.get(source)?.isbn">
-          <span>ISBN</span>
-          <input
-            class="search-input"
-            v-model="isbn"
-            type="text"
-            placeholder="ISBN"
-            aria-label="ISBN"
-            @keyup.enter="searchBooksAndResetPage"
-          />
-        </label>
-        <label class="search-field" v-if="metadataSearchFields.get(source)?.asin">
-          <span>ASIN</span>
-          <input
-            class="search-input"
-            v-model="asin"
-            type="text"
-            placeholder="ASIN"
-            aria-label="ASIN"
-            @keyup.enter="searchBooksAndResetPage"
-          />
-        </label>
-        <label class="search-field" v-if="metadataSearchFields.get(source)?.genres">
-          <span>Genres</span>
-          <input
-            class="search-input"
-            v-model="genres"
-            type="text"
-            placeholder="Genres (comma-separated)"
-            aria-label="Genres"
-            @keyup.enter="searchBooksAndResetPage"
-          />
-        </label>
-        <label class="search-field" v-if="metadataSearchFields.get(source)?.languages">
-          <span>Languages</span>
-          <input
-            class="search-input"
-            v-model="languages"
-            type="text"
-            placeholder="Languages (comma-separated)"
-            aria-label="Languages"
-            @keyup.enter="searchBooksAndResetPage"
-          />
-        </label>
-        <label class="search-field" v-if="metadataSearchFields.get(source)?.keywords">
-          <span>Keywords</span>
-          <input
-            class="search-input"
-            v-model="keywords"
-            type="text"
-            placeholder="Keywords (comma-separated)"
-            aria-label="Keywords"
-            @keyup.enter="searchBooksAndResetPage"
-          />
-        </label>
-      </div>
-    </div>
+    <SearchControls placeholder="Search metadata" :metadata="true" @search="setTermsAndSearch($event)" @reset="clearSearch" />
 
     <div class="search-meta">
       <span v-if="count > 0">Results: {{ count }} / {{ totalCount }}</span>
@@ -262,12 +111,7 @@ function closeModal() {
     <div v-if="error" class="error">{{ error }}</div>
 
     <ul class="results" v-if="results.length > 0">
-      <ResultItem
-        v-for="(item, index) in results"
-        :key="index"
-        :item="item"
-        @click="openModal(item)"
-      />
+      <ResultItem v-for="(item, index) in results" :key="index" :item="item" @click="openModal(item)" />
     </ul>
 
     <div v-if="hasMultiplePages" class="pagination">
@@ -282,12 +126,7 @@ function closeModal() {
   </section>
 
   <!-- Modal component for adding books -->
-  <AddBookModal
-    :show="showModal"
-    :params="selectedItem"
-    @close="closeModal"
-    @add-book="addBook"
-  />
+  <AddBookModal :show="showModal" :params="selectedItem" @close="closeModal" @add-book="addBook" />
 </template>
 
 <style scoped>
@@ -332,19 +171,9 @@ function closeModal() {
   flex-direction: column;
 }
 
-.add-book .search-row > .search-button,
-.add-book .search-row > .toggle-button {
+.add-book .search-row>.search-button,
+.add-book .search-row>.toggle-button {
   width: 100%;
-}
-
-.search-select.region {
-  width: 100%;
-}
-
-.source-region {
-  display: flex;
-  gap: 0.7rem;
-  height: 100%;
 }
 
 /* Desktop layout: restore multi-column grid */
@@ -367,8 +196,8 @@ function closeModal() {
     color: var(--color-text);
   }
 
-  .add-book .search-row > .search-button,
-  .add-book .search-row > .toggle-button {
+  .add-book .search-row>.search-button,
+  .add-book .search-row>.toggle-button {
     width: auto;
   }
 

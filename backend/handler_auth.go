@@ -45,7 +45,7 @@ func (cfg *apiConfig) handlerGetAuthStatus(w http.ResponseWriter, r *http.Reques
 
 	var user *database.User
 	if id, err := authenticate(true, r, cfg.tokenSecret); err == nil {
-		usr, err := cfg.db.GetUser(id)
+		usr, _, err := cfg.db.GetUser(id)
 		if err != nil {
 			respondWithError(w, http.StatusInternalServerError, DatabaseError, err)
 			return
@@ -103,7 +103,7 @@ func (cfg *apiConfig) handlerRegister(w http.ResponseWriter, r *http.Request) {
 
 	var user database.User
 	err = cfg.db.HandleTransaction(func(c *database.Client) error {
-		user, err = cfg.db.AddUser(params)
+		user, _, err = cfg.db.AddUser(params)
 		return err
 	})
 	if err != nil {
@@ -111,7 +111,6 @@ func (cfg *apiConfig) handlerRegister(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user.Password = ""
 	respondWithJson(w, http.StatusOK, user)
 }
 
@@ -123,7 +122,7 @@ func (cfg *apiConfig) handlerLogin(w http.ResponseWriter, r *http.Request) {
 		respondWithError(w, http.StatusBadRequest, BodyDecodeError, err)
 	}
 
-	user, err := cfg.db.GetUserWithUsername(login.Username)
+	user, password, err := cfg.db.GetUserWithUsername(login.Username)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			respondWithError(w, http.StatusNotFound, "Username not found", err)
@@ -133,7 +132,7 @@ func (cfg *apiConfig) handlerLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if ok, err := auth.CheckPassword(login.Password, user.Password); err != nil {
+	if ok, err := auth.CheckPassword(login.Password, password); err != nil {
 		respondWithError(w, http.StatusInternalServerError, "Authentication error", err)
 		return
 	} else if !ok {
@@ -156,7 +155,6 @@ func (cfg *apiConfig) handlerLogin(w http.ResponseWriter, r *http.Request) {
 	addJWTCookie(w, token)
 	addRefreshCookie(w, refresh, refreshLifetime)
 
-	user.Password = ""
 	respondWithJson(w, http.StatusOK, user)
 }
 
@@ -202,7 +200,7 @@ func (cfg *apiConfig) handlerRefresh(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user, err := cfg.db.GetUser(info.UserId)
+	user, _, err := cfg.db.GetUser(info.UserId)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			respondWithError(w, http.StatusUnauthorized, AuthBadAuthorization, err)
@@ -272,13 +270,13 @@ func (cfg *apiConfig) handlerUpdatePassword(id uuid.UUID, w http.ResponseWriter,
 		return
 	}
 
-	user, err := cfg.db.GetUser(id)
+	user, password, err := cfg.db.GetUser(id)
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, DatabaseError, err)
 		return
 	}
 
-	if ok, err := auth.CheckPassword(params.OldPassword, user.Password); err != nil {
+	if ok, err := auth.CheckPassword(params.OldPassword, password); err != nil {
 		respondWithError(w, http.StatusInternalServerError, "Authentication error", err)
 		return
 	} else if !ok {
@@ -292,12 +290,11 @@ func (cfg *apiConfig) handlerUpdatePassword(id uuid.UUID, w http.ResponseWriter,
 		return
 	}
 
-	user, err = cfg.db.UpdatePassword(id, hash)
+	user, _, err = cfg.db.UpdatePassword(id, hash)
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, DatabaseError, err)
 		return
 	}
-	user.Password = ""
 
 	respondWithJson(w, http.StatusOK, user)
 }

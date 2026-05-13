@@ -121,9 +121,9 @@ func SearchAudible(params SearchParams, region string, cache *cache.Cache) (Sear
 	if params.Author != nil {
 		q.Add("author", *params.Author)
 	}
-	if params.Genres != nil {
-		for _, genre := range *params.Genres {
-			q.Add("keywords", genre)
+	if params.Keywords != nil {
+		for _, keyword := range *params.Keywords {
+			q.Add("keywords", keyword)
 		}
 	}
 	if params.Page != nil {

@@ -11,12 +11,12 @@ type User struct {
 	Id        uuid.UUID `json:"id"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
-	UserParams
+	Username  string    `json:"username"`
 }
 
 type UserParams struct {
 	Username string `json:"username"`
-	Password string `json:"password,omitempty"`
+	Password string `json:"password"`
 }
 
 type RefreshTokenInfo struct {
@@ -42,7 +42,7 @@ func (c *Client) CountUsers() (int, error) {
 	return count, nil
 }
 
-func (c *Client) AddUser(params UserParams) (User, error) {
+func (c *Client) AddUser(params UserParams) (User, string, error) {
 
 	_, err := c.handler.Exec(
 		"INSERT INTO users (id, username, password_hash, created_at, updated_at) VALUES (?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)",
@@ -51,41 +51,43 @@ func (c *Client) AddUser(params UserParams) (User, error) {
 		params.Password,
 	)
 	if err != nil {
-		return User{}, err
+		return User{}, "", err
 	}
 
 	return c.GetUserWithUsername(params.Username)
 }
 
-func (c *Client) UpdatePassword(id uuid.UUID, password string) (User, error) {
+func (c *Client) UpdatePassword(id uuid.UUID, password string) (User, string, error) {
 
 	_, err := c.handler.Exec("UPDATE users SET password_hash = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?", password, id)
 	if err != nil {
-		return User{}, err
+		return User{}, "", err
 	}
 
 	return c.GetUser(id)
 }
 
-func (c *Client) GetUser(id uuid.UUID) (User, error) {
+func (c *Client) GetUser(id uuid.UUID) (User, string, error) {
 
 	var user User
-	err := c.handler.QueryRow("SELECT * FROM users WHERE id = ?", id).Scan(&user.Id, &user.Username, &user.Password, &user.CreatedAt, &user.UpdatedAt)
+	var password string
+	err := c.handler.QueryRow("SELECT * FROM users WHERE id = ?", id).Scan(&user.Id, &user.Username, &password, &user.CreatedAt, &user.UpdatedAt)
 	if err != nil {
-		return User{}, err
+		return User{}, "", err
 	}
-	return user, nil
+	return user, password, nil
 
 }
 
-func (c *Client) GetUserWithUsername(username string) (User, error) {
+func (c *Client) GetUserWithUsername(username string) (User, string, error) {
 
 	var user User
-	err := c.handler.QueryRow("SELECT * FROM users WHERE username = ?", username).Scan(&user.Id, &user.Username, &user.Password, &user.CreatedAt, &user.UpdatedAt)
+	var password string
+	err := c.handler.QueryRow("SELECT * FROM users WHERE username = ?", username).Scan(&user.Id, &user.Username, &password, &user.CreatedAt, &user.UpdatedAt)
 	if err != nil {
-		return User{}, err
+		return User{}, "", err
 	}
-	return user, nil
+	return user, password, nil
 }
 
 func (c *Client) DeleteUser(id uuid.UUID) (int, error) {

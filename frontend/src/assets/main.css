@@ -77,9 +77,11 @@
 
 /* #endregion */
 
+/* #region Buttons */
+
 .text-input,
-.search-select,
-.search-button,
+.dropdown-select,
+.green-button,
 .toggle-button {
   width: 100%;
   height: 100%;
@@ -92,20 +94,23 @@
   color: var(--vt-c-text-light-1);
 }
 
-/* #region Buttons */
+.dropdown-select {
+  background: var(--vt-c-white);
+  color: var(--vt-c-text-light-1);
+}
 
-.search-button {
+.green-button {
   background: var(--color-primary-blue);
   color: var(--vt-c-text-light-1);
   border: none;
   cursor: pointer;
 }
 
-.search-button:hover {
+.green-button:hover {
   background: var(--color-primary-blue-dark);
 }
 
-.search-button:disabled {
+.green-button:disabled {
   opacity: 0.65;
   cursor: not-allowed;
 }
@@ -117,8 +122,11 @@
   cursor: pointer;
 }
 
+.dropdown-select:hover,
 .toggle-button:hover {
-  background: var(--vt-c-white-soft);
+    background: var(--vt-c-white-soft);
+    border-color: var(--vt-c-brand);
+    color: var(--vt-c-brand);
 }
 
 .advanced-panel {
@@ -162,24 +170,6 @@
 
 .advanced-panel .search-row {
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-}
-
-/* Shared search tool styling for add book and library views */
-.search-panel {
-  display: grid;
-  gap: 1rem;
-}
-
-.search-row {
-  display: grid;
-  grid-template-columns: minmax(220px, 1fr) minmax(170px, 180px) minmax(150px, 150px) auto auto;
-  gap: 0.75rem;
-  align-items: center;
-}
-
-.search-select {
-  background: var(--vt-c-white);
-  color: var(--vt-c-text-light-1);
 }
 
 @media (max-width: 900px) {

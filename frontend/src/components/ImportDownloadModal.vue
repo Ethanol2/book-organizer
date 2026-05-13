@@ -5,7 +5,7 @@ import { useNotificationsStore } from '@/stores/notifications';
 import type { Download } from '@/types/download';
 import { postBook, type BookSummary, type BookParams, getCategoriesString } from '@/types/book';
 import { getDownloadName } from '@/types/download';
-import { AudibleRegion, getMetadataDetails, MetadataType, searchMetadataSource } from '@/types/metadata';
+import { AudibleRegion, getMetadataDetails, MetadataSource, searchMetadataSource } from '@/types/metadata';
 import api from '@/services/api';
 
 const router = useRouter();
@@ -25,7 +25,7 @@ const searchQuery = ref('');
 const searchResults = ref<BookSummary[] | BookParams[]>([]);
 const isLoading = ref(false);
 const useDownloadedCover = ref(true);
-const source = ref<MetadataType | string>('Library');
+const source = ref<MetadataSource | string>('Library');
 const region = ref<AudibleRegion>(AudibleRegion.US)
 const libraryPage = ref(1);
 const libraryPageSize = 10;
@@ -128,7 +128,7 @@ const performSearch = async () => {
     }
 
     const metadataResults = await searchMetadataSource({
-      source: source.value as MetadataType,
+      source: source.value as MetadataSource,
       title: searchQuery.value,
       page: 1,
       pageLimit: 10,
@@ -285,12 +285,12 @@ watch(() => props.modelShow, (newVal) => {
         <label class="search-field">
             <select class="search-select" v-model="source" @change="performSearch">
                 <option value='Library'>Library</option>
-                <option v-for="(type, value) in MetadataType" :key="value" :value="type">
+                <option v-for="(type, value) in MetadataSource" :key="value" :value="type">
                   {{ type }}
                 </option>
             </select>
 
-            <select class="search-select region" v-model="region" aria-label="Audible Region" v-show="source == MetadataType.Audible" @change="performSearch">
+            <select class="search-select region" v-model="region" aria-label="Audible Region" v-show="source == MetadataSource.Audible" @change="performSearch">
             <option v-for="(type, value) in AudibleRegion" :key="value" :value="type">
               .{{ type }}
             </option>
