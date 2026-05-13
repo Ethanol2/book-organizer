@@ -112,6 +112,8 @@ func (cfg *apiConfig) handlerRegister(w http.ResponseWriter, r *http.Request) {
 	}
 
 	respondWithJson(w, http.StatusOK, user)
+
+	log.Printf("New user \"%s\" created\n", params.Username)
 }
 
 func (cfg *apiConfig) handlerLogin(w http.ResponseWriter, r *http.Request) {
@@ -156,6 +158,8 @@ func (cfg *apiConfig) handlerLogin(w http.ResponseWriter, r *http.Request) {
 	addRefreshCookie(w, refresh, refreshLifetime)
 
 	respondWithJson(w, http.StatusOK, user)
+
+	log.Printf("%s has logged in\n", user.Username)
 }
 
 func (cfg *apiConfig) handlerLogout(w http.ResponseWriter, r *http.Request) {
@@ -171,10 +175,12 @@ func (cfg *apiConfig) handlerLogout(w http.ResponseWriter, r *http.Request) {
 
 	clearAuthCookies(w)
 	w.WriteHeader(http.StatusOK)
+
+	log.Println("User logged out")
 }
 
 func (cfg *apiConfig) handlerRefresh(w http.ResponseWriter, r *http.Request) {
-	refresh, err := auth.GetBearerToken(r)
+	refresh, err := auth.GetRefreshToken(r)
 	if err != nil {
 		respondWithError(w, http.StatusUnauthorized, AuthBadAuthorization, err)
 		return
@@ -233,6 +239,8 @@ func (cfg *apiConfig) handlerRefresh(w http.ResponseWriter, r *http.Request) {
 	addJWTCookie(w, token)
 	addRefreshCookie(w, refresh, refreshLifetime)
 	w.WriteHeader(http.StatusNoContent)
+
+	log.Printf("%s refresh their session\n", user.Username)
 }
 
 func (cfg *apiConfig) handlerDeleteUser(id uuid.UUID, w http.ResponseWriter, r *http.Request) {
@@ -250,6 +258,8 @@ func (cfg *apiConfig) handlerDeleteUser(id uuid.UUID, w http.ResponseWriter, r *
 	if count == 0 {
 		log.Println("ALL USERS HAVE BEEN DELETED. THE APP WILL NO LONGER USE AUTHENTICATION")
 		cfg.authRequired = false
+	} else {
+		log.Printf("User with id \"%s\" deleted\n", id)
 	}
 
 	clearAuthCookies(w)
@@ -297,4 +307,6 @@ func (cfg *apiConfig) handlerUpdatePassword(id uuid.UUID, w http.ResponseWriter,
 	}
 
 	respondWithJson(w, http.StatusOK, user)
+
+	log.Printf("%s updated their password\n", user.Username)
 }

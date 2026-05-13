@@ -73,6 +73,7 @@ export const useAuthStore = defineStore('auth', {
                 const resp = await api.post('/api/auth/login', params)
                 this.user = resp.data.user as User;
                 useNotificationsStore().notifySuccess('Logged in successfully!')
+                waitAndRefresh(1, false);
                 return true;
             }
             catch (err) {

@@ -151,7 +151,7 @@ func (c *Client) GetRefreshToken(token string) (RefreshTokenInfo, error) {
 
 func (c *Client) RevokeRefreshToken(token string) error {
 
-	_, err := c.handler.Exec("UPDATE request_tokens SET revoked_at = ? WHERE token = ?", time.Now().UTC(), token)
+	_, err := c.handler.Exec("UPDATE refresh_tokens SET revoked_at = ? WHERE token = ?", time.Now().UTC(), token)
 	if err != nil {
 		return err
 	}
@@ -161,7 +161,7 @@ func (c *Client) RevokeRefreshToken(token string) error {
 
 func (c *Client) DeleteRefreshToken(token string) error {
 
-	_, err := c.handler.Exec("DELETE FROM request_tokens WHERE token = ?", token)
+	_, err := c.handler.Exec("DELETE FROM refresh_tokens WHERE token = ?", token)
 	if err != nil {
 		return err
 	}

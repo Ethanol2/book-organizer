@@ -66,6 +66,24 @@ func ValidateJWT(tokenString, tokenSecret string) (uuid.UUID, error) {
 	return id, nil
 }
 
+func GetRefreshToken(r *http.Request) (string, error) {
+
+	if cookie, err := r.Cookie("refresh_token"); err == nil {
+		return cookie.Value, nil
+	}
+
+	authHeader := r.Header.Get("Authorization")
+	if authHeader == "" {
+		return "", errors.New("no authorization token included in request")
+	}
+
+	if len(authHeader) < 7 || authHeader[:7] != "Bearer " {
+		return "", errors.New("malformed authorization header")
+	}
+
+	return authHeader[7:], nil
+}
+
 func GetBearerToken(r *http.Request) (string, error) {
 
 	if cookie, err := r.Cookie("access_token"); err == nil {

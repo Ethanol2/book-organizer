@@ -63,8 +63,8 @@ export const NewSearchTerms = (): SearchTerms =>({
     asin: '',
     languages: '',
     files: '',
-    sort: '',
-    order: '',
+    sort: 'title',
+    order: 'asc',
     metadataSource: null,
     audibleRegion: null
 });

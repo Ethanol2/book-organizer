@@ -168,7 +168,7 @@ onMounted(async () => {
 
     <section>
         <SearchControls placeholder="Search title, subtitle, or description" :metadata="false"
-            @search="searchBooksWithNewSearch($event)">
+            @search="searchBooksWithNewSearch($event)" @reset="searchBooksWithNewSearch(NewSearchTerms())">
         </SearchControls>
 
         <div class="library">

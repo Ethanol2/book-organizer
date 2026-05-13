@@ -10,25 +10,15 @@ const authStore = useAuthStore();
 const username = ref('');
 const password = ref('');
 
-async function login() {
+function login() {
   if (username.value === '' || password.value === '') {
     notificationsStore.notifyError('Username and password are required');
     return;
   }
-
-  try {
-    const ok = await authStore.login({
-      username: username.value,
-      password: password.value,
-    });
-
-    if (ok) {
-      router.push('/');
-      window.location.reload();
-    }
-  } catch (error) {
-    console.error('Error logging in:', error);
-  }
+  authStore.login({
+    username: username.value,
+    password: password.value,
+  });
 }
 
 </script>
