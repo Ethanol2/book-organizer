@@ -42,6 +42,12 @@ func (cfg *apiConfig) handlerMetadataSearch(w http.ResponseWriter, r *http.Reque
 			searchParams.Limit = &num
 		}
 	}
+	if sort := r.URL.Query().Get("sort"); sort != "" {
+		searchParams.Sort = &sort
+	}
+	if order := r.URL.Query().Get("order"); order != "" {
+		searchParams.Order = &order
+	}
 
 	if genres := r.URL.Query()["genre"]; len(genres) > 0 {
 		searchParams.Genres = &genres

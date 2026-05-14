@@ -1,6 +1,7 @@
-import { AddSearchTermsToQuery, HasSearchAdvancedTerms, type AdvancedSearchFields, type SearchTerms } from "@/types/search"
+import { AddSearchTermsToQuery, HasSearchAdvancedTerms, TrimSearchTerms, type SearchParams, type SearchTerms } from "@/types/search"
 import type { BookParams } from "./book"
 import { useNotificationsStore } from "@/stores/notifications"
+import api from "@/services/api"
 
 const pageLimit = 10
 
@@ -24,47 +25,6 @@ export enum AudibleRegion {
   AU = "co.au"
 }
 
-export const metadataSearchFields = new Map<MetadataSource, AdvancedSearchFields>()
-metadataSearchFields.set(MetadataSource.OpenLibrary, {
-  authors: true,
-  narrators: false,
-  tags: false,
-  year: true,
-  publisher: true,
-  isbn: true,
-  genres: true,
-  languages: true,
-  asin: false,
-  keywords: false,
-  series: false
-})
-metadataSearchFields.set(MetadataSource.GoogleBooks, {
-  authors: true,
-  narrators: false,
-  tags: false,
-  year: true,
-  publisher: true,
-  isbn: true,
-  genres: true,
-  languages: true,
-  asin: false,
-  keywords: false,
-  series: false
-})
-metadataSearchFields.set(MetadataSource.Audible, {
-  authors: true,
-  narrators: false,
-  tags: false,
-  year: false,
-  publisher: true,
-  isbn: false,
-  genres: false,
-  languages: false,
-  asin: true,
-  keywords: true,
-  series: true
-})
-
 export type MetadataSearchResults = {
   items: BookParams[]
   total_count: number
@@ -80,15 +40,20 @@ function buildQueryParams(params: SearchTerms, pageLimit: number, page: number):
     if (params.audibleRegion && params.metadataSource === MetadataSource.Audible) urlParams.append('region', params.audibleRegion)
   }
 
-  if (params.search?.trim()) urlParams.set('title', params.search)
-  if (params.authors?.trim()) urlParams.set('author', params.authors)
-  if (params.year?.trim()) urlParams.set('year', params.year)
-  if (params.publisher?.trim()) urlParams.set('publisher', params.publisher)
-  if (params.isbn?.trim()) urlParams.set('isbn', params.isbn)
-  if (params.asin?.trim()) urlParams.set('asin', params.asin)
-  if (params.keywords?.trim()) urlParams.set('keyword', params.keywords)
-  if (params.genres?.trim()) params.genres.split(',').forEach(g => urlParams.append('genre', g.trim()))
-  if (params.languages?.trim()) params.languages.split(',').forEach(l => urlParams.append('language', l.trim()))
+  params = TrimSearchTerms(params);
+
+  if (params.search)    urlParams.set('title', params.search)
+  if (params.authors)   urlParams.set('author', params.authors)
+  if (params.year)      urlParams.set('year', params.year)
+  if (params.publisher) urlParams.set('publisher', params.publisher)
+  if (params.isbn)      urlParams.set('isbn', params.isbn)
+  if (params.asin)      urlParams.set('asin', params.asin)
+  if (params.keywords)  urlParams.set('keyword', params.keywords)
+  if (params.sort)      urlParams.set('sort', params.sort)
+  if (params.order)     urlParams.set('order', params.order)
+
+  if (params.genres)    params.genres.split(',').forEach(g => urlParams.append('genre', g.trim()))
+  if (params.languages) params.languages.split(',').forEach(l => urlParams.append('language', l.trim()))
 
   urlParams.append('limit', pageLimit?.toString())
   urlParams.append('page', page.toString())
@@ -106,19 +71,9 @@ export async function searchMetadataSource(params: SearchTerms, pageLimit: numbe
   const queryParams = buildQueryParams(params, pageLimit, page)
 
   try {
-    const resp = await fetch(`${endpoint}?${queryParams.toString()}`, {
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-      },
-    })
+    const resp = await api.get(endpoint, { params: queryParams })
 
-    if (!resp.ok) {
-      const body = await resp.text()
-      throw new Error(`${resp.status} ${resp.statusText}: ${body}`)
-    }
-
-    const body = (await resp.json()) as MetadataSearchResults
+    const body = resp.data as MetadataSearchResults
     return body
 
   } catch (err) {
@@ -136,19 +91,9 @@ export async function getMetadataDetails(item: BookParams | null): Promise<BookP
   }
 
   try {
-    const resp = await fetch(item.key, {
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-      },
-    })
+    const resp = await api.get(item.key);
 
-    if (!resp.ok) {
-      const body = await resp.text()
-      throw new Error(`${resp.status} ${resp.statusText}: ${body}`)
-    }
-
-    var details: BookParams = (await resp.json()) as BookParams
+    var details: BookParams = resp.data as BookParams;
 
     details.title = details.title ?? item.title
     details.subtitle = details.subtitle ?? item.subtitle
@@ -168,3 +113,87 @@ export async function getMetadataDetails(item: BookParams | null): Promise<BookP
     return null
   }
 }
+
+export const metadataSearchFields = new Map<MetadataSource, SearchParams>()
+metadataSearchFields.set(MetadataSource.OpenLibrary, {
+  authors: true,
+  narrators: false,
+  tags: false,
+  year: true,
+  publisher: true,
+  isbn: true,
+  genres: true,
+  languages: true,
+  asin: false,
+  keywords: false,
+  series: false,
+
+  files: false,
+
+  sortOptions: {
+        'editions': 'Editions Count',
+        'old': 'Year (Oldest First)',
+        'new': 'Year (Newest First)',
+        'rating': 'Ratings (Highest First)',
+        'rating asc': 'Ratings (Lowest First)',
+        'title': 'Title',
+        // Random
+        'random': 'Random (Ascending)',
+        'random desc': 'Random (Descending)',
+    },
+
+  orderOptions: {}
+})
+
+metadataSearchFields.set(MetadataSource.GoogleBooks, {
+  authors: true,
+  narrators: false,
+  tags: false,
+  year: true,
+  publisher: true,
+  isbn: true,
+  genres: true,
+  languages: true,
+  asin: false,
+  keywords: false,
+  series: false,
+
+  files: false,
+
+  sortOptions: {
+    relevance: 'Relevance',
+    newest: 'Newest',
+  },
+  orderOptions: {}
+})
+metadataSearchFields.set(MetadataSource.Audible, {
+  authors: true,
+  narrators: false,
+  tags: false,
+  year: false,
+  publisher: true,
+  isbn: false,
+  genres: false,
+  languages: false,
+  asin: true,
+  keywords: true,
+  series: true,
+  files: false,
+  sortOptions: {
+    'Relevance'             : 'Relevance',
+
+    'Title'                 : 'Title',
+    '-Title'                : 'Title (Descending)',
+    'ReleaseDate'           : 'Release Date (Oldest First)',
+    '-ReleaseDate'          : 'Release Date (Newest First)',
+    'ContentLevel'          : 'Content Level (Ascending)',
+    '-ContentLevel'         : 'Content Level (Descending)',
+    'RuntimeLength'         : 'Length (Shortest First)',
+    '-RuntimeLength'        : 'Length (Longest First)',
+    
+    'AmazonEnglish'         : 'Amazon English',
+    'BestSellers'           : 'Best Sellers',
+    'AvgRating'             : 'Average Rating',
+  },
+  orderOptions: {}
+})

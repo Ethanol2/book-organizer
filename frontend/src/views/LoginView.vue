@@ -1,10 +1,8 @@
 <script setup lang="ts">
 import { ref } from 'vue';
-import { useRouter } from 'vue-router';
 import { useNotificationsStore } from '@/stores/notifications';
 import { useAuthStore } from '@/stores/auth';
 
-const router = useRouter();
 const notificationsStore = useNotificationsStore();
 const authStore = useAuthStore();
 const username = ref('');
@@ -45,7 +43,7 @@ function login() {
           <input type="password" v-model="password" autocomplete="current-password" />
         </div>
 
-        <button type="submit" class="search-button">
+        <button type="submit" class="green-button">
           Sign In
         </button>
       </form>

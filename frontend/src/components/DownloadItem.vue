@@ -22,7 +22,7 @@ const props = defineProps<{
         <h2> {{ getDownloadName(download) }} </h2>
         <p class="meta"> {{ getTimeAdded(download) }} </p>
 
-        <button @click="openModalFunc(download)" class="import-button">Import</button>
+        <button @click="openModalFunc(download)" class="green-button">Import</button>
       </div>
     </div>
 
@@ -82,17 +82,9 @@ const props = defineProps<{
   font-size: 0.8rem;
 }
 
-.import-button {
-  margin-top: 0.5rem;
-  background: var(--color-primary-blue);
-  border: none;
-  padding: 0.4rem 0.8rem;
-  cursor: pointer;
-  transition: background-color 0.2s;
-}
-
-.import-button:hover {
-  background: var(--color-primary-blue-dark);
+.green-button {
+  margin-top: 1rem;
+  height: fit-content;
 }
 
 .file-list {
@@ -155,8 +147,4 @@ h3 {
   color: var(--color-heading);
 }
 
-
-.import-button:hover {
-  background-color: var(--color-primary-blue-dark);
-}
 </style>

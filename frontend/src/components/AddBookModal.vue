@@ -37,7 +37,7 @@ interface ModalProps {
 const props = withDefaults(defineProps<ModalProps>(), {
   show: false,
   params: null,
-  showDeleteButton: false,
+  isEditMode: false,
   hasFiles: false
 })
 
@@ -182,7 +182,7 @@ watch(
         <!-- Action buttons -->
         <div class="modal-buttons">
           <button type="button" @click="handleOverlayClick">Cancel</button>
-          <button type="submit">Save</button>
+          <button type="submit">{{props.isEditMode ? 'Save Changes' : 'Add Book'}}</button>
         </div>
 
         <div v-if="props.params && props.isEditMode" class="modal-delete-wrap">

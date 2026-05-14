@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { onMounted, ref, watch } from 'vue';
-import { librarySearchFields, type AdvancedSearchFields, type SearchTerms } from '@/types/search';
+import { librarySearchFields, type SearchParams, type SearchTerms } from '@/types/search';
 import { useRoute, type LocationQueryValue } from 'vue-router';
 import { AudibleRegion, metadataSearchFields, MetadataSource } from '@/types/metadata';
 
@@ -22,12 +22,14 @@ const languages = ref('');
 const keywords = ref('');
 
 const files = ref('all');
+const showSort = ref(true);
 const sortBy = ref('');
+const showOrder = ref(true);
 const sortOrder = ref('');
 
 const metadataSource = ref<MetadataSource>(MetadataSource.OpenLibrary);
 const audibleRegion = ref<AudibleRegion>(AudibleRegion.US);
-const availableFields = ref<AdvancedSearchFields>()
+const availableFields = ref<SearchParams>()
 
 const props = defineProps<{
     placeholder?: string;
@@ -72,8 +74,8 @@ function normalizeQueryValue(value: LocationQueryValue | LocationQueryValue[] | 
 
 function resetFiltersFromRoute() {
     searchTerm.value = normalizeQueryValue(route.query.search);
-    sortBy.value = normalizeQueryValue(route.query.sortBy) || 'created_at';
-    sortOrder.value = normalizeQueryValue(route.query.sortOrder) || 'asc';
+    sortBy.value = normalizeQueryValue(route.query.sortBy) || '';
+    sortOrder.value = normalizeQueryValue(route.query.sortOrder) || '';
     year.value = normalizeQueryValue(route.query.year);
     isbn.value = normalizeQueryValue(route.query.isbn);
     asin.value = normalizeQueryValue(route.query.asin);
@@ -121,18 +123,39 @@ function hasAdvancedSearchTerms(): boolean {
         || year.value !== '';
 }
 
-onMounted(() => {    
+function changeSortValue(overwrite: boolean = false) {
+
+    if (!availableFields.value) {
+        return;
+    }
+
+    if (overwrite || (!overwrite && sortBy.value === '')) {
+        const sortOptions = Object.keys(availableFields.value?.sortOptions)
+        showSort.value = sortOptions.length > 0
+        sortBy.value = showSort.value ? sortOptions[0] as string : '';
+    }
+    if (overwrite || (!overwrite && sortOrder.value === '')) {
+        const orderOptions = Object.keys(availableFields.value?.orderOptions)
+        showOrder.value = orderOptions.length > 0
+        sortOrder.value = showOrder.value ? orderOptions[0] as string : '';
+    }
+}
+
+onMounted(() => {
     resetFiltersFromRoute();
     showAdvanced.value = hasAdvancedSearchTerms();
     availableFields.value = props.metadata ? metadataSearchFields.get(metadataSource.value) : librarySearchFields;
+    changeSortValue();
 });
 
 watch(() => metadataSource.value, () => {
     availableFields.value = props.metadata ? metadataSearchFields.get(metadataSource.value) : librarySearchFields;
+    changeSortValue(true);
     search();
 });
 
 watch(() => audibleRegion.value, () => {
+    changeSortValue(true);
     search();
 })
 
@@ -141,16 +164,17 @@ watch(() => audibleRegion.value, () => {
 <template>
     <div class="search-controls">
         <div class="source-region" v-if="props.metadata">
-          <select class="dropdown-select" v-model="metadataSource" aria-label="Metadata source">
-            <option v-for="(type, value) in MetadataSource" :key="value" :value="type">
-              {{ type }}
-            </option>
-          </select>
-          <select class="dropdown-select region" v-model="audibleRegion" aria-label="Audible Region" v-show="metadataSource == MetadataSource.Audible">
-            <option v-for="(type, value) in AudibleRegion" :key="value" :value="type">
-              .{{ type }}
-            </option>
-          </select>
+            <select class="dropdown-select" v-model="metadataSource" aria-label="Metadata source">
+                <option v-for="(type, value) in MetadataSource" :key="value" :value="type">
+                    {{ type }}
+                </option>
+            </select>
+            <select class="dropdown-select region" v-model="audibleRegion" aria-label="Audible Region"
+                v-show="metadataSource == MetadataSource.Audible">
+                <option v-for="(type, value) in AudibleRegion" :key="value" :value="type">
+                    .{{ type }}
+                </option>
+            </select>
         </div>
         <input class="text-input" v-model="searchTerm" type="search" :placeholder="props.placeholder || 'Search books'"
             aria-label="Search books" @keyup.enter="search" />
@@ -212,8 +236,8 @@ watch(() => audibleRegion.value, () => {
                 @keyup.enter="search" />
         </label>
     </div>
-    <div class="sort-row" v-if="!props.metadata">
-        <label>
+    <div class="sort-row">
+        <label v-if="availableFields?.files">
             <span>Files</span>
             <select class="dropdown-select" v-model="files" @change="search">
                 <option value="all">All</option>
@@ -222,23 +246,19 @@ watch(() => audibleRegion.value, () => {
             </select>
         </label>
 
-        <label>
+        <label v-if="showSort && availableFields">
             <span>Sort by</span>
             <select class="dropdown-select" v-model="sortBy" @change="search">
-                <option value="created_at">Date Added</option>
-                <option value="title">Title</option>
-                <option value="author">Author</option>
-                <option value="publish_year">Year</option>
-                <option value="series">Series</option>
-                <option value="publisher">Publisher</option>
+                <option v-for="(value, term) in availableFields.sortOptions" :key="term" :value="term">{{ value }}
+                </option>
             </select>
         </label>
 
-        <label>
+        <label v-if="showOrder && availableFields">
             <span>Order</span>
             <select class="dropdown-select" v-model="sortOrder" @change="search">
-                <option value="asc">Ascending</option>
-                <option value="desc">Descending</option>
+                <option v-for="(value, term) in availableFields.orderOptions" :key="term" :value="term">{{ value }}
+                </option>
             </select>
         </label>
     </div>
@@ -263,14 +283,14 @@ watch(() => audibleRegion.value, () => {
 }
 
 .source-region {
-  display: flex;
-  gap: 0.7rem;
-  height: 100%;
-  width: 500px;
+    display: flex;
+    gap: 0.7rem;
+    height: 100%;
+    width: 500px;
 }
 
 .dropdown-select.region {
-  width: 80px;
+    width: 80px;
 }
 
 .advanced-search {

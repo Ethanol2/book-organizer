@@ -126,6 +126,9 @@ func SearchAudible(params SearchParams, region string, cache *cache.Cache) (Sear
 			q.Add("keywords", keyword)
 		}
 	}
+	if params.Sort != nil {
+		q.Add("products_sort_by", *params.Sort)
+	}
 	if params.Page != nil {
 		q.Add("page", fmt.Sprint(*params.Page))
 	}

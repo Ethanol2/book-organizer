@@ -1,6 +1,6 @@
 import type { AudibleRegion, MetadataSource } from "./metadata"
 
-export type AdvancedSearchFields = {
+export type SearchParams = {
     authors: boolean
     genres: boolean
     narrators: boolean
@@ -14,10 +14,17 @@ export type AdvancedSearchFields = {
     isbn: boolean
     asin: boolean
     languages: boolean
+
+    files: boolean
+    sortOptions: Record<string, string>
+    orderOptions: Record<string, string>
 }
 
-export const librarySearchFields: AdvancedSearchFields = {
-    year: true, isbn: true, asin: true, publisher: true, series: true, tags: true, genres: true, authors: true, narrators: true, keywords: false, languages: false
+export const librarySearchFields: SearchParams = {
+    year: true, isbn: true, asin: true, publisher: true, series: true, tags: true, genres: true, authors: true, narrators: true, keywords: false, languages: false,
+    files: true,
+    sortOptions: { "title": "Title", "author": "Author", "publish_year": "Year", "series": "Series", "publisher": "Publisher", "created_at": "Added Date" },
+    orderOptions: { "asc": "Ascending", "desc": "Descending" }
 }
 
 export type SearchTerms = {
@@ -43,13 +50,13 @@ export type SearchTerms = {
 
     // Sorting
     sort: string
-    order: string 
+    order: string
 
     // Metadata
     metadataSource: MetadataSource | null
     audibleRegion: AudibleRegion | null
 }
-export const NewSearchTerms = (): SearchTerms =>({
+export const NewSearchTerms = (): SearchTerms => ({
     search: '',
     authors: '',
     genres: '',
@@ -94,7 +101,7 @@ export function AddSearchTermsToQuery(terms: SearchTerms, params: URLSearchParam
 
 export function TrimSearchTerms(terms: SearchTerms): SearchTerms {
     if (!terms) return NewSearchTerms();
-    
+
     terms.search = terms.search?.trim();
     terms.authors = terms.authors?.trim();
     terms.genres = terms.genres?.trim();

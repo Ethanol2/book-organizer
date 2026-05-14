@@ -95,7 +95,11 @@ func SearchOpenLibrary(params SearchParams, cache *cache.Cache) (SearchResults, 
 		q.Add("limit", fmt.Sprint(*params.Limit))
 	}
 	if params.Sort != nil {
-		q.Add("sort", *params.Sort)
+		sort := *params.Sort
+		if params.Order != nil {
+			sort += " " + *params.Order
+		}
+		q.Add("sort", sort)
 	}
 
 	u.RawQuery = q.Encode()
