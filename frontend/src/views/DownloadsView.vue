@@ -19,7 +19,7 @@ const selectedDownload = ref<Download>({
         cover: null,
         text_files: null,
         audio_files: null,
-        hasMetadata: null
+        has_metadata: null
     },
     created_at: ""
 });

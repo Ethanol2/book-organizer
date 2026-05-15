@@ -1,12 +1,11 @@
 <script setup lang="ts">
-import { ref } from 'vue';
-import { getBaseName, getDownloadName, getTimeAdded, type Download } from '@/types/download';
-import ImportDownload from './ImportDownloadModal.vue';
+import { getDownloadName, getTimeAdded, type Download } from '@/types/download';
+import FilesView from './FilesView.vue';
 
 const props = defineProps<{
   download: Download
   openModalFunc: (download: Download) => void
-}>()
+}>();
 
 </script>
 
@@ -26,27 +25,7 @@ const props = defineProps<{
       </div>
     </div>
 
-    <div class="file-list">
-      <div v-if="download.files.cover !== null" class="file-row">
-        {{ getBaseName(download.files.cover) }}
-      </div>
-      <div
-        v-if="download.files.text_files && download.files.text_files.length > 0" 
-        class="file-row" 
-        v-for="file in download.files.text_files" 
-        :key="file"
-      >
-        {{ getBaseName(file) }}
-      </div>
-      <div 
-        v-if="download.files.audio_files && download.files.audio_files.length > 0"
-        class="file-row" 
-        v-for="file in download.files.audio_files" 
-        :key="file"
-      >
-        {{ getBaseName(file) }}
-      </div>
-    </div>
+    <FilesView :files="props.download.files" />
 
   </div>
 </template>
@@ -85,21 +64,6 @@ const props = defineProps<{
 .green-button {
   margin-top: 1rem;
   height: fit-content;
-}
-
-.file-list {
-  flex: 1;
-  padding: 1rem;
-}
-
-.file-row {
-  padding: 0.4rem 0;
-  border-bottom: 1px solid var(--color-border);
-  font-size: 0.9rem;
-}
-
-.file-row:last-child {
-  border-bottom: none;
 }
 
 .cover-wrapper {
