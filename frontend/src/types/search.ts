@@ -115,16 +115,17 @@ export function TrimSearchTerms(terms: SearchTerms): SearchTerms {
     return terms
 }
 
-export function HasSearchAdvancedTerms(terms: SearchTerms): boolean {
+export function IsEmpty(terms: SearchTerms): boolean {
     terms = TrimSearchTerms(terms);
-    return terms.authors !== '' ||
-        terms.genres !== '' ||
-        terms.narrators !== '' ||
-        terms.series !== '' ||
-        terms.keywords !== '' ||
-        terms.tags !== '' ||
-        terms.year !== '' ||
-        terms.publisher !== '' ||
-        terms.isbn !== '' ||
-        terms.asin !== ''
+    return terms.search === '' &&
+        terms.authors === '' &&
+        terms.genres === '' &&
+        terms.narrators === '' &&
+        terms.series === '' &&
+        terms.keywords === '' &&
+        terms.tags === '' &&
+        terms.year === '' &&
+        terms.publisher === '' &&
+        terms.isbn === '' &&
+        terms.asin === ''
 }

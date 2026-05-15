@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { onMounted, ref, watch } from 'vue';
-import { librarySearchFields, type SearchParams, type SearchTerms } from '@/types/search';
+import { IsEmpty, librarySearchFields, type SearchParams, type SearchTerms } from '@/types/search';
 import { useRoute, type LocationQueryValue } from 'vue-router';
 import { AudibleRegion, metadataSearchFields, MetadataSource } from '@/types/metadata';
 
@@ -142,28 +142,46 @@ function changeSortValue(overwrite: boolean = false) {
 }
 
 onMounted(() => {
-    resetFiltersFromRoute();
-    showAdvanced.value = hasAdvancedSearchTerms();
-    availableFields.value = props.metadata ? metadataSearchFields.get(metadataSource.value) : librarySearchFields;
-    changeSortValue();
-});
+    onMounted(() => {
+        resetFiltersFromRoute();
+        showAdvanced.value = hasAdvancedSearchTerms();
+        availableFields.value = props.metadata ? metadataSearchFields.get(metadataSource.value) : librarySearchFields;
+        changeSortValue();
+    });
 
-watch(() => metadataSource.value, () => {
-    availableFields.value = props.metadata ? metadataSearchFields.get(metadataSource.value) : librarySearchFields;
-    changeSortValue(true);
-    search();
-});
+    watch(() => metadataSource.value, () => {
+        if (IsEmpty(buildSearchTerms())) {
+            return;
+        }
+        availableFields.value = props.metadata ? metadataSearchFields.get(metadataSource.value) : librarySearchFields;
+        changeSortValue(true);
+        search();
+    });
 
-watch(() => audibleRegion.value, () => {
-    changeSortValue(true);
-    search();
-})
+    watch(() => audibleRegion.value, () => {
+        if (IsEmpty(buildSearchTerms())) {
+            return;
+        }
+        changeSortValue(true);
+        search();
+    })
 
 </script>
 
 <template>
     <div class="search-controls">
         <div class="source-region" v-if="props.metadata">
+            <select class="dropdown-select" v-model="metadataSource" aria-label="Metadata source">
+                <option v-for="(type, value) in MetadataSource" :key="value" :value="type">
+                    {{ type }}
+                </option>
+            </select>
+            <select class="dropdown-select region" v-model="audibleRegion" aria-label="Audible Region"
+                v-show="metadataSource == MetadataSource.Audible">
+                <option v-for="(type, value) in AudibleRegion" :key="value" :value="type">
+                    .{{ type }}
+                </option>
+            </select>
             <select class="dropdown-select" v-model="metadataSource" aria-label="Metadata source">
                 <option v-for="(type, value) in MetadataSource" :key="value" :value="type">
                     {{ type }}
@@ -287,9 +305,14 @@ watch(() => audibleRegion.value, () => {
     gap: 0.7rem;
     height: 100%;
     width: 500px;
+    display: flex;
+    gap: 0.7rem;
+    height: 100%;
+    width: 500px;
 }
 
 .dropdown-select.region {
+    width: 80px;
     width: 80px;
 }
 

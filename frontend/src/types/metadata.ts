@@ -1,4 +1,4 @@
-import { AddSearchTermsToQuery, HasSearchAdvancedTerms, TrimSearchTerms, type SearchParams, type SearchTerms } from "@/types/search"
+import { IsEmpty, type SearchTerms, type SearchParams, TrimSearchTerms } from "@/types/search"
 import type { BookParams } from "./book"
 import { useNotificationsStore } from "@/stores/notifications"
 import api from "@/services/api"
@@ -42,17 +42,17 @@ function buildQueryParams(params: SearchTerms, pageLimit: number, page: number):
 
   params = TrimSearchTerms(params);
 
-  if (params.search)    urlParams.set('title', params.search)
-  if (params.authors)   urlParams.set('author', params.authors)
-  if (params.year)      urlParams.set('year', params.year)
+  if (params.search) urlParams.set('title', params.search)
+  if (params.authors) urlParams.set('author', params.authors)
+  if (params.year) urlParams.set('year', params.year)
   if (params.publisher) urlParams.set('publisher', params.publisher)
-  if (params.isbn)      urlParams.set('isbn', params.isbn)
-  if (params.asin)      urlParams.set('asin', params.asin)
-  if (params.keywords)  urlParams.set('keyword', params.keywords)
-  if (params.sort)      urlParams.set('sort', params.sort)
-  if (params.order)     urlParams.set('order', params.order)
+  if (params.isbn) urlParams.set('isbn', params.isbn)
+  if (params.asin) urlParams.set('asin', params.asin)
+  if (params.keywords) urlParams.set('keyword', params.keywords)
+  if (params.sort) urlParams.set('sort', params.sort)
+  if (params.order) urlParams.set('order', params.order)
 
-  if (params.genres)    params.genres.split(',').forEach(g => urlParams.append('genre', g.trim()))
+  if (params.genres) params.genres.split(',').forEach(g => urlParams.append('genre', g.trim()))
   if (params.languages) params.languages.split(',').forEach(l => urlParams.append('language', l.trim()))
 
   urlParams.append('limit', pageLimit?.toString())
@@ -62,10 +62,10 @@ function buildQueryParams(params: SearchTerms, pageLimit: number, page: number):
 }
 
 export async function searchMetadataSource(params: SearchTerms, pageLimit: number, page: number): Promise<MetadataSearchResults | null> {
-  // if (!HasSearchAdvancedTerms(params) || !params.search) {
-  //   useNotificationsStore().notifyError('Enter at least one search term.')
-  //   return null
-  // }
+  if (IsEmpty(params)) {
+    useNotificationsStore().notifyError('Enter at least one search term.')
+    return null
+  }
 
   const endpoint = '/api/metadata/'
   const queryParams = buildQueryParams(params, pageLimit, page)
@@ -131,16 +131,16 @@ metadataSearchFields.set(MetadataSource.OpenLibrary, {
   files: false,
 
   sortOptions: {
-        'editions': 'Editions Count',
-        'old': 'Year (Oldest First)',
-        'new': 'Year (Newest First)',
-        'rating': 'Ratings (Highest First)',
-        'rating asc': 'Ratings (Lowest First)',
-        'title': 'Title',
-        // Random
-        'random': 'Random (Ascending)',
-        'random desc': 'Random (Descending)',
-    },
+    'editions': 'Editions Count',
+    'old': 'Year (Oldest First)',
+    'new': 'Year (Newest First)',
+    'rating': 'Ratings (Highest First)',
+    'rating asc': 'Ratings (Lowest First)',
+    'title': 'Title',
+    // Random
+    'random': 'Random (Ascending)',
+    'random desc': 'Random (Descending)',
+  },
 
   orderOptions: {}
 })
@@ -180,20 +180,20 @@ metadataSearchFields.set(MetadataSource.Audible, {
   series: true,
   files: false,
   sortOptions: {
-    'Relevance'             : 'Relevance',
+    'Relevance': 'Relevance',
 
-    'Title'                 : 'Title',
-    '-Title'                : 'Title (Descending)',
-    'ReleaseDate'           : 'Release Date (Oldest First)',
-    '-ReleaseDate'          : 'Release Date (Newest First)',
-    'ContentLevel'          : 'Content Level (Ascending)',
-    '-ContentLevel'         : 'Content Level (Descending)',
-    'RuntimeLength'         : 'Length (Shortest First)',
-    '-RuntimeLength'        : 'Length (Longest First)',
-    
-    'AmazonEnglish'         : 'Amazon English',
-    'BestSellers'           : 'Best Sellers',
-    'AvgRating'             : 'Average Rating',
+    'Title': 'Title',
+    '-Title': 'Title (Descending)',
+    'ReleaseDate': 'Release Date (Oldest First)',
+    '-ReleaseDate': 'Release Date (Newest First)',
+    'ContentLevel': 'Content Level (Ascending)',
+    '-ContentLevel': 'Content Level (Descending)',
+    'RuntimeLength': 'Length (Shortest First)',
+    '-RuntimeLength': 'Length (Longest First)',
+
+    'AmazonEnglish': 'Amazon English',
+    'BestSellers': 'Best Sellers',
+    'AvgRating': 'Average Rating',
   },
   orderOptions: {}
 })

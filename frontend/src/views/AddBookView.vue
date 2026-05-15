@@ -44,10 +44,14 @@ function setTermsAndSearch(terms: SearchTerms) {
   page.value = 1
   searchBooks()
 }
+
 function clearSearch() {
   searchTerms.value = NewSearchTerms()
   page.value = 1
-  searchBooks()
+  results.value = []
+  totalCount.value = 0
+  offset.value = 0
+  count.value = 0
 }
 
 async function searchBooks() {
@@ -101,7 +105,8 @@ function closeModal() {
   <section class="add-book">
     <h2 class="vue-heading">Add Book</h2>
 
-    <SearchControls placeholder="Search metadata" :metadata="true" @search="setTermsAndSearch($event)" @reset="clearSearch" />
+    <SearchControls placeholder="Search metadata" :metadata="true" @search="setTermsAndSearch($event)"
+      @reset="clearSearch" />
 
     <div class="search-meta">
       <span v-if="count > 0">Results: {{ count }} / {{ totalCount }}</span>
