@@ -1,20 +1,12 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue';
+import { ref } from 'vue';
 import { getBaseName, getDownloadName, getTimeAdded, type Download } from '@/types/download';
-
-const showAudioFiles = ref(false)
-const showBookFiles = ref(false)
-const hasMetadata = ref(false)
-const showOtherFiles = ref(false)
+import ImportDownload from './ImportDownloadModal.vue';
 
 const props = defineProps<{
   download: Download
   openModalFunc: (download: Download) => void
-}>();
-
-onMounted(() => {
-  hasMetadata.value = props.download.files.hasMetadata ?? false;
-});
+}>()
 
 </script>
 
@@ -34,19 +26,24 @@ onMounted(() => {
       </div>
     </div>
 
-    <div class="file-section">
-      <div v-if="download.files.text_files && download.files.text_files.length > 0">
-        <button class="toggle-files" @click="showBookFiles = !showBookFiles">
-          <span>View Files</span>
-          <span class="count">{{download.files.text_files.length}}</span>
-        </button>
-        <div class="file-list">
-          <div class="file-row" v-if="showBookFiles" v-for="file in download.files.text_files" :key="file">{{
-            getBaseName(file) }}</div>
-        </div>
+    <div class="file-list">
+      <div v-if="download.files.cover !== null" class="file-row">
+        {{ getBaseName(download.files.cover) }}
       </div>
-      <div v-if="download.files.audio_files && download.files.audio_files.length > 0" class="file-row"
-        v-for="file in download.files.audio_files" :key="file">
+      <div
+        v-if="download.files.text_files && download.files.text_files.length > 0" 
+        class="file-row" 
+        v-for="file in download.files.text_files" 
+        :key="file"
+      >
+        {{ getBaseName(file) }}
+      </div>
+      <div 
+        v-if="download.files.audio_files && download.files.audio_files.length > 0"
+        class="file-row" 
+        v-for="file in download.files.audio_files" 
+        :key="file"
+      >
         {{ getBaseName(file) }}
       </div>
     </div>
@@ -55,6 +52,7 @@ onMounted(() => {
 </template>
 
 <style scoped>
+
 .folder {
   display: flex;
   border: 1px solid var(--color-border);
@@ -94,74 +92,14 @@ onMounted(() => {
   padding: 1rem;
 }
 
-.file-section {
-  margin-top: 1rem;
-}
-
-.toggle-files {
-  width: 100%;
-
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-
-  background: var(--color-background-mute);
-
-  border: 1px solid var(--color-border);
-
-  border-radius: 10px;
-
-  padding: 0.75rem 1rem;
-
-  cursor: pointer;
-
-  color: var(--color-text);
-
-  font-size: 0.9rem;
-  font-weight: 500;
-
-  transition:
-    background 0.15s ease,
-    border-color 0.15s ease;
-}
-
-.toggle-files:hover {
-  background: var(--color-nav-hover-bg);
-  border-color: var(--color-border-hover);
-}
-
-.count {
-  color: var(--color-text-subtle);
-  font-size: 0.8rem;
-}
-
-.file-list {
-  margin-top: 0.75rem;
-
-  display: flex;
-  flex-direction: column;
-
-  gap: 0.35rem;
-}
-
 .file-row {
-  background: var(--color-background);
-
-  border: 1px solid var(--color-border);
-
-  border-radius: 8px;
-
-  padding: 0.65rem 0.85rem;
-
-  font-size: 0.88rem;
-
-  color: var(--color-text);
-
-  transition: background 0.15s ease;
+  padding: 0.4rem 0;
+  border-bottom: 1px solid var(--color-border);
+  font-size: 0.9rem;
 }
 
-.file-row:hover {
-  background: var(--color-background-mute);
+.file-row:last-child {
+  border-bottom: none;
 }
 
 .cover-wrapper {
@@ -208,4 +146,5 @@ h3 {
   margin-bottom: 0.4rem;
   color: var(--color-heading);
 }
+
 </style>
