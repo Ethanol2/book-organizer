@@ -7,6 +7,7 @@ import BookDetailsCategoryListView from '@/components/BookDetailsCategoryListVie
 import { useNotificationsStore } from '@/stores/notifications';
 import { basename } from '@/types/download';
 import api from '@/services/api';
+import FilesView from '@/components/FilesView.vue';
 
 type CategoryList = {
   showAll: boolean;
@@ -290,28 +291,7 @@ onMounted(async () => {
           <div class="section-heading">
             <h2>Files</h2>
           </div>
-          <div class="file-overview">
-            <div class="file-metric">
-              <span class="metric-label">Text files</span>
-              <strong>( {{ textFiles.length }} )</strong>
-            </div>
-            <ul class="file-list">
-              <li v-for="filePath in textFiles" :key="filePath">{{ basename(filePath) }}</li>
-            </ul>
-            <div class="file-metric">
-              <span class="metric-label">Audio files</span>
-              <strong>( {{ audioFiles.length }} )</strong>
-            </div>
-            <ul class="file-list">
-              <li v-for="filePath in audioFiles" :key="filePath">{{ basename(filePath) }}</li>
-            </ul>
-          </div>
-          
-          <div class="file-list-group" v-if="audioFiles.length">
-          </div>
-          
-          <div class="file-list-group" v-if="textFiles.length">
-          </div>
+          <FilesView :files="book.files" />
         </section>
       </div>
     </div>

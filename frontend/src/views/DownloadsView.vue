@@ -56,7 +56,11 @@ function updateLastRefresh() {
         return
     }
     let timeSince = (Date.now() - lastRefreshParams.time) / 1000
-    if (timeSince / 60 > 1) {
+    if (timeSince / 60 > 60) {
+        lastRefresh.value = `${Math.round(timeSince / 60 / 60)} hour(s) since last refresh`
+        return
+    }
+    else if (timeSince / 60 > 1) {
         lastRefresh.value = `${Math.round(timeSince / 60)} minute(s) since last refresh`
         return
     }

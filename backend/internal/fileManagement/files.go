@@ -10,6 +10,7 @@ type Files struct {
 	Root        *string   `json:"root"`
 	AudioFiles  *[]string `json:"audio_files"`
 	TextFiles   *[]string `json:"text_files"`
+	OtherFiles  *[]string `json:"other_files"`
 	Cover       *string   `json:"cover"`
 	HasMetadata bool      `json:"has_metadata"`
 

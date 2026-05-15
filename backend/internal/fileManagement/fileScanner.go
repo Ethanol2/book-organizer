@@ -183,10 +183,11 @@ func getFolderContents(root, folder string) (Files, error) {
 
 	p := path.Join(root, folder)
 
+	hasMD := false
 	var audio []string
 	var text []string
 	var images []string
-	hasMD := false
+	var others []string
 	var dirs []string
 
 	bookItems, err := os.ReadDir(p)
@@ -218,6 +219,9 @@ func getFolderContents(root, folder string) (Files, error) {
 
 		case Metadata:
 			hasMD = true
+
+		case Other:
+			others = append(others, path.Join(folder, item.Name()))
 		}
 
 	}
@@ -248,6 +252,7 @@ func getFolderContents(root, folder string) (Files, error) {
 		Root:        &folder,
 		AudioFiles:  &audio,
 		TextFiles:   &text,
+		OtherFiles:  &others,
 		Cover:       cover,
 		HasMetadata: hasMD,
 

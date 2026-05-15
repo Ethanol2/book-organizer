@@ -15,7 +15,8 @@ const props = defineProps<{
     <div class="preview">
 
       <div class="cover-wrapper">
-        <img :src="download.files.cover === null ? '' : download.files.cover" class="cover">
+        <img  v-if="download.files.cover !== null" :src="download.files.cover" class="cover">
+        <span v-else class="cover missing"></span>
       </div>
       <div class="info">
         <h2> {{ getDownloadName(download) }} </h2>
@@ -79,6 +80,10 @@ const props = defineProps<{
   display: flex;
   align-items: center;
   justify-content: center;
+}
+
+.cover.missing {
+  background-color: transparent;
 }
 
 /* ===================================================================== */
