@@ -32,7 +32,7 @@ func respondWithError(w http.ResponseWriter, code int, msg string, err error) {
 		log.Println(err)
 		_, file, line, ok := runtime.Caller(1)
 		if ok {
-			fmt.Printf("Called from %s at line %d\n", file, line)
+			fmt.Printf("Called from %s:%d\n", file, line)
 			fmt.Println()
 		}
 	}

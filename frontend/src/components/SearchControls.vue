@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { onMounted, ref, watch } from 'vue';
-import { IsEmpty, librarySearchFields, type SearchParams, type SearchTerms } from '@/types/search';
 import { useRoute, type LocationQueryValue } from 'vue-router';
 import { AudibleRegion, metadataSearchFields, MetadataSource } from '@/types/metadata';
+import { IsEmpty, librarySearchFields, type SearchParams, type SearchTerms } from '@/types/search';
 
 const route = useRoute();
 
@@ -142,34 +142,35 @@ function changeSortValue(overwrite: boolean = false) {
 }
 
 onMounted(() => {
-    onMounted(() => {
-        resetFiltersFromRoute();
-        showAdvanced.value = hasAdvancedSearchTerms();
-        availableFields.value = props.metadata ? metadataSearchFields.get(metadataSource.value) : librarySearchFields;
-        changeSortValue();
-    });
+    resetFiltersFromRoute();
+    showAdvanced.value = hasAdvancedSearchTerms();
+    availableFields.value = props.metadata ? metadataSearchFields.get(metadataSource.value) : librarySearchFields;
+    changeSortValue();
+});
 
-    watch(() => metadataSource.value, () => {
-        if (IsEmpty(buildSearchTerms())) {
-            return;
-        }
-        availableFields.value = props.metadata ? metadataSearchFields.get(metadataSource.value) : librarySearchFields;
-        changeSortValue(true);
-        search();
-    });
+watch(() => metadataSource.value, () => {
+    availableFields.value = props.metadata ? metadataSearchFields.get(metadataSource.value) : librarySearchFields;
+    changeSortValue(true);
+    if (IsEmpty(buildSearchTerms())) {
+        return;
+    }
+    search();
+});
 
-    watch(() => audibleRegion.value, () => {
-        if (IsEmpty(buildSearchTerms())) {
-            return;
-        }
-        changeSortValue(true);
-        search();
-    })
+watch(() => audibleRegion.value, () => {
+    changeSortValue(true);
+    if (IsEmpty(buildSearchTerms())) {
+        return;
+    }
+    search();
+});
 
 </script>
 
 <template>
     <div class="search-controls">
+
+        <!-- Metadata Controls -->
         <div class="source-region" v-if="props.metadata">
             <select class="dropdown-select" v-model="metadataSource" aria-label="Metadata source">
                 <option v-for="(type, value) in MetadataSource" :key="value" :value="type">
@@ -182,18 +183,9 @@ onMounted(() => {
                     .{{ type }}
                 </option>
             </select>
-            <select class="dropdown-select" v-model="metadataSource" aria-label="Metadata source">
-                <option v-for="(type, value) in MetadataSource" :key="value" :value="type">
-                    {{ type }}
-                </option>
-            </select>
-            <select class="dropdown-select region" v-model="audibleRegion" aria-label="Audible Region"
-                v-show="metadataSource == MetadataSource.Audible">
-                <option v-for="(type, value) in AudibleRegion" :key="value" :value="type">
-                    .{{ type }}
-                </option>
-            </select>
         </div>
+
+        <!-- Search Bar -->
         <input class="text-input" v-model="searchTerm" type="search" :placeholder="props.placeholder || 'Search books'"
             aria-label="Search books" @keyup.enter="search" />
         <button class="green-button" type="button" @click="search()">Search</button>
@@ -203,7 +195,10 @@ onMounted(() => {
             </button>
             <button class="toggle-button" type="button" @click="reset()">Reset</button>
         </div>
+
     </div>
+
+    <!-- Advanced Search Fields -->
     <div class="advanced-search" v-if="showAdvanced && availableFields">
         <label class="advanced-search-field" v-if="availableFields.year">
             <span>Year</span>
@@ -254,6 +249,8 @@ onMounted(() => {
                 @keyup.enter="search" />
         </label>
     </div>
+
+    <!-- Sorting and Filtering Controls -->
     <div class="sort-row">
         <label v-if="availableFields?.files">
             <span>Files</span>
@@ -280,6 +277,7 @@ onMounted(() => {
             </select>
         </label>
     </div>
+
 </template>
 
 <style scoped>

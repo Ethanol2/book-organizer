@@ -174,7 +174,7 @@ export const useAuthStore = defineStore('auth', {
     }
 });
 
-async function waitAndRefresh(seconds: number = 2, countdown: boolean = true) {
+export async function waitAndRefresh(seconds: number = 2, countdown: boolean = true) {
     const notifId = countdown ? useNotificationsStore().notifyInfo("Refreshing in " + seconds + " seconds...", seconds * 1000) : '';
     while (seconds > 0) {
         if (countdown) {

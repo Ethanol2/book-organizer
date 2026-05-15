@@ -17,16 +17,16 @@ import (
 func (cfg *apiConfig) createRefreshToken(userId uuid.UUID) (string, int, error) {
 	refresh := auth.MakeRefreshToken()
 	// Lifetime is 60 days
-	refreshLifetime := time.Now().UTC().Add(time.Hour * 24 * 60)
+	refreshLifetime := time.Hour * 24 * 60
 	_, err := cfg.db.AddRefreshToken(
 		userId,
 		refresh,
-		refreshLifetime,
+		time.Now().UTC().Add(refreshLifetime),
 	)
 	if err != nil {
 		return "", -1, err
 	}
-	return refresh, int(refreshLifetime.Second()), nil
+	return refresh, int(refreshLifetime.Seconds()), nil
 }
 
 func (cfg *apiConfig) handlerGetAuthStatus(w http.ResponseWriter, r *http.Request) {

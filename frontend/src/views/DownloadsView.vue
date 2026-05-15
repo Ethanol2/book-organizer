@@ -18,7 +18,8 @@ const selectedDownload = ref<Download>({
     files: {
         cover: null,
         text_files: null,
-        audio_files: null
+        audio_files: null,
+        hasMetadata: null
     },
     created_at: ""
 });
@@ -89,7 +90,7 @@ onUnmounted(() => {
             </div>
         </header>
 
-        <div>
+        <div class="download-items">
             <DownloadItem v-for="download in downloads" :key="download.id" :download="download" :openModalFunc="showModal" />
         </div>
     </section>
@@ -101,10 +102,20 @@ onUnmounted(() => {
 <style scoped>
 
 .downloads-view {
-    display: block;
+    display: flex;
+    flex-direction: column;
     overflow-y: auto;
     padding-bottom: 10rem;
     box-sizing: border-box;
+}
+
+.download-items {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    width: 100%;
+    max-width: 1200px;
+    align-self: center;
 }
 
 .refresh {

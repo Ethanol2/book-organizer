@@ -32,6 +32,8 @@ type SearchResults struct {
 	Count      int                   `json:"count"`
 	Offset     int                   `json:"offset"`
 	Items      []database.BookParams `json:"items"`
+
+	Error *string `json:"error,omitempty"`
 }
 
 func BookToMetadata(book database.Book) *fileManagement.MetadataFile {

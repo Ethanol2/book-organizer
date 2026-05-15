@@ -30,7 +30,7 @@ export type MetadataSearchResults = {
   total_count: number
   count: number
   offset: number
-  error: string
+  error: string | null
 }
 
 function buildQueryParams(params: SearchTerms, pageLimit: number, page: number): URLSearchParams {
@@ -74,6 +74,17 @@ export async function searchMetadataSource(params: SearchTerms, pageLimit: numbe
     const resp = await api.get(endpoint, { params: queryParams })
 
     const body = resp.data as MetadataSearchResults
+
+    if (body.error) {
+      useNotificationsStore().notifyError(body.error)
+      return null
+    }
+
+    if (body.total_count === 0) {
+      useNotificationsStore().notifyInfo('No Results Found')
+      return null
+    }
+
     return body
 
   } catch (err) {
@@ -114,6 +125,7 @@ export async function getMetadataDetails(item: BookParams | null): Promise<BookP
   }
 }
 
+// Open Library
 export const metadataSearchFields = new Map<MetadataSource, SearchParams>()
 metadataSearchFields.set(MetadataSource.OpenLibrary, {
   authors: true,
@@ -131,12 +143,12 @@ metadataSearchFields.set(MetadataSource.OpenLibrary, {
   files: false,
 
   sortOptions: {
+    'title': 'Title',
     'editions': 'Editions Count',
     'old': 'Year (Oldest First)',
     'new': 'Year (Newest First)',
     'rating': 'Ratings (Highest First)',
     'rating asc': 'Ratings (Lowest First)',
-    'title': 'Title',
     // Random
     'random': 'Random (Ascending)',
     'random desc': 'Random (Descending)',
@@ -145,6 +157,7 @@ metadataSearchFields.set(MetadataSource.OpenLibrary, {
   orderOptions: {}
 })
 
+// Google Books
 metadataSearchFields.set(MetadataSource.GoogleBooks, {
   authors: true,
   narrators: false,
@@ -166,6 +179,8 @@ metadataSearchFields.set(MetadataSource.GoogleBooks, {
   },
   orderOptions: {}
 })
+
+// Audible
 metadataSearchFields.set(MetadataSource.Audible, {
   authors: true,
   narrators: false,

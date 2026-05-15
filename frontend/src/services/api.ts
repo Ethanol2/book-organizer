@@ -1,4 +1,6 @@
 import axios from 'axios';
+import { waitAndRefresh } from '@/stores/auth';
+import { useNotificationsStore } from '@/stores/notifications';
 
 const api = axios.create({
     baseURL: '',
@@ -26,6 +28,8 @@ api.interceptors.response.use(
         return api(originalRequest);
       } catch (refreshError) {
         // Refresh failed (token truly expired/invalid)
+        useNotificationsStore().notifyError('Your session has expired. Please log in again.');
+        waitAndRefresh(3, true);
         return Promise.reject(refreshError);
       }
     }

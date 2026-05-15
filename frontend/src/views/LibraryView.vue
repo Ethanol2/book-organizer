@@ -5,7 +5,6 @@ import { onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { useNotificationsStore } from '@/stores/notifications';
 import api from '@/services/api';
-import SearchControls from '@/components/SearchControls.vue';
 import { AddSearchTermsToQuery, NewSearchTerms, type SearchTerms, TrimSearchTerms} from '@/types/search';
 
 const router = useRouter();

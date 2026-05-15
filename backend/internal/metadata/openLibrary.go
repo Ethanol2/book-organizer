@@ -108,6 +108,10 @@ func SearchOpenLibrary(params SearchParams, cache *cache.Cache) (SearchResults, 
 
 	body, err := cache.HttpGet(u.String())
 	if err != nil {
+		if len(body) > 0 {
+			bodyStr := "OpenLibrary: " + string(body)
+			return SearchResults{Error: &bodyStr}, nil
+		}
 		return SearchResults{}, err
 	}
 

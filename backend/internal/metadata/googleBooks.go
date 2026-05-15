@@ -113,7 +113,12 @@ func SearchGoogleBooks(params SearchParams, key string, cache *cache.Cache) (Sea
 
 	body, err := cache.HttpGet(u.String())
 	if err != nil {
-		return SearchResults{}, err
+		msg, dErr := handleErrorMsg(body)
+		if dErr != nil {
+			return SearchResults{}, err
+		}
+
+		return SearchResults{Error: &msg}, nil
 	}
 
 	var results GoogleBooksSearchResults
@@ -233,6 +238,25 @@ func (result *GoogleBooksItem) parse() (database.BookParams, error) {
 		Cover:       result.VolumeInfo.ImageLinks.GetBiggestImage(),
 		Key:         &key,
 	}, nil
+}
+
+func handleErrorMsg(body []byte) (string, error) {
+	var msg struct {
+		Error struct {
+			Code    int    `json:"code"`
+			Message string `json:"message"`
+			Errors  []struct {
+				Message string `json:"message"`
+				Domain  string `json:"domain"`
+				Reason  string `json:"reason"`
+			} `json:"errors"`
+		} `json:"error"`
+	}
+	err := json.Unmarshal(body, &msg)
+	if err != nil {
+		return "", err
+	}
+	return "Google Books: " + msg.Error.Message, nil
 }
 
 func (covers *GoogleImageLinks) GetBiggestImage() *string {

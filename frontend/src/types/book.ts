@@ -52,7 +52,8 @@ export type BookFiles = {
     root?: string | null,
     cover?: string | null,
     audio_files?: string[] | null,
-    text_files?: string[] | null
+    text_files?: string[] | null,
+    hasMetadata: boolean | null
 };
 
 export type Category = {
