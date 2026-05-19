@@ -31,7 +31,7 @@ type apiConfig struct {
 	mdCache cache.Cache
 	scanner *fileManagement.Scanner
 
-	// Env
+	// Environment Variables
 	Env map[string]string
 
 	// Folder Paths

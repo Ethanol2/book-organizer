@@ -1,10 +1,34 @@
 <script setup lang="ts">
-import { ref } from 'vue';
+import { onMounted, ref } from 'vue';
 import { useAuthStore } from '@/stores/auth';
 import { useNotificationsStore } from '@/stores/notifications';
+import api from '@/services/api';
+
+type UserSettings = {
+    google_api_key: string,
+    scan_frequency: number,
+    port: number
+}
 
 const authStore = useAuthStore();
 
+// User Settings
+const userSettings = ref<UserSettings>({
+    google_api_key: '',
+    scan_frequency: 5,
+    port: 8080
+});
+const port = ref(8080);
+const portValid = ref(true);
+const google_api_key = ref('');
+const showKey = ref(false);
+const scan_frequency = ref(5);
+const scanFrequencyValid = ref(true);
+
+const validatePort = () => port.value >= 1 && port.value <= 65535;
+const validateScanFrequency = () => scan_frequency.value >= 1;
+
+// Authentication Params
 const username = ref('');
 const oldPassword = ref('');
 const newPassword = ref('');
@@ -16,6 +40,49 @@ const deleterUserConfirm = ref(false);
 const usernameOk = () => username.value.length >= 3;
 const passwordOk = () => newPassword.value.length >= 3;
 const passwordConfirmOk = () => newPassword.value === passwordConfirm.value;
+
+async function getUserSettings() {
+    try {
+        const resp = await api.get('/api/settings');
+        userSettings.value = resp.data;
+
+        port.value = userSettings.value.port;
+        google_api_key.value = userSettings.value.google_api_key;
+        scan_frequency.value = userSettings.value.scan_frequency;
+
+    } catch (err) {
+        console.error('Error fetching user settings:', err);
+        useNotificationsStore().notifyError('Something went wrong while fetching user settings')
+    }
+}
+
+async function postUserSettings() {
+    const newSettings = {
+        google_api_key: google_api_key.value,
+        scan_frequency: scan_frequency.value,
+        port: port.value
+    }
+
+    try {
+        const resp = await api.post('/api/settings', newSettings);
+        useNotificationsStore().notifySuccess('Settings saved successfully!');
+
+        userSettings.value = newSettings;
+    } catch (err) {
+        console.error('Error saving user settings:', err);
+        useNotificationsStore().notifyError('Something went wrong while saving user settings')
+    }
+}
+
+function settingsChanged(): boolean {
+    return port.value !== userSettings.value.port ||
+        google_api_key.value !== userSettings.value.google_api_key ||
+        scan_frequency.value !== userSettings.value.scan_frequency
+}
+
+function allSettingsValid(): boolean {
+    return validatePort() && validateScanFrequency();
+}
 
 function checkUserParams(isRegistering: boolean = true, notifications: boolean = false): boolean {
 
@@ -62,12 +129,52 @@ async function changePassword() {
     await authStore.changePassword(oldPassword.value, newPassword.value);
 }
 
+onMounted(async () => {
+    await getUserSettings();
+})
+
 </script>
 
 <template>
     <section class="settings-view">
         <h2 class="vue-heading">Settings</h2>
 
+        <!-- General Settings -->
+        <h3>General Settings</h3>
+        <section id="general-settings">
+            <div class="card">
+                <div>
+                    <h4>Port</h4>
+                    <small>Server will have to restart for settings to take effect</small>
+                    <input :class="'text-input ' + (portValid ? '' : 'invalid')" v-model="port" type="text"
+                        placeholder="Port" name="port" @keyup="portValid = validatePort()" />
+                </div>
+                <div>
+                    <h4>Google API Key</h4>
+                    <small>Required to use Google Books as a metadata source. <a
+                            href="https://developers.google.com/books/docs/v1/using" target="_blank">Google's
+                            documentation</a></small>
+                    <div class="hidden-field">
+                        <input class="text-input" v-model="google_api_key" :type="showKey ? 'text' : 'password'"
+                            placeholder=" Google API Key" name="google_api_key" />
+                        <button class="toggle-button" @click="showKey = !showKey">{{ showKey ? "Hide" : "Show"
+                            }}</button>
+                    </div>
+                </div>
+                <div>
+                    <h4>Scan Frequency</h4>
+                    <p>How often to scan the downloads folder</p>
+                    <small>Number in seconds. Must be larger than 0 seconds</small>
+                    <input :class="'text-input ' + (scanFrequencyValid ? '' : 'invalid')"" v-model="scan_frequency"
+                        type="text" placeholder="Scan Frequency" name="scan_frequency"
+                        @keyup=" scanFrequencyValid = validateScanFrequency()" />
+                </div>
+                <button class="green-button" v-if="settingsChanged()" :disabled="!allSettingsValid()"
+                    @click="postUserSettings()">Apply</button>
+            </div>
+        </section>
+
+        <!-- Authentication -->
         <h3>Authentication</h3>
         <section id="authentication"">
             <div class=" card">
@@ -81,7 +188,7 @@ async function changePassword() {
                         name="password" required />
                     <input class="text-input" v-model="passwordConfirm" type="password" placeholder="Confirm Password"
                         name="passwordConfirm" required />
-                    <button class="search-button" type="submit" :disabled="!userParamsOk">Change Password</button>
+                    <button class="green-button" type="submit" :disabled="!userParamsOk">Change Password</button>
                 </form>
             </div>
             <div v-else>
@@ -98,7 +205,7 @@ async function changePassword() {
                         name="password" required />
                     <input class="text-input" v-model="passwordConfirm" type="password" placeholder="Confirm Password"
                         name="passwordConfirm" required />
-                    <button class="search-button" type="submit" :disabled="!userParamsOk">Create User</button>
+                    <button class="green-button" type="submit" :disabled="!userParamsOk">Create User</button>
                 </form>
             </div>
             </div>
@@ -134,6 +241,19 @@ async function changePassword() {
     height: 100%;
 }
 
+.settings-view h3 {
+    margin: 0;
+    margin-bottom: 0.5rem;
+    font-size: 1.2rem;
+}
+
+.general-settings {
+    display: flex;
+    flex-direction: column;
+    gap: 0.8rem;
+    align-items: center;
+}
+
 .card {
     display: flex;
     flex-direction: column;
@@ -144,6 +264,7 @@ async function changePassword() {
     border-radius: 6px;
     padding: 1rem;
     margin-bottom: 1rem;
+    gap: 1rem;
 }
 
 .card form {
@@ -157,12 +278,6 @@ async function changePassword() {
     margin: 0;
     margin-bottom: 0.5rem;
     font-size: 1rem;
-}
-
-.settings-view h3 {
-    margin: 0;
-    margin-bottom: 0.5rem;
-    font-size: 1.2rem;
 }
 
 .warning-box {
@@ -179,6 +294,24 @@ async function changePassword() {
     display: flex;
     align-items: center;
     gap: 0.5rem;
+}
+
+.text-input {
+    height: auto;
+}
+
+.text-input.invalid {
+    border-color: var(--color-error-border);
+}
+
+.hidden-field {
+    display: flex;
+    gap: 0.5rem;
+    justify-content: space-between;
+}
+
+.hidden-field button {
+    max-width: 100px;
 }
 
 @media (max-width: 768px) {
