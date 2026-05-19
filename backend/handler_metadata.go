@@ -76,12 +76,12 @@ func (cfg *apiConfig) handlerMetadataSearch(w http.ResponseWriter, r *http.Reque
 		}
 
 	case "google books":
-		if cfg.googleBooksApiKey == "" {
+		if cfg.Env[GoogleApiKey] == "" {
 			respondWithError(w, http.StatusInternalServerError, MetadataApiKeyMissing, fmt.Errorf(MetadataApiKeyMissing))
 			return
 		}
 
-		results, err = metadata.SearchGoogleBooks(searchParams, cfg.googleBooksApiKey, &cfg.mdCache)
+		results, err = metadata.SearchGoogleBooks(searchParams, cfg.Env[GoogleApiKey], &cfg.mdCache)
 		if err != nil {
 			respondWithError(w, http.StatusInternalServerError, MetadataFetchError, err)
 			return
@@ -132,12 +132,12 @@ func (cfg *apiConfig) handlerGetMetadataBookDetails(w http.ResponseWriter, r *ht
 		}
 
 	case "google books":
-		if cfg.googleBooksApiKey == "" {
+		if cfg.Env[GoogleApiKey] == "" {
 			respondWithError(w, http.StatusInternalServerError, MetadataApiKeyMissing, fmt.Errorf(MetadataApiKeyMissing))
 			return
 		}
 
-		result, err = metadata.GetFromGoogleBooks(id, cfg.googleBooksApiKey, &cfg.mdCache)
+		result, err = metadata.GetFromGoogleBooks(id, cfg.Env[GoogleApiKey], &cfg.mdCache)
 		if err != nil {
 			respondWithError(w, http.StatusInternalServerError, MetadataFetchError, err)
 			return

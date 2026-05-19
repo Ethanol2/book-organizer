@@ -44,7 +44,7 @@ func (cfg *apiConfig) handlerGetAuthStatus(w http.ResponseWriter, r *http.Reques
 	}
 
 	var user *database.User
-	if id, err := authenticate(true, r, cfg.tokenSecret); err == nil {
+	if id, err := authenticate(true, r, cfg.Env[TokenSecret]); err == nil {
 		usr, _, err := cfg.db.GetUser(id)
 		if err != nil {
 			respondWithError(w, http.StatusInternalServerError, DatabaseError, err)
@@ -69,7 +69,7 @@ func (cfg *apiConfig) handlerRegister(w http.ResponseWriter, r *http.Request) {
 
 	// If there aren't any users, assume the first user is the admin
 	if count > 0 {
-		_, err := authenticate(true, r, cfg.tokenSecret)
+		_, err := authenticate(true, r, cfg.Env[TokenSecret])
 		if err != nil {
 			respondWithError(w, http.StatusUnauthorized, AuthBadAuthorization, err)
 			return
@@ -142,7 +142,7 @@ func (cfg *apiConfig) handlerLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	token, err := auth.MakeJWT(user.Id, cfg.tokenSecret, time.Hour)
+	token, err := auth.MakeJWT(user.Id, cfg.Env[TokenSecret], time.Hour)
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, "Failed to create token", err)
 		return
@@ -228,7 +228,7 @@ func (cfg *apiConfig) handlerRefresh(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	token, err := auth.MakeJWT(user.Id, cfg.tokenSecret, time.Hour)
+	token, err := auth.MakeJWT(user.Id, cfg.Env[TokenSecret], time.Hour)
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, GenericError, err)
 		return

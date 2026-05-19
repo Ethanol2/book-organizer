@@ -86,7 +86,7 @@ func (cfg *apiConfig) handlerAssociateDownloadToBook(downloadId uuid.UUID, w htt
 		return
 	}
 
-	oldPath, newPath, err := fileManagement.MoveFiles(downloadDir, cfg.downloadsPath, bookDir, cfg.libraryPath, authorDir, seriesDir)
+	oldPath, newPath, err := fileManagement.MoveFiles(downloadDir, cfg.Env[DownloadsPath], bookDir, cfg.Env[LibraryPath], authorDir, seriesDir)
 	if err != nil {
 		if os.IsExist(err) {
 			respondWithError(w, http.StatusConflict, "The library already has files at the book's location", err)
@@ -178,7 +178,7 @@ func (cfg *apiConfig) handlerGetDownloadCover(id uuid.UUID, w http.ResponseWrite
 		return
 	}
 
-	coverPath := path.Join(cfg.downloadsPath, *download.Files.Root, *download.Files.Cover)
+	coverPath := path.Join(cfg.Env[DownloadsPath], *download.Files.Root, *download.Files.Cover)
 	log.Println("Serving download cover from", coverPath)
 
 	http.ServeFile(w, r, coverPath)
@@ -200,7 +200,7 @@ func (cfg *apiConfig) handlerGetDownloadMetadata(id uuid.UUID, w http.ResponseWr
 		return
 	}
 
-	metadataFile, err := os.Open(path.Join(cfg.downloadsPath, *download.Files.Root, "metadata.json"))
+	metadataFile, err := os.Open(path.Join(cfg.Env[DownloadsPath], *download.Files.Root, "metadata.json"))
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, FileOpenError, err)
 		return

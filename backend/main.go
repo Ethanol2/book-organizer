@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/signal"
 	"path"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -30,22 +31,18 @@ type apiConfig struct {
 	mdCache cache.Cache
 	scanner *fileManagement.Scanner
 
+	// Env
+	Env map[string]string
+
 	// Folder Paths
-	frontendPath  string
-	downloadsPath string
-	libraryPath   string
-	metadataPath  string
-	testDataPath  string
+	metadataPath string
 
 	// Endpoint Paths
 	downloadsName string
 	libraryName   string
 
 	// Other
-	port              string
-	googleBooksApiKey string
-	tokenSecret       string
-	authRequired      bool
+	authRequired bool
 }
 
 type cliFlags struct {
@@ -67,6 +64,11 @@ func main() {
 
 	logger.InitLogger()
 
+	err := godotenv.Load()
+	if err != nil {
+		log.Fatal("Error loading .env file: " + err.Error())
+	}
+
 	flags, err := getFlags(os.Args[1:])
 	if err != nil {
 		fmt.Println(err)
@@ -83,7 +85,7 @@ func main() {
 	log.Println("Environment variables and database loaded successfully")
 
 	mux := http.NewServeMux()
-	fHandler := http.FileServer(http.Dir(cfg.frontendPath))
+	fHandler := http.FileServer(http.Dir(cfg.Env[FrontendPath]))
 	mux.Handle("/", fHandler)
 
 	// Auth Endpoints
@@ -94,6 +96,10 @@ func main() {
 	mux.HandleFunc("DELETE /api/auth/users/{id}", cfg.uuidMiddleware(cfg.handlerDeleteUser))
 	mux.HandleFunc("PUT /api/auth/users/{id}/reset-password", cfg.uuidMiddleware(cfg.handlerUpdatePassword))
 	mux.HandleFunc("POST /api/auth/refresh", cfg.handlerRefresh)
+
+	// Setting Endpoints
+	mux.HandleFunc("GET /api/settings", cfg.authMiddleware(cfg.handlerGetSettings))
+	mux.HandleFunc("POST /api/settings", cfg.authMiddleware(cfg.handlerPostSettings))
 
 	// Downloads Endpoints
 	mux.HandleFunc("POST /api/downloads/{id}/associate", cfg.uuidMiddleware(cfg.handlerAssociateDownloadToBook))
@@ -119,18 +125,35 @@ func main() {
 	mux.HandleFunc("GET /api/metadata/{id}", cfg.authMiddleware(cfg.handlerGetMetadataBookDetails))
 
 	// Media
-	mux.Handle("/media/downloads/", http.StripPrefix(cfg.downloadsName, http.FileServer(http.Dir(cfg.downloadsPath))))
-	mux.Handle("/media/library/", http.StripPrefix(cfg.libraryName, http.FileServer(http.Dir(cfg.libraryPath))))
+	mux.Handle("/media/downloads/", http.StripPrefix(cfg.downloadsName, http.FileServer(http.Dir(cfg.Env[DownloadsPath]))))
+	mux.Handle("/media/library/", http.StripPrefix(cfg.libraryName, http.FileServer(http.Dir(cfg.Env[LibraryPath]))))
 	mux.Handle("/media/metadata/", http.StripPrefix("/media/metadata/", http.FileServer(http.Dir(cfg.metadataPath))))
 
 	srv := &http.Server{
-		Addr:    ":" + cfg.port,
+		Addr:    ":" + cfg.Env[Port],
 		Handler: mux,
 	}
 
+	// Downloads Scanner
+	scanFrequency := time.Second * 5
+	if fStr, ok := cfg.Env[ScanFrequency]; ok && fStr != "" {
+		seconds, err := strconv.Atoi(fStr)
+		if err != nil || seconds < 1 {
+			log.Fatal("scan frequency must be a positive integer greater than 0")
+		}
+		scanFrequency = time.Duration(seconds) * time.Second
+	} else {
+		cfg.Env[ScanFrequency] = "5"
+
+		err = godotenv.Write(cfg.Env, "./.env")
+		if err != nil {
+			log.Fatal("failed to set default scan frequency: " + err.Error())
+		}
+	}
+
 	scanner := fileManagement.Scanner{
-		Frequency: time.Second * 5,
-		Directory: cfg.downloadsPath,
+		Frequency: scanFrequency,
+		Directory: cfg.Env[DownloadsPath],
 
 		AddHandler:    cfg.db.AddDownloads,
 		UpdateHandler: cfg.db.UpdateDownloadFiles,
@@ -153,7 +176,7 @@ func main() {
 	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
 
 	go func() {
-		log.Printf("Serving on: http://localhost:%s/\n", cfg.port)
+		log.Printf("Serving on: http://localhost:%s/\n", cfg.Env[Port])
 		log.Println("Starting server")
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			log.Fatalf("listen: %s\n", err)
@@ -363,35 +386,36 @@ func initConfig(flags cliFlags) (*apiConfig, error) {
 		return nil, fmt.Errorf("couldn't open database: %v", err)
 	}
 
-	fPath := os.Getenv("FRONTEND_PATH")
-	if fPath == "" {
+	env, err := godotenv.Read("./.env")
+	if err != nil {
+		return nil, err
+	}
+
+	if fPath, ok := env[FrontendPath]; !ok || fPath == "" {
 		return nil, fmt.Errorf("FRONTEND_PATH must be set")
 	}
 
-	dPath := os.Getenv("DOWNLOADS_PATH")
-	if dPath == "" {
+	if dPath, ok := env[DownloadsPath]; !ok || dPath == "" {
 		return nil, fmt.Errorf("DOWNLOADS_PATH must be set")
 	}
 
-	lPath := os.Getenv("LIBRARY_PATH")
-	if lPath == "" {
+	if lPath, ok := env[LibraryPath]; !ok || lPath == "" {
 		return nil, fmt.Errorf("LIBRARY_PATH must be set")
 	}
 
-	tPath := os.Getenv("TEST_DATA_PATH")
-	if tPath == "" {
+	if tPath, ok := env[TestDataPath]; !ok || tPath == "" {
 		fmt.Println("TEST_DATA_PATH not set. Needed for the -t insert test data flag")
 		if flags.dbTestData {
 			return nil, fmt.Errorf("insert test data flag triggered but no test folder path was provided")
 		}
 	}
 
-	port := os.Getenv("PORT")
+	port := os.Getenv(string(Port))
 	if port == "" {
 		return nil, fmt.Errorf("PORT must be set")
 	}
 
-	gbApiKey := os.Getenv("GOOGLE_BOOKS_API_KEY")
+	gbApiKey := os.Getenv(string(GoogleApiKey))
 	if gbApiKey == "" {
 		fmt.Println("no google books api key in env variables. Google books search won't work")
 	}
@@ -402,7 +426,7 @@ func initConfig(flags cliFlags) (*apiConfig, error) {
 	}
 
 	if flags.clearDownloads {
-		err = fileManagement.RemoveDirectoryContents(dPath)
+		err = fileManagement.RemoveDirectoryContents(env[DownloadsPath])
 		if err != nil {
 			return nil, err
 		}
@@ -410,7 +434,7 @@ func initConfig(flags cliFlags) (*apiConfig, error) {
 
 	if flags.clearLibrary {
 		fmt.Println("Deleting library")
-		err = fileManagement.RemoveDirectoryContents(lPath)
+		err = fileManagement.RemoveDirectoryContents(env[LibraryPath])
 		if err != nil {
 			return nil, err
 		}
@@ -464,12 +488,12 @@ func initConfig(flags cliFlags) (*apiConfig, error) {
 		if flags.dbTestData {
 
 			fmt.Println("Creating test data path")
-			err = fileManagement.CreateDirectory(tPath)
+			err = fileManagement.CreateDirectory(env[TestDataPath])
 			if err != nil {
 				return err
 			}
 
-			testBooks, err := c.InsertTestData(metadataPath, tPath)
+			testBooks, err := c.InsertTestData(metadataPath, env[TestDataPath])
 			if err != nil {
 				return err
 			}
@@ -486,7 +510,7 @@ func initConfig(flags cliFlags) (*apiConfig, error) {
 				handleDirs := func(book database.Book) (string, error) {
 					bookPath := book.Authors[0].Name
 
-					err = fileManagement.CreateDirectory(path.Join(lPath, bookPath))
+					err = fileManagement.CreateDirectory(path.Join(env[LibraryPath], bookPath))
 					if err != nil {
 						return "", err
 					}
@@ -500,7 +524,7 @@ func initConfig(flags cliFlags) (*apiConfig, error) {
 							bookDir = *book.Series[0].Index + " - " + bookDir
 						}
 
-						err = fileManagement.CreateDirectory(path.Join(lPath, bookPath))
+						err = fileManagement.CreateDirectory(path.Join(env[LibraryPath], bookPath))
 						if err != nil {
 							return "", err
 						}
@@ -520,7 +544,7 @@ func initConfig(flags cliFlags) (*apiConfig, error) {
 
 					book.Files, err = fileManagement.CreateTestDirectory(
 						bookPath,
-						lPath,
+						env[LibraryPath],
 						nil,
 						path.Join(metadataPath, book.Id.String()+".jpg"), rand.Intn(10)+1, rand.Intn(10)+1,
 					)
@@ -541,7 +565,7 @@ func initConfig(flags cliFlags) (*apiConfig, error) {
 
 					book.Files, err = fileManagement.CreateTestDirectory(
 						bookPath,
-						lPath,
+						env[LibraryPath],
 						metadata.BookToMetadata(book),
 						path.Join(metadataPath, book.Id.String()+".jpg"), rand.Intn(10)+1, rand.Intn(10)+1,
 					)
@@ -605,7 +629,7 @@ func initConfig(flags cliFlags) (*apiConfig, error) {
 
 					_, err = fileManagement.CreateTestDirectory(
 						path.Join(d.title),
-						dPath,
+						env[DownloadsPath],
 						d.md,
 						d.cover,
 						d.audio, d.text,
@@ -629,19 +653,14 @@ func initConfig(flags cliFlags) (*apiConfig, error) {
 		db:      db,
 		mdCache: cache.NewCache(time.Minute * 5),
 
-		frontendPath:  fPath,
-		downloadsPath: dPath,
-		libraryPath:   lPath,
-		metadataPath:  metadataPath,
-		testDataPath:  tPath,
+		Env: env,
+
+		metadataPath: metadataPath,
 
 		libraryName:   "/media/library",
 		downloadsName: "/media/downloads",
 
-		port:              port,
-		googleBooksApiKey: gbApiKey,
-		tokenSecret:       secret,
-		authRequired:      authRequired,
+		authRequired: authRequired,
 	}, nil
 }
 
@@ -701,7 +720,7 @@ func (cfg *apiConfig) uuidMiddleware(handler func(uuid.UUID, http.ResponseWriter
 			return
 		}
 
-		_, err = authenticate(cfg.authRequired, r, cfg.tokenSecret)
+		_, err = authenticate(cfg.authRequired, r, cfg.Env[TokenSecret])
 		if err != nil {
 			respondWithError(w, http.StatusUnauthorized, AuthBadAuthorization, err)
 			return
@@ -716,7 +735,7 @@ func (cfg *apiConfig) authMiddleware(handler func(http.ResponseWriter, *http.Req
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		_, err := authenticate(cfg.authRequired, r, cfg.tokenSecret)
+		_, err := authenticate(cfg.authRequired, r, cfg.Env[TokenSecret])
 		if err != nil {
 			respondWithError(w, http.StatusUnauthorized, AuthBadAuthorization, err)
 			return
