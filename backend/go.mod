@@ -8,6 +8,8 @@ require (
 	github.com/mattn/go-sqlite3 v1.14.33
 )
 
+require gopkg.in/natefinch/lumberjack.v2 v2.2.1 // indirect
+
 require (
 	github.com/alexedwards/argon2id v1.0.0
 	github.com/golang-jwt/jwt/v5 v5.3.1

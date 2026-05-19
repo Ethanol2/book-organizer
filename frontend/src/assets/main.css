@@ -75,12 +75,22 @@
   font-weight: 500;
 }
 
+@media (max-width: 768px) {
+  .modal {
+    padding: 1rem;
+    width: 95%;
+    height: 95%;
+    overflow-y: hidden;
+  }
+}
+
 /* #endregion */
 
 /* #region Buttons */
 
 .text-input,
 .dropdown-select,
+.purple-button,
 .green-button,
 .toggle-button {
   width: 100%;
@@ -111,6 +121,22 @@
 }
 
 .green-button:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+.purple-button {
+  background: var(--color-primary-purple);
+  color: var(--vt-c-text-light-1);
+  border: none;
+  cursor: pointer;
+}
+
+.purple-button:hover {
+  background: var(--color-primary-purple-dark);
+}
+
+.purple-button:disabled {
   opacity: 0.65;
   cursor: not-allowed;
 }

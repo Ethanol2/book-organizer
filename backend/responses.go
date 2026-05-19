@@ -13,10 +13,12 @@ const (
 
 	BodyDecodeError string = "Failed to read request body"
 	DatabaseError   string = "Something went wrong with the database"
-	FileMoveError   string = "Something went wrong while moving files"
-	FileDeleteError string = "Something went wrong while deleting files"
 	CoverURLError   string = "Failed to fetch the cover from the url. Only png and jpg are currently supported"
 	NotFoundError   string = "Not Found"
+
+	FileMoveError   string = "Something went wrong while moving files"
+	FileDeleteError string = "Something went wrong while deleting files"
+	FileOpenError   string = "Something went wrong while trying to open a file"
 
 	MetadataFetchError    string = "Something went wrong querying source api"
 	MetadataApiKeyMissing string = "Api key for source not set"

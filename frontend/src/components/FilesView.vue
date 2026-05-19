@@ -118,10 +118,6 @@ const props = defineProps<{
 
     display: flex;
     flex-direction: column;
-
-    --metadata-color: rgba(233, 150, 226, 0.2);
-    --book-files-color: rgba(143, 218, 236, 0.2);
-    --audio-files-color: rgba(236, 143, 143, 0.2);
 }
 
 .files-view>div {
@@ -149,7 +145,7 @@ const props = defineProps<{
 }
 
 .file-header.metadata {
-    background: var(--metadata-color);
+    background: var(--color-primary-purple);
     cursor: default;
     text-decoration: none;
 }
@@ -174,4 +170,11 @@ const props = defineProps<{
 .file-row:last-child {
     border-bottom: none;
 }
+
+@media (max-width: 903px) {
+    .files-view>div {
+        border-bottom: none;
+    }
+}
+
 </style>

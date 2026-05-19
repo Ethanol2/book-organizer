@@ -6,6 +6,7 @@ import { useRouter } from 'vue-router';
 import { useNotificationsStore } from '@/stores/notifications';
 import api from '@/services/api';
 import { AddSearchTermsToQuery, NewSearchTerms, type SearchTerms, TrimSearchTerms} from '@/types/search';
+import SearchControls from '@/components/SearchControls.vue';
 
 const router = useRouter();
 const books = ref<BookSummary[]>([]);
@@ -138,6 +139,8 @@ async function loadMore() {
 }
 
 onMounted(async () => {
+    searchTerms.value.sort = 'title';
+    searchTerms.value.order = 'asc';
     await fetchBooks(false);
 
     // Set up intersection observer for infinite scroll

@@ -17,6 +17,7 @@ import (
 	"github.com/Ethanol2/book-organizer/internal/cache"
 	"github.com/Ethanol2/book-organizer/internal/database"
 	"github.com/Ethanol2/book-organizer/internal/fileManagement"
+	"github.com/Ethanol2/book-organizer/internal/logger"
 	"github.com/Ethanol2/book-organizer/internal/metadata"
 	"github.com/google/uuid"
 	"github.com/joho/godotenv"
@@ -27,6 +28,7 @@ type apiConfig struct {
 	// System Structs
 	db      database.Client
 	mdCache cache.Cache
+	scanner *fileManagement.Scanner
 
 	// Folder Paths
 	frontendPath  string
@@ -63,6 +65,8 @@ type cliFlags struct {
 
 func main() {
 
+	logger.InitLogger()
+
 	flags, err := getFlags(os.Args[1:])
 	if err != nil {
 		fmt.Println(err)
@@ -96,6 +100,7 @@ func main() {
 	mux.HandleFunc("GET /api/downloads", cfg.authMiddleware(cfg.handlerGetDownloads))
 	mux.HandleFunc("GET /api/downloads/{id}", cfg.uuidMiddleware(cfg.handlerGetDownload))
 	mux.HandleFunc("GET /api/downloads/{id}/cover", cfg.uuidMiddleware(cfg.handlerGetDownloadCover))
+	mux.HandleFunc("GET /api/downloads/{id}/metadata", cfg.uuidMiddleware(cfg.handlerGetDownloadMetadata))
 
 	// Category Endpoints
 	mux.HandleFunc("POST /api/categories/{categoryType}", cfg.authMiddleware(cfg.handlerPutCategory))
@@ -138,6 +143,8 @@ func main() {
 	}
 	log.Println("File scanning started")
 
+	cfg.scanner = &scanner
+
 	// Cull refresh tokens once a week
 	cfg.refreshTokenCulling(time.Hour * 168)
 
@@ -155,7 +162,8 @@ func main() {
 
 	<-sigChan // Wait for shutdown
 
-	fmt.Println("\nShutting down...")
+	fmt.Println()
+	log.Println("Shutting down...")
 
 	// Give the HTTP server 5 seconds to finish active requests
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -164,7 +172,7 @@ func main() {
 
 	// FINALLY: Close the DB
 	cfg.db.Close()
-	fmt.Println("Database closed. Goodbye!")
+	log.Println("Database closed. Goodbye!")
 	os.Exit(0)
 }
 

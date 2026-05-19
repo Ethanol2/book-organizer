@@ -186,12 +186,9 @@ onMounted(async () => {
 
 <template>
   <div class="book-details">
-    <div class="page-header">
-      <div class="page-header-left">
-        <RouterLink to="/" class="back-button">← Back to library</RouterLink>
-        <h1>Book Details</h1>
-      </div>
-      <button class="edit-button" type="button" @click="openEditModal">Edit Book</button>
+    <div class="vue-heading">
+      <h2>Book Details</h2>
+      <button class="toggle-button" type="button" @click="openEditModal">Edit Book</button>
     </div>
 
     <div v-if="loading" class="status-message">Loading book details…</div>
@@ -328,51 +325,9 @@ onMounted(async () => {
   gap: 1.5rem;
 }
 
-.page-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-  margin-bottom: 1.5rem;
-}
-
-.page-header-left {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-}
-
-.page-header h1 {
-  margin: 0;
-  font-size: clamp(1.8rem, 2.2vw, 2.6rem);
-}
-
-.back-button {
-  display: inline-flex;
-  align-items: center;
-  padding: 0.75rem 1rem;
-  border-radius: 999px;
-  border: 1px solid var(--color-border);
-  background: var(--color-background-soft);
-  color: var(--color-text);
-  font-weight: 700;
-  transition: transform 0.2s ease, background-color 0.2s ease;
-}
-
-.back-button:hover {
-  transform: translateX(-1px);
-  background: var(--color-border-hover);
-}
-
-.edit-button {
-  padding: 0.75rem 1rem;
-  border-radius: 999px;
-  border: 1px solid var(--color-border);
-  background: var(--color-background-soft);
-  color: var(--color-text);
-  font-weight: 700;
+.toggle-button {
+  width: 100px;
   cursor: pointer;
-  transition: transform 0.2s ease, background-color 0.2s ease;
 }
 
 .edit-button:hover {
@@ -385,7 +340,7 @@ onMounted(async () => {
   grid-template-columns: minmax(260px, 320px) 1fr;
   gap: 1.5rem;
   padding: 1.5rem;
-  border-radius: 6px;
+  border-radius: 12px;
   background: var(--color-background-soft);
   border: 1px solid var(--color-border);
 }
@@ -559,50 +514,6 @@ onMounted(async () => {
 .info-grid dd {
   margin: 0;
   font-size: 0.95rem;
-  color: var(--color-text);
-}
-
-.file-overview {
-  display: grid;
-  gap: 0.85rem;
-}
-
-.file-metric {
-  display: flex;
-  justify-content: space-between;
-  gap: 1rem;
-  padding: 0.95rem 1rem;
-  border-radius: 6px;
-  background: var(--color-background);
-  border: 1px solid var(--color-border);
-}
-
-.file-metric .metric-label {
-  color: var(--color-text-subtle);
-  font-size: 0.9rem;
-}
-
-.file-list-group h3 {
-  margin: 1rem 0 0.6rem;
-  font-size: 0.95rem;
-  color: var(--color-text-subtle);
-}
-
-.file-list {
-  list-style: none;
-  padding: 0;
-  margin: 0;
-  display: grid;
-  gap: 0.35rem;
-}
-
-.file-list li {
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
-  font-size: 0.88rem;
-  padding: 0.65rem 0.9rem;
-  border-radius: 6px;
-  background: var(--color-background);
-  border: 1px solid var(--color-border);
   color: var(--color-text);
 }
 

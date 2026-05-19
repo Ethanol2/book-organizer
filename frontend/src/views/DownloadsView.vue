@@ -5,6 +5,9 @@ import DownloadItem from '@/components/DownloadItem.vue';
 import ImportDownloadModal from '@/components/ImportDownloadModal.vue';
 import { useNotificationsStore } from '@/stores/notifications';
 import api from '@/services/api';
+import type { BookParams } from '@/types/book';
+import AddBookModal from '@/components/AddBookModal.vue';
+import { AxiosError } from 'axios';
 
 const downloads = ref<Download[]>([]);
 const lastRefresh = ref<string>("Never refreshed");
@@ -13,6 +16,8 @@ const lastRefreshParams: { time: number, intervalId: number } = {
     intervalId: 0
 }
 const showImportModal = ref(false);
+const showAddModal = ref(false);
+const newBookParams = ref<BookParams | null>(null);
 const selectedDownload = ref<Download>({
     id: "if this shows up something went wrong",
     files: {
@@ -34,17 +39,28 @@ async function fetchDownloads() {
         const resp = await api.get('/api/downloads');
 
         downloads.value = resp.data;
-        lastRefreshParams.time = Date.now()
-        updateLastRefresh()
+        lastRefreshParams.time = Date.now();
+        updateLastRefresh();
 
     } catch (error) {
-        console.error("Error fetching downloads list:", error)
+        console.error("Error fetching downloads list:", error);
         useNotificationsStore().notifyError('Something went wrong while fetching downloads')
     }
     finally {
         loading.value = false;
-        updateLastRefresh()
+        updateLastRefresh();
     }
+}
+
+async function fetchDownloadMetadata(): Promise<BookParams | null> {
+    var params = null;
+    try {
+        const resp = await api.get("/api/downloads/" + selectedDownload.value.id + "/metadata");
+        params = resp.data;
+    } catch (err) {
+        console.error("Error fetching download metadata:", err);
+    }
+    return params;
 }
 
 function updateLastRefresh() {
@@ -68,9 +84,59 @@ function updateLastRefresh() {
     lastRefresh.value = `${Math.round(timeSince)} seconds since last refresh`
 }
 
-function showModal(download: Download) {
-    showImportModal.value = true;
+async function showModal(download: Download, usingMetadata?: boolean) {
+
     selectedDownload.value = download;
+
+    if (usingMetadata) {
+        const params = await fetchDownloadMetadata();
+        if (params === null) {
+            return;
+        }
+        newBookParams.value = params;
+        showAddModal.value = true;
+        return;
+    }
+
+    showImportModal.value = true;
+}
+
+async function importWithNewBook(params: BookParams) {
+
+    var newBookId = '';
+    try {
+        const resp = await api.post("/api/books", params);
+        useNotificationsStore().notifySuccess('Book added successfully!');
+        newBookId = resp.data.id;
+    }
+    catch (err) {
+        console.error('Add book error', err);
+
+        if (err instanceof AxiosError) {
+            useNotificationsStore().notifyError('Failed to add book: ' + err.response?.data.error);
+        }
+        else {
+            useNotificationsStore().notifyError('Failed to add book');
+        }
+    }
+
+    if (newBookId !== '') {
+
+        await new Promise(resolve => setTimeout(resolve, 500));
+
+        try {
+            const resp = await api.post("/api/downloads/" + selectedDownload.value.id + "/associate", { book_id: newBookId });
+            useNotificationsStore().notifySuccess('Download associated successfully!');
+            downloads.value = downloads.value.filter(download => download.id !== selectedDownload.value.id);
+        }
+        catch (err) {
+            console.error('Associate download error', err);
+            useNotificationsStore().notifyError('Failed to associate download');
+        }
+    }
+
+    showAddModal.value = false;
+
 }
 
 onMounted(async () => {
@@ -95,16 +161,19 @@ onUnmounted(() => {
         </header>
 
         <div class="download-items">
-            <DownloadItem v-for="download in downloads" :key="download.id" :download="download" :openModalFunc="showModal" />
+            <DownloadItem v-for="download in downloads" :key="download.id" :download="download"
+                :openModalFunc="showModal" />
         </div>
     </section>
     <div>
-        <ImportDownloadModal v-model="showImportModal" :download="selectedDownload" :modelShow="showImportModal" :refreshFunc="fetchDownloads" />
+        <AddBookModal v-model="showAddModal" :show="showAddModal" :isEditMode="false" :has-files="false"
+            :params="newBookParams" @add-book="importWithNewBook" @close="showAddModal = false" />
+        <ImportDownloadModal v-model="showImportModal" :download="selectedDownload" :show="showImportModal"
+            :refreshFunc="fetchDownloads" />
     </div>
 </template>
 
 <style scoped>
-
 .downloads-view {
     display: flex;
     flex-direction: column;
@@ -126,5 +195,18 @@ onUnmounted(() => {
     display: flex;
     align-items: center;
     gap: 0.5rem;
+}
+
+@media (max-width: 410px) {
+    .vue-heading {
+        display: block;
+        justify-content: left;
+        gap: 0.5rem;
+    }
+
+    .refresh {
+        justify-content: space-between;
+        width: 100%;
+    }
 }
 </style>

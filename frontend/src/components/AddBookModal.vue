@@ -194,7 +194,7 @@ watch(
               <button type="button" class="confirm-delete-button" @click="confirmDelete">Delete</button>
             </div>
             <label class="delete-files-checkbox" v-if="props.hasFiles">
-              <select class="search-select" v-model="deleteModeSelection" aria-label="Delete Mode">
+              <select class="dropdown-select" v-model="deleteModeSelection" aria-label="Delete Mode">
                 <option v-for="(type, value) in deleteMode" :key="value" :value="type">
                   {{ type }}
                 </option>
@@ -339,4 +339,11 @@ watch(
   background: var(--color-background);
   box-shadow: 0 18px 40px rgba(0, 0, 0, 0.08);
 }
+
+@media (max-width: 768px) {
+  .modal {
+    overflow: scroll;
+  }
+}
+
 </style>

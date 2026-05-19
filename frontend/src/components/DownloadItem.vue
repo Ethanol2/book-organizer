@@ -4,7 +4,7 @@ import FilesView from './FilesView.vue';
 
 const props = defineProps<{
   download: Download
-  openModalFunc: (download: Download) => void
+  openModalFunc: (download: Download, usingMetadata?: boolean) => void
 }>();
 
 </script>
@@ -15,24 +15,34 @@ const props = defineProps<{
     <div class="preview">
 
       <div class="cover-wrapper">
-        <img  v-if="download.files.cover !== null" :src="download.files.cover" class="cover">
+        <img v-if="download.files.cover !== null" :src="download.files.cover" class="cover">
         <span v-else class="cover missing"></span>
       </div>
       <div class="info">
-        <h2> {{ getDownloadName(download) }} </h2>
-        <p class="meta"> {{ getTimeAdded(download) }} </p>
+        <div>
+          <h2> {{ getDownloadName(download) }} </h2>
+          <p class="meta"> {{ getTimeAdded(download) }} </p>
+        </div>
 
-        <button @click="openModalFunc(download)" class="green-button">Import</button>
+        <div class="import-buttons">
+          <button @click="openModalFunc(download)" class="green-button">Import</button>
+          <button v-if="download.files.has_metadata" @click="openModalFunc(download, true)" class="purple-button">Import
+            with Metadata</button>
+        </div>
       </div>
     </div>
 
     <FilesView :files="props.download.files" />
 
+    <div class="import-buttons mobile">
+      <button @click="openModalFunc(download)" class="green-button">Import</button>
+      <button v-if="download.files.has_metadata" @click="openModalFunc(download, true)" class="purple-button">Import
+        with Metadata</button>
+    </div>
   </div>
 </template>
 
 <style scoped>
-
 .folder {
   display: flex;
   border: 1px solid var(--color-border);
@@ -62,6 +72,7 @@ const props = defineProps<{
   font-size: 0.8rem;
 }
 
+.purple-button,
 .green-button {
   margin-top: 1rem;
   height: fit-content;
@@ -75,7 +86,7 @@ const props = defineProps<{
 
 .cover {
   width: 100px;
-  aspect-ratio: 1;
+  height: 100%;
   object-fit: contain;
   display: flex;
   align-items: center;
@@ -85,8 +96,6 @@ const props = defineProps<{
 .cover.missing {
   background-color: transparent;
 }
-
-/* ===================================================================== */
 
 .card {
   height: 140px;
@@ -116,4 +125,38 @@ h3 {
   color: var(--color-heading);
 }
 
+.import-buttons {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.import-buttons.mobile {
+  display: none;
+}
+
+@media (max-width: 903px) {
+
+  .folder {
+    flex-direction: column;
+  }
+
+  .import-buttons {
+    display: none;
+  }
+
+  .preview {
+    border-right: none;
+  }
+
+  .import-buttons.mobile {
+    display: flex;
+    gap: 0;
+  }
+
+  .purple-button,
+  .green-button {
+    height: unset;
+  }
+
+}
 </style>

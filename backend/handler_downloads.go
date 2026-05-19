@@ -160,13 +160,16 @@ func (cfg *apiConfig) handlerAssociateDownloadToBook(downloadId uuid.UUID, w htt
 	}
 
 	book.Files.Prepend(cfg.libraryName)
-
 	respondWithJson(w, http.StatusOK, book)
 }
 
 func (cfg *apiConfig) handlerGetDownloadCover(id uuid.UUID, w http.ResponseWriter, r *http.Request) {
 	download, err := cfg.db.GetDownload(id)
 	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			respondWithError(w, http.StatusBadRequest, "Download "+NotFoundError, err)
+			return
+		}
 		respondWithError(w, http.StatusInternalServerError, DatabaseError, err)
 		return
 	}
@@ -179,4 +182,37 @@ func (cfg *apiConfig) handlerGetDownloadCover(id uuid.UUID, w http.ResponseWrite
 	log.Println("Serving download cover from", coverPath)
 
 	http.ServeFile(w, r, coverPath)
+}
+func (cfg *apiConfig) handlerGetDownloadMetadata(id uuid.UUID, w http.ResponseWriter, r *http.Request) {
+
+	download, err := cfg.db.GetDownload(id)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			respondWithError(w, http.StatusBadRequest, "Download "+NotFoundError, err)
+			return
+		}
+		respondWithError(w, http.StatusInternalServerError, DatabaseError, err)
+		return
+	}
+
+	if !download.Files.HasMetadata {
+		respondWithError(w, http.StatusNoContent, NotFoundError, err)
+		return
+	}
+
+	metadataFile, err := os.Open(path.Join(cfg.downloadsPath, *download.Files.Root, "metadata.json"))
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, FileOpenError, err)
+		return
+	}
+	defer metadataFile.Close()
+
+	var metadataContent fileManagement.MetadataFile
+	err = json.NewDecoder(metadataFile).Decode(&metadataContent)
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, FileOpenError, err)
+		return
+	}
+
+	respondWithJson(w, http.StatusOK, metadata.MetadataToBookParams(metadataContent))
 }

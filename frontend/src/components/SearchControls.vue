@@ -56,8 +56,7 @@ const reset = () => {
     languages.value = '';
     keywords.value = '';
     files.value = 'all';
-    sortBy.value = 'title';
-    sortOrder.value = 'asc';
+    changeSortValue(true);
     emit('reset');
 }
 

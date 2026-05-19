@@ -7,13 +7,14 @@ import { postBook, type BookSummary, type BookParams, getCategoriesString } from
 import { getDownloadName } from '@/types/download';
 import { AudibleRegion, getMetadataDetails, MetadataSource, searchMetadataSource } from '@/types/metadata';
 import api from '@/services/api';
+import { NewSearchTerms, type SearchParams } from '@/types/search';
 
 const router = useRouter();
 const notificationsStore = useNotificationsStore();
 
 const props = defineProps<{
   download: Download;
-  modelShow: boolean;
+  show: boolean;
   refreshFunc: () => void
 }>();
 
@@ -127,13 +128,12 @@ const performSearch = async () => {
       return;
     }
 
-    const metadataResults = await searchMetadataSource({
-      source: source.value as MetadataSource,
-      title: searchQuery.value,
-      page: 1,
-      pageLimit: 10,
-      region: region.value
-    })
+    const searchParams = NewSearchTerms();
+    searchParams.search = searchQuery.value;
+    searchParams.metadataSource = source.value as MetadataSource;
+    searchParams.audibleRegion = region.value;
+    
+    const metadataResults = await searchMetadataSource(searchParams, 10, 1);
 
     if (metadataResults == null) {
       searchResults.value = [];
@@ -187,7 +187,7 @@ function getCover(book: BookSummary | BookParams, isSummary: boolean): string {
   return book.cover ?? '';
 }
 
-watch(() => props.modelShow, (newVal) => {
+watch(() => props.show, (newVal) => {
   if (newVal) {
     libraryPage.value = 1;
     searchQuery.value = getDownloadName(props.download);
@@ -200,23 +200,27 @@ watch(() => props.modelShow, (newVal) => {
 
 <template>
   <!-- Modal overlay - closes when clicked -->
-  <div v-if="modelShow" class="modal-overlay" @click="closeModal">
+  <div v-if="show" class="modal-overlay" @click="closeModal">
     <!-- Modal dialog - prevents closing from interior clicks -->
     <div class="modal" @click.stop>
       <h3>Import Download - <strong>{{ downloadName }}</strong></h3>
 
-      <div v-if="download.files.cover != null && download.files.cover !== ''">
+      <!-- Cover preview -->
+      <div v-if="download.files.cover != null && download.files.cover !== ''" class="download-cover">
         <label>
-          <input type="checkbox" v-model="useDownloadedCover" />
-          Use this cover
+          <div>
+            <input type="checkbox" v-model="useDownloadedCover" />
+            Use this cover
+          </div>
+          <img :src="download.files.cover" alt="no cover found">
         </label>
-        <img :src="download.files.cover" alt="no cover found" class="download-cover">
       </div>
 
       <!-- Search bar -->
       <div class="search-section">
         <label>Select Book:</label>
         <input
+        class="text-input"
           v-model="searchQuery"
           type="text"
           @input="performSearch"
@@ -225,57 +229,59 @@ watch(() => props.modelShow, (newVal) => {
       </div>
 
       <!-- Search results -->
-      <div v-if="isLoading" class="loading">Searching...</div>
-      <div v-else-if="searchResults == null" class="no-results">
-        No books found matching "{{ searchQuery }}"
-      </div>
-      <div v-else-if="searchResults.length === 0 && searchQuery.trim()" class="no-results">
-        No books found matching "{{ searchQuery }}"
-      </div>
-      <div v-else class="results-list">
-        <div v-if="source === 'Library'">
-        <button
-            v-for="book in searchResults as BookSummary[]"
-            :key="book.id"
-            @click="associateDownload(book, true)"
-            :disabled="isImporting"
-            class="result-item result-button"
-          >
-            <img
-              :src="getCover(book, true)"
-              alt=""
-              class="book-cover"
-            />
-            <div class="book-info">
-              <h4>{{ book.title }}</h4>
-              <p v-if="book.subtitle">{{ book.subtitle }}</p>
-              <p v-if="book.authors.length > 0">
-                By: {{ book.authors.map(a => a.name).join(', ') }}
-              </p>
-            </div>
-          </button>
+      <div class="results-list">
+        <div v-if="isLoading" class="loading">Searching...</div>
+        <div v-else-if="searchResults == null" class="no-results">
+          No books found matching "{{ searchQuery }}"
+        </div>
+        <div v-else-if="searchResults.length === 0 && searchQuery.trim()" class="no-results">
+          No books found matching "{{ searchQuery }}"
         </div>
         <div v-else>
+          <div v-if="source === 'Library'">
           <button
-            v-for="(book, index) in searchResults as BookParams[]"
-            :key="index"
-            @click="associateDownload(book, false)"
-            :disabled="isImporting"
-            class="result-item result-button"
-          >
-            <img
-              :src="getCover(book, false)"
-              alt=""
-              class="book-cover"
-            />
-            <div class="book-info">
-              <h4>{{ book.title }}</h4>
-              <p v-if="book.subtitle">{{ book.subtitle }}</p>
-              <p>
-                By: {{ getCategoriesString(book.authors ?? []) }}
-              </p>
-            </div>
-          </button>
+              v-for="book in searchResults as BookSummary[]"
+              :key="book.id"
+              @click="associateDownload(book, true)"
+              :disabled="isImporting"
+              class="result-item result-button"
+            >
+              <img
+                :src="getCover(book, true)"
+                alt=""
+                class="book-cover"
+              />
+              <div class="book-info">
+                <h4>{{ book.title }}</h4>
+                <p v-if="book.subtitle">{{ book.subtitle }}</p>
+                <p v-if="book.authors.length > 0">
+                  By: {{ book.authors.map(a => a.name).join(', ') }}
+                </p>
+              </div>
+            </button>
+          </div>
+          <div v-else>
+            <button
+              v-for="(book, index) in searchResults as BookParams[]"
+              :key="index"
+              @click="associateDownload(book, false)"
+              :disabled="isImporting"
+              class="result-item result-button"
+            >
+              <img
+                :src="getCover(book, false)"
+                alt=""
+                class="book-cover"
+              />
+              <div class="book-info">
+                <h4>{{ book.title }}</h4>
+                <p v-if="book.subtitle">{{ book.subtitle }}</p>
+                <p>
+                  By: {{ getCategoriesString(book.authors ?? []) }}
+                </p>
+              </div>
+            </button>
+          </div>
         </div>
       </div>
 
@@ -283,14 +289,14 @@ watch(() => props.modelShow, (newVal) => {
       <div class="modal-buttons">
 
         <label class="search-field">
-            <select class="search-select" v-model="source" @change="performSearch">
+            <select class="dropdown-select" v-model="source" @change="performSearch">
                 <option value='Library'>Library</option>
                 <option v-for="(type, value) in MetadataSource" :key="value" :value="type">
                   {{ type }}
                 </option>
             </select>
 
-            <select class="search-select region" v-model="region" aria-label="Audible Region" v-show="source == MetadataSource.Audible" @change="performSearch">
+            <select class="dropdown-select region" v-model="region" aria-label="Audible Region" v-show="source == MetadataSource.Audible" @change="performSearch">
             <option v-for="(type, value) in AudibleRegion" :key="value" :value="type">
               .{{ type }}
             </option>
@@ -300,7 +306,7 @@ watch(() => props.modelShow, (newVal) => {
         <span v-if="source !== 'Library'" style="color: var(--vt-c-text-subtle);">Use the Add Book page for more control</span>
         <span v-else style="color: var(--vt-c-text-subtle);">Results don't include books with files</span>
 
-        <button type="button" @click="closeModal">Cancel</button>
+        <button class="delete-button" type="button" @click="closeModal">Cancel</button>
       </div>
 
       <!-- Loading overlay -->
@@ -323,6 +329,7 @@ watch(() => props.modelShow, (newVal) => {
 
 /* Search section */
 .search-section {
+  flex: 0 0 auto;
   margin-bottom: 1rem;
 }
 
@@ -332,11 +339,10 @@ watch(() => props.modelShow, (newVal) => {
   font-weight: 500;
 }
 
-.search-section input {
+.text-input {
+  height: auto;
   width: 100%;
   padding: 0.5rem;
-  border: 1px solid var(--color-gray-600);
-  border-radius: 4px;
   box-sizing: border-box;
   font-family: inherit;
   font-size: 0.95rem;
@@ -346,30 +352,31 @@ watch(() => props.modelShow, (newVal) => {
   width: 100%;
 }
 
-/* Loading and no results */
-.loading, .no-results {
-  flex: 1;
+.search-field {
+  height: 100%;
   display: flex;
-  align-items: center;
-  justify-content: center;
-  text-align: center;
-  color: var(--vt-c-text-subtle);
-  border: 1px solid var(--color-gray-300);
-  border-radius: 4px;
-  margin-bottom: 1rem;
-}
-
-.no-results {
-  font-style: italic;
+  gap: 0.5rem;
 }
 
 /* Results list */
 .results-list {
-  flex: 1;
+  flex: 1 1 auto;
   overflow-y: auto;
   border: 1px solid var(--color-gray-300);
   border-radius: 4px;
   margin-bottom: 1rem;
+}
+
+.loading, .no-results {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  height: 100%;
+}
+
+.no-results {
+  font-style: italic;
 }
 
 .result-item {
@@ -431,26 +438,23 @@ watch(() => props.modelShow, (newVal) => {
 /* Modal action buttons */
 .modal-buttons {
   display: flex;
+  flex: 0 0 auto;
   gap: 1rem;
   justify-content: space-between;
   margin-top: 1.5rem;
+  height: 40px;
+  text-align: center;
 }
 
-.modal-buttons button {
-  padding: 0.5rem 1rem;
-  border: 1px solid var(--color-gray-600);
-  border-radius: 4px;
-  background: var(--color-gray-100);
-  cursor: pointer;
-  font-size: 0.95rem;
-  transition: background-color 0.2s;
-}
-
-.modal-buttons button:hover {
-  background: var(--color-gray-400);
+.modal-buttons span {
+  align-content: center;
 }
 
 .download-cover {
+  flex: 0 0 auto;
+}
+
+.download-cover img {
   max-height: 150px;
   aspect-ratio: 1;
   object-fit: contain;
@@ -493,5 +497,23 @@ watch(() => props.modelShow, (newVal) => {
 @keyframes spin {
   0% { transform: rotate(0deg); }
   100% { transform: rotate(360deg); }
+}
+
+@media (max-width: 768px) {
+  .modal-buttons {
+    flex-direction: column;
+  }
+  
+  .download-cover label {
+    align-items: center;
+    justify-content: space-between;
+    display: flex;
+    margin-bottom: 0;
+  }
+
+  .modal-buttons {
+    height: auto;
+  }
+
 }
 </style>
