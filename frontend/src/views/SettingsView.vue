@@ -3,6 +3,7 @@ import { onMounted, ref } from 'vue';
 import { useAuthStore } from '@/stores/auth';
 import { useNotificationsStore } from '@/stores/notifications';
 import api from '@/services/api';
+import LogsViewer from '@/components/LogsViewer.vue';
 
 type UserSettings = {
     google_api_key: string,
@@ -222,6 +223,15 @@ onMounted(async () => {
                 </div>
             </div>
         </section>
+
+        <!-- Logs -->
+        <h3>Logs</h3>
+        <section id="logs">
+            <div class="card logs">
+                <LogsViewer />
+            </div>
+        </section>
+
     </section>
 </template>
 
@@ -278,6 +288,11 @@ onMounted(async () => {
     margin: 0;
     margin-bottom: 0.5rem;
     font-size: 1rem;
+}
+
+.card.logs {
+    max-width: 800px;
+    height: fit-content;
 }
 
 .warning-box {

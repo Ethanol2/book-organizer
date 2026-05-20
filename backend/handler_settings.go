@@ -5,11 +5,13 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"path"
 	"strconv"
 	"sync"
 	"time"
 
 	"github.com/Ethanol2/book-organizer/internal/auth"
+	"github.com/Ethanol2/book-organizer/internal/logger"
 	"github.com/joho/godotenv"
 )
 
@@ -98,6 +100,38 @@ func (cfg *apiConfig) handlerPostSettings(w http.ResponseWriter, r *http.Request
 
 	w.WriteHeader(http.StatusOK)
 	log.Println("Updated user settings")
+}
+
+func (cfg *apiConfig) handlerGetLogs(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	offset := 0
+	if str := r.URL.Query().Get("offset"); str != "" {
+		offset, err = strconv.Atoi(str)
+		if err != nil || offset < 0 {
+			respondWithError(w, http.StatusBadRequest, "Offset must be an integer greater or equal to 0", err)
+			return
+		}
+	}
+	count := 20
+	if str := r.URL.Query().Get("count"); str != "" {
+		count, err = strconv.Atoi(str)
+		if err != nil || count <= 0 {
+			respondWithError(w, http.StatusBadRequest, "Count must an integer greater or equal to 1", err)
+			return
+		}
+	}
+
+	logs, err := logger.GetLogs(path.Join(cfg.logsPath, "logs.txt"), count, offset)
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, FileOpenError, err)
+		return
+	}
+
+	respondWithJson(w, http.StatusOK, struct {
+		Logs []logger.Log `json:"logs"`
+	}{Logs: logs})
 }
 
 // #region Env Functions

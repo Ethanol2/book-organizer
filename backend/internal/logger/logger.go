@@ -4,6 +4,7 @@ package logger
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"log"
@@ -14,6 +15,13 @@ import (
 
 	"gopkg.in/natefinch/lumberjack.v2"
 )
+
+type Log struct {
+	Time  string  `json:"time"`
+	Level string  `json:"level"`
+	Msg   string  `json:"msg"`
+	Error *string `json:"error,omitempty"`
+}
 
 // 1. Define a completely custom Console Handler
 type CustomConsoleHandler struct {
@@ -101,4 +109,67 @@ func InitLogger(logsPath string) {
 
 	slog.SetDefault(slog.New(customHandler))
 	log.SetFlags(0)
+}
+
+func GetLogs(filePath string, count, offset int) ([]Log, error) {
+	file, err := os.Open(filePath)
+	if err != nil {
+		return nil, err
+	}
+	defer file.Close()
+
+	stat, _ := file.Stat()
+	filesize := stat.Size()
+
+	var cursor int64 = 0
+	var lines [][]byte
+	var line []byte
+
+	lineCount := 0
+
+	// Start from the end of the file and move backward
+	for int64(len(lines)) < int64(count) && filesize+cursor > 0 {
+		cursor--
+		file.Seek(cursor, io.SeekEnd)
+
+		char := make([]byte, 1)
+		file.Read(char)
+
+		if char[0] == '\n' {
+			lineCount++
+			if len(line) > 0 {
+				// Reverse the line bytes before adding to slice
+				lines = append([][]byte{reverse(line)}, lines...)
+				line = []byte{}
+			}
+		} else if lineCount > offset {
+			line = append(line, char[0])
+		}
+	}
+
+	// Add the very first line if we reached start of file
+	if len(line) > 0 {
+		lines = append([][]byte{reverse(line)}, lines...)
+	}
+
+	logs := []Log{}
+	errStr := "Failed to parse log"
+	for _, line := range lines {
+		var newLog Log
+		err = json.Unmarshal([]byte(line), &newLog)
+		if err != nil {
+			newLog = Log{Error: &errStr}
+			log.Println(err)
+		}
+		logs = append(logs, newLog)
+	}
+
+	return logs, nil
+}
+
+func reverse(b []byte) []byte {
+	for i, j := 0, len(b)-1; i < j; i, j = i+1, j-1 {
+		b[i], b[j] = b[j], b[i]
+	}
+	return b
 }

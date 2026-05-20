@@ -95,6 +95,9 @@ func main() {
 	mux.HandleFunc("GET /api/settings", cfg.authMiddleware(cfg.handlerGetSettings))
 	mux.HandleFunc("POST /api/settings", cfg.authMiddleware(cfg.handlerPostSettings))
 
+	// Logs Endpoints
+	mux.HandleFunc("GET /api/logs", cfg.authMiddleware(cfg.handlerGetLogs))
+
 	// Downloads Endpoints
 	mux.HandleFunc("POST /api/downloads/{id}/associate", cfg.uuidMiddleware(cfg.handlerAssociateDownloadToBook))
 	mux.HandleFunc("GET /api/downloads", cfg.authMiddleware(cfg.handlerGetDownloads))

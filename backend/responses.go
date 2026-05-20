@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"log/slog"
 	"net/http"
 	"runtime"
 )
@@ -31,15 +32,16 @@ const (
 func respondWithError(w http.ResponseWriter, code int, msg string, err error) {
 
 	if err != nil {
-		log.Println(err)
-		_, file, line, ok := runtime.Caller(1)
-		if ok {
-			fmt.Printf("Called from %s:%d\n", file, line)
-			fmt.Println()
+
+		details := ""
+		if _, file, line, ok := runtime.Caller(1); ok {
+			details = fmt.Sprintf("\n\nCalled from %s:%d\n", file, line)
 		}
+		slog.Error(err.Error() + details)
+		fmt.Println()
 	}
 	if code > 499 {
-		log.Printf("Responding with 5XX error: %s\n", msg)
+		slog.Error("Responding with 5XX error: %s\n" + msg)
 	}
 	type errorResponse struct {
 		Error string `json:"error"`
