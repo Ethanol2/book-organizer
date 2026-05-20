@@ -202,14 +202,14 @@ func TestRefreshToken(t *testing.T) {
 
 	var firstToken string
 	t.Run("Generation Test", func(t *testing.T) {
-		firstToken = MakeRefreshToken()
+		firstToken = MakeToken()
 		if len(strings.TrimSpace(firstToken)) == 0 {
 			t.Error("Nothing was generated")
 		}
 	})
 
 	t.Run("Deplicate Test", func(t *testing.T) {
-		secondToken := MakeRefreshToken()
+		secondToken := MakeToken()
 		if firstToken == secondToken {
 			t.Error("Generated duplicates")
 		}

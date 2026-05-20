@@ -15,8 +15,6 @@ import (
 	"gopkg.in/natefinch/lumberjack.v2"
 )
 
-const LogsFilePath string = "./data/logs/"
-
 // 1. Define a completely custom Console Handler
 type CustomConsoleHandler struct {
 	writer io.Writer
@@ -78,9 +76,9 @@ func (h *DualHandler) Handle(ctx context.Context, r slog.Record) error {
 func (h *DualHandler) WithAttrs(attrs []slog.Attr) slog.Handler { return h }
 func (h *DualHandler) WithGroup(name string) slog.Handler       { return h }
 
-func InitLogger() {
-	logDir := filepath.Dir(LogsFilePath)
-	if info, err := os.Stat(LogsFilePath); err != nil {
+func InitLogger(logsPath string) {
+	logDir := filepath.Dir(logsPath)
+	if info, err := os.Stat(logsPath); err != nil {
 		if err = os.Mkdir(logDir, 0755); err != nil {
 			panic("failed to create log directory: " + err.Error())
 		}
@@ -89,7 +87,7 @@ func InitLogger() {
 	}
 
 	fileWriter := &lumberjack.Logger{
-		Filename:   path.Join(LogsFilePath, "logs.txt"),
+		Filename:   path.Join(logsPath, "logs.txt"),
 		MaxSize:    10,
 		MaxBackups: 3,
 		Compress:   true,

@@ -212,13 +212,13 @@ func (cfg *apiConfig) handlerUpdateBook(id uuid.UUID, w http.ResponseWriter, r *
 			return
 		}
 
-		err = fileManagement.CreateDirectory(path.Join(cfg.Env[LibraryPath], authorDir))
+		err = fileManagement.CreateDirectory(path.Join(cfg.Env.Get(LibraryPath), authorDir))
 		if err != nil {
 			respondWithError(w, http.StatusInternalServerError, FileMoveError, err)
 			return
 		}
 
-		err = fileManagement.CreateDirectory(path.Join(cfg.Env[LibraryPath], authorDir, seriesDir))
+		err = fileManagement.CreateDirectory(path.Join(cfg.Env.Get(LibraryPath), authorDir, seriesDir))
 		if err != nil {
 			respondWithError(w, http.StatusInternalServerError, FileMoveError, err)
 			return
@@ -227,7 +227,7 @@ func (cfg *apiConfig) handlerUpdateBook(id uuid.UUID, w http.ResponseWriter, r *
 		newPath := path.Join(authorDir, seriesDir, bookDir)
 
 		if book.Files.Root != &newPath {
-			err = fileManagement.MoveFilesWithPaths(path.Join(cfg.Env[LibraryPath], *oldPath), path.Join(cfg.Env[LibraryPath], newPath))
+			err = fileManagement.MoveFilesWithPaths(path.Join(cfg.Env.Get(LibraryPath), *oldPath), path.Join(cfg.Env.Get(LibraryPath), newPath))
 			if err != nil {
 				respondWithError(w, http.StatusInternalServerError, FileMoveError, err)
 				return
@@ -243,7 +243,7 @@ func (cfg *apiConfig) handlerUpdateBook(id uuid.UUID, w http.ResponseWriter, r *
 		if book.Files.Root == nil {
 			coverPath = path.Join(cfg.metadataPath, book.Id.String()+path.Ext(newCover.Name()))
 		} else {
-			coverPath = path.Join(cfg.Env[LibraryPath], *book.Files.Root, "cover.jpg")
+			coverPath = path.Join(cfg.Env.Get(LibraryPath), *book.Files.Root, "cover.jpg")
 		}
 
 		err = fileManagement.DeleteFiles(coverPath)
@@ -265,7 +265,7 @@ func (cfg *apiConfig) handlerUpdateBook(id uuid.UUID, w http.ResponseWriter, r *
 	}
 
 	if book.Files.Root != nil {
-		fileManagement.CreateMetadataFile(*metadata.BookToMetadata(book), path.Join(cfg.Env[LibraryPath], *book.Files.Root))
+		fileManagement.CreateMetadataFile(*metadata.BookToMetadata(book), path.Join(cfg.Env.Get(LibraryPath), *book.Files.Root))
 	}
 
 	book.Files.Prepend(cfg.libraryName)
@@ -290,7 +290,7 @@ func (cfg *apiConfig) handlerDeleteBook(id uuid.UUID, w http.ResponseWriter, r *
 			return
 		}
 		if dir != nil {
-			err = fileManagement.DeleteFiles(path.Join(cfg.Env[LibraryPath], *dir))
+			err = fileManagement.DeleteFiles(path.Join(cfg.Env.Get(LibraryPath), *dir))
 			if err != nil {
 				respondWithError(w, http.StatusInternalServerError, FileDeleteError, err)
 				return
@@ -444,7 +444,7 @@ func (cfg *apiConfig) handlerGetScanLibrary(w http.ResponseWriter, r *http.Reque
 
 				// If the item has a metadata file then import that and continue
 				if item.HasMetadata {
-					md, err := fileManagement.OpenMetadataFile(path.Join(cfg.Env[LibraryPath], *item.Root, "metadata.json"))
+					md, err := fileManagement.OpenMetadataFile(path.Join(cfg.Env.Get(LibraryPath), *item.Root, "metadata.json"))
 					if err != nil {
 						strErr := fmt.Sprintln("Error trying to open metadata file in \"", *item.Root, "\" =>", err)
 						log.Print(strErr)
@@ -520,7 +520,7 @@ func (cfg *apiConfig) handlerGetScanLibrary(w http.ResponseWriter, r *http.Reque
 			// Format known directories to be handled by the scan function
 			for i := range knownDirsList {
 				dir, name := path.Split(knownDirsList[i])
-				dir = path.Join(cfg.Env[LibraryPath], dir)
+				dir = path.Join(cfg.Env.Get(LibraryPath), dir)
 				if item, ok := knownDirs[dir]; ok {
 					item.Folders = append(item.Folders, name)
 					item.Ids = append(item.Ids, ids[i])
@@ -534,7 +534,7 @@ func (cfg *apiConfig) handlerGetScanLibrary(w http.ResponseWriter, r *http.Reque
 			}
 		}
 
-		folderScan(cfg.Env[LibraryPath], "", []string{})
+		folderScan(cfg.Env.Get(LibraryPath), "", []string{})
 
 		// Handle new books
 		for params, files := range libraryParams {

@@ -9,7 +9,6 @@ import (
 	"os"
 	"os/signal"
 	"path"
-	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -21,7 +20,6 @@ import (
 	"github.com/Ethanol2/book-organizer/internal/logger"
 	"github.com/Ethanol2/book-organizer/internal/metadata"
 	"github.com/google/uuid"
-	"github.com/joho/godotenv"
 	_ "github.com/mattn/go-sqlite3"
 )
 
@@ -32,10 +30,11 @@ type apiConfig struct {
 	scanner *fileManagement.Scanner
 
 	// Environment Variables
-	Env map[string]string
+	Env env
 
 	// Folder Paths
 	metadataPath string
+	logsPath     string
 
 	// Endpoint Paths
 	downloadsName string
@@ -62,30 +61,25 @@ type cliFlags struct {
 
 func main() {
 
-	logger.InitLogger()
-
-	err := godotenv.Load()
-	if err != nil {
-		log.Fatal("Error loading .env file: " + err.Error())
-	}
-
 	flags, err := getFlags(os.Args[1:])
 	if err != nil {
 		fmt.Println(err)
 		return
 	}
 
-	log.Println("Starting book organizer")
+	fmt.Println("Starting book organizer")
 
 	cfg, err := initConfig(flags)
 	if err != nil {
-		log.Fatal(err)
+		fmt.Println(err)
+		os.Exit(1)
 	}
 
+	logger.InitLogger(cfg.logsPath)
 	log.Println("Environment variables and database loaded successfully")
 
 	mux := http.NewServeMux()
-	fHandler := http.FileServer(http.Dir(cfg.Env[FrontendPath]))
+	fHandler := http.FileServer(http.Dir(cfg.Env.Get(FrontendPath)))
 	mux.Handle("/", fHandler)
 
 	// Auth Endpoints
@@ -125,35 +119,19 @@ func main() {
 	mux.HandleFunc("GET /api/metadata/{id}", cfg.authMiddleware(cfg.handlerGetMetadataBookDetails))
 
 	// Media
-	mux.Handle("/media/downloads/", http.StripPrefix(cfg.downloadsName, http.FileServer(http.Dir(cfg.Env[DownloadsPath]))))
-	mux.Handle("/media/library/", http.StripPrefix(cfg.libraryName, http.FileServer(http.Dir(cfg.Env[LibraryPath]))))
+	mux.Handle("/media/downloads/", http.StripPrefix(cfg.downloadsName, http.FileServer(http.Dir(cfg.Env.Get(DownloadsPath)))))
+	mux.Handle("/media/library/", http.StripPrefix(cfg.libraryName, http.FileServer(http.Dir(cfg.Env.Get(LibraryPath)))))
 	mux.Handle("/media/metadata/", http.StripPrefix("/media/metadata/", http.FileServer(http.Dir(cfg.metadataPath))))
 
 	srv := &http.Server{
-		Addr:    ":" + cfg.Env[Port],
+		Addr:    ":" + cfg.Env.Get(Port),
 		Handler: mux,
 	}
 
 	// Downloads Scanner
-	scanFrequency := time.Second * 5
-	if fStr, ok := cfg.Env[ScanFrequency]; ok && fStr != "" {
-		seconds, err := strconv.Atoi(fStr)
-		if err != nil || seconds < 1 {
-			log.Fatal("scan frequency must be a positive integer greater than 0")
-		}
-		scanFrequency = time.Duration(seconds) * time.Second
-	} else {
-		cfg.Env[ScanFrequency] = "5"
-
-		err = godotenv.Write(cfg.Env, "./.env")
-		if err != nil {
-			log.Fatal("failed to set default scan frequency: " + err.Error())
-		}
-	}
-
 	scanner := fileManagement.Scanner{
-		Frequency: scanFrequency,
-		Directory: cfg.Env[DownloadsPath],
+		Frequency: time.Duration(cfg.Env.GetInt(ScanFrequency)) * time.Second,
+		Directory: cfg.Env.Get(DownloadsPath),
 
 		AddHandler:    cfg.db.AddDownloads,
 		UpdateHandler: cfg.db.UpdateDownloadFiles,
@@ -176,7 +154,7 @@ func main() {
 	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
 
 	go func() {
-		log.Printf("Serving on: http://localhost:%s/\n", cfg.Env[Port])
+		log.Printf("Serving on: http://localhost:%s/\n", cfg.Env.Get(Port))
 		log.Println("Starting server")
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			log.Fatalf("listen: %s\n", err)
@@ -202,63 +180,6 @@ func main() {
 // #region Initialization
 
 func getFlags(args []string) (cliFlags, error) {
-
-	const helpMsg string = `
-
-Book Organizer Backend
-An app written by Ethan Colucci for organizing your digital book library.
-
-Project Repo	https://github.com/Ethanol2/book-organizer
-
-My Website:		https://ethanasc.ca
-My GitHub:		https://github.com/Ethanol2
-My LinkedIn:	https://www.linkedin.com/in/ethan-colucci/
-
-[-h, --help]:
-	Displays this message and exits. All other commands run the app.
-
-[-r, --reset]:
-	Deletes the appData.db file, reseting the database, and empties the metadata folder.
-	This also deletes all users, and disables authentication.
-
-[-rb, --reset-books]
-	Clears the books table, which will also clear all the category tables.
-
-[-rd, --reset-downloads]
-	Clears the downloads table
-
-[-ru, --reset-users]:
-	Clears the users table, which also removes any authentication in the app. Use with caution.
-
-[-rs, --reset-sessions]
-	Clears the refresh tokens, effectively logging out every user with an expired session.
-
-[-cl, --clear-library]:
-	Clears the contents of the library, defined in the .env as LIBRARY_PATH.
-
-[-cd, --clear-downloads]:
-	Clears the contents of the downloads, defined in the .env as DOWNLOAD_PATH.
-
-[-t, --test-dataset] <l, test-library> <d, test-downloads>:
-	Does everything reset does and inserts the test dataset (./backend/internal/database/testData.go).
-
-	<l, test-library>:
-		Clears the library and creates a test library structure using the test dataset.
-		Inserts 15 books with random text and audio files. All books will have a cover.
-		Half will have a metadata file.
-	
-	<d, test-downloads>:
-		Clears the downloads and creates a test download structure using the test dataset.
-		Inserts 10 total downloads: 
-			Count | Has Cover | Has Metadata | Audio Files | Text Files
-			-----------------------------------------------------------
-			  1   |    true   |     false    |      1      |     1
-			  1   |    false  |     false    |      1      |     1
-			  1   |    true   |     false    |      10     |     1
-			  1   |    false  |     false    |      1      |     10
-			  3   |    true   |     true     |      5      |     1
-			  3   |    false  |     true     |      1      |     5
-`
 
 	flags := cliFlags{}
 
@@ -331,14 +252,39 @@ My LinkedIn:	https://www.linkedin.com/in/ethan-colucci/
 
 func initConfig(flags cliFlags) (*apiConfig, error) {
 
-	godotenv.Load(".env")
+	// This function is so dumb it needs its own regions. Needs a refactor
 
-	dbPath := os.Getenv("DB_PATH")
-	if dbPath == "" {
-		return nil, fmt.Errorf("DB_PATH must be set")
+	// #region Env File
+
+	env, err := initEnv()
+	if err != nil {
+		return nil, err
 	}
 
-	metadataPath := "./data/metadata"
+	dataPath := env.Get(DataPath)
+	metadataPath := path.Join(dataPath, "metadata")
+	logsPath := path.Join(dataPath, "logs")
+	dbPath := path.Join(dataPath, "appData.db")
+
+	// Making this a func so that the test data folder can be handled only if required
+	generateFolders := func(paths ...string) error {
+		for i, path := range paths {
+			if _, err := os.Stat(path); err != nil {
+				err = os.Mkdir(path, 0755)
+				if err != nil {
+					fmt.Println("Error creating directory for \"", path, "\". #", i, "in the list")
+					return err
+				}
+			}
+		}
+		return nil
+	}
+	err = generateFolders(dataPath, metadataPath, logsPath, env.Get(DownloadsPath), env.Get(LibraryPath))
+	if err != nil {
+		return nil, err
+	}
+
+	// #region Init Flags and Database
 
 	clearMetadata := func() error {
 		if _, err := os.Stat(metadataPath); err == nil {
@@ -386,47 +332,8 @@ func initConfig(flags cliFlags) (*apiConfig, error) {
 		return nil, fmt.Errorf("couldn't open database: %v", err)
 	}
 
-	env, err := godotenv.Read("./.env")
-	if err != nil {
-		return nil, err
-	}
-
-	if fPath, ok := env[FrontendPath]; !ok || fPath == "" {
-		return nil, fmt.Errorf("FRONTEND_PATH must be set")
-	}
-
-	if dPath, ok := env[DownloadsPath]; !ok || dPath == "" {
-		return nil, fmt.Errorf("DOWNLOADS_PATH must be set")
-	}
-
-	if lPath, ok := env[LibraryPath]; !ok || lPath == "" {
-		return nil, fmt.Errorf("LIBRARY_PATH must be set")
-	}
-
-	if tPath, ok := env[TestDataPath]; !ok || tPath == "" {
-		fmt.Println("TEST_DATA_PATH not set. Needed for the -t insert test data flag")
-		if flags.dbTestData {
-			return nil, fmt.Errorf("insert test data flag triggered but no test folder path was provided")
-		}
-	}
-
-	port := os.Getenv(string(Port))
-	if port == "" {
-		return nil, fmt.Errorf("PORT must be set")
-	}
-
-	gbApiKey := os.Getenv(string(GoogleApiKey))
-	if gbApiKey == "" {
-		fmt.Println("no google books api key in env variables. Google books search won't work")
-	}
-
-	secret := os.Getenv("TOKEN_SECRET")
-	if secret == "" {
-		return nil, fmt.Errorf("token secret must be set")
-	}
-
 	if flags.clearDownloads {
-		err = fileManagement.RemoveDirectoryContents(env[DownloadsPath])
+		err = fileManagement.RemoveDirectoryContents(env.Get(DownloadsPath))
 		if err != nil {
 			return nil, err
 		}
@@ -434,7 +341,7 @@ func initConfig(flags cliFlags) (*apiConfig, error) {
 
 	if flags.clearLibrary {
 		fmt.Println("Deleting library")
-		err = fileManagement.RemoveDirectoryContents(env[LibraryPath])
+		err = fileManagement.RemoveDirectoryContents(env.Get(LibraryPath))
 		if err != nil {
 			return nil, err
 		}
@@ -487,13 +394,19 @@ func initConfig(flags cliFlags) (*apiConfig, error) {
 
 		if flags.dbTestData {
 
-			fmt.Println("Creating test data path")
-			err = fileManagement.CreateDirectory(env[TestDataPath])
+			testdataPath := path.Join(dataPath, "test-data")
+			err = generateFolders(testdataPath)
 			if err != nil {
 				return err
 			}
 
-			testBooks, err := c.InsertTestData(metadataPath, env[TestDataPath])
+			fmt.Println("Creating test data path")
+			err = fileManagement.CreateDirectory(testdataPath)
+			if err != nil {
+				return err
+			}
+
+			testBooks, err := c.InsertTestData(metadataPath, testdataPath)
 			if err != nil {
 				return err
 			}
@@ -510,7 +423,7 @@ func initConfig(flags cliFlags) (*apiConfig, error) {
 				handleDirs := func(book database.Book) (string, error) {
 					bookPath := book.Authors[0].Name
 
-					err = fileManagement.CreateDirectory(path.Join(env[LibraryPath], bookPath))
+					err = fileManagement.CreateDirectory(path.Join(env.Get(LibraryPath), bookPath))
 					if err != nil {
 						return "", err
 					}
@@ -524,7 +437,7 @@ func initConfig(flags cliFlags) (*apiConfig, error) {
 							bookDir = *book.Series[0].Index + " - " + bookDir
 						}
 
-						err = fileManagement.CreateDirectory(path.Join(env[LibraryPath], bookPath))
+						err = fileManagement.CreateDirectory(path.Join(env.Get(LibraryPath), bookPath))
 						if err != nil {
 							return "", err
 						}
@@ -544,7 +457,7 @@ func initConfig(flags cliFlags) (*apiConfig, error) {
 
 					book.Files, err = fileManagement.CreateTestDirectory(
 						bookPath,
-						env[LibraryPath],
+						env.Get(LibraryPath),
 						nil,
 						path.Join(metadataPath, book.Id.String()+".jpg"), rand.Intn(10)+1, rand.Intn(10)+1,
 					)
@@ -565,7 +478,7 @@ func initConfig(flags cliFlags) (*apiConfig, error) {
 
 					book.Files, err = fileManagement.CreateTestDirectory(
 						bookPath,
-						env[LibraryPath],
+						env.Get(LibraryPath),
 						metadata.BookToMetadata(book),
 						path.Join(metadataPath, book.Id.String()+".jpg"), rand.Intn(10)+1, rand.Intn(10)+1,
 					)
@@ -629,7 +542,7 @@ func initConfig(flags cliFlags) (*apiConfig, error) {
 
 					_, err = fileManagement.CreateTestDirectory(
 						path.Join(d.title),
-						env[DownloadsPath],
+						env.Get(DownloadsPath),
 						d.md,
 						d.cover,
 						d.audio, d.text,
@@ -649,6 +562,8 @@ func initConfig(flags cliFlags) (*apiConfig, error) {
 		return nil, err
 	}
 
+	// #region Return apiConfig
+
 	return &apiConfig{
 		db:      db,
 		mdCache: cache.NewCache(time.Minute * 5),
@@ -656,6 +571,7 @@ func initConfig(flags cliFlags) (*apiConfig, error) {
 		Env: env,
 
 		metadataPath: metadataPath,
+		logsPath:     logsPath,
 
 		libraryName:   "/media/library",
 		downloadsName: "/media/downloads",
@@ -720,7 +636,7 @@ func (cfg *apiConfig) uuidMiddleware(handler func(uuid.UUID, http.ResponseWriter
 			return
 		}
 
-		_, err = authenticate(cfg.authRequired, r, cfg.Env[TokenSecret])
+		_, err = authenticate(cfg.authRequired, r, cfg.Env.Get(TokenSecret))
 		if err != nil {
 			respondWithError(w, http.StatusUnauthorized, AuthBadAuthorization, err)
 			return
@@ -735,7 +651,7 @@ func (cfg *apiConfig) authMiddleware(handler func(http.ResponseWriter, *http.Req
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		_, err := authenticate(cfg.authRequired, r, cfg.Env[TokenSecret])
+		_, err := authenticate(cfg.authRequired, r, cfg.Env.Get(TokenSecret))
 		if err != nil {
 			respondWithError(w, http.StatusUnauthorized, AuthBadAuthorization, err)
 			return
@@ -744,3 +660,60 @@ func (cfg *apiConfig) authMiddleware(handler func(http.ResponseWriter, *http.Req
 		handler(w, r)
 	}
 }
+
+const helpMsg string = `
+	
+Book Organizer Backend
+An app written by Ethan Colucci for organizing your digital book library.
+
+Project Repo	https://github.com/Ethanol2/book-organizer
+
+My Website:		https://ethanasc.ca
+My GitHub:		https://github.com/Ethanol2
+My LinkedIn:	https://www.linkedin.com/in/ethan-colucci/
+
+[-h, --help]:
+	Displays this message and exits. All other commands run the app.
+
+[-r, --reset]:
+	Deletes the appData.db file, reseting the database, and empties the metadata folder.
+	This also deletes all users, and disables authentication.
+
+[-rb, --reset-books]
+	Clears the books table, which will also clear all the category tables.
+
+[-rd, --reset-downloads]
+	Clears the downloads table
+
+[-ru, --reset-users]:
+	Clears the users table, which also removes any authentication in the app. Use with caution.
+
+[-rs, --reset-sessions]
+	Clears the refresh tokens, effectively logging out every user with an expired session.
+
+[-cl, --clear-library]:
+	Clears the contents of the library, defined in the .env as LIBRARY_PATH.
+
+[-cd, --clear-downloads]:
+	Clears the contents of the downloads, defined in the .env as DOWNLOAD_PATH.
+
+[-t, --test-dataset] <l, test-library> <d, test-downloads>:
+	Does everything reset does and inserts the test dataset (./backend/internal/database/testData.go).
+
+	<l, test-library>:
+		Clears the library and creates a test library structure using the test dataset.
+		Inserts 15 books with random text and audio files. All books will have a cover.
+		Half will have a metadata file.
+	
+	<d, test-downloads>:
+		Clears the downloads and creates a test download structure using the test dataset.
+		Inserts 10 total downloads: 
+			Count | Has Cover | Has Metadata | Audio Files | Text Files
+			-----------------------------------------------------------
+			  1   |    true   |     false    |      1      |     1
+			  1   |    false  |     false    |      1      |     1
+			  1   |    true   |     false    |      10     |     1
+			  1   |    false  |     false    |      1      |     10
+			  3   |    true   |     true     |      5      |     1
+			  3   |    false  |     true     |      1      |     5
+`
