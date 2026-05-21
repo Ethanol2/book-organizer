@@ -5,36 +5,14 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
 	"path"
 	"strconv"
-	"sync"
 	"time"
 
-	"github.com/Ethanol2/book-organizer/internal/auth"
+	"github.com/Ethanol2/book-organizer/internal/env"
 	"github.com/Ethanol2/book-organizer/internal/logger"
-	"github.com/joho/godotenv"
 )
-
-const (
-	EnvPath = "./.env"
-
-	// User editable
-	GoogleApiKey  = "GOOGLE_BOOKS_API_KEY"
-	Port          = "PORT"
-	ScanFrequency = "DOWNLOADS_SCAN_FREQUENCY"
-
-	// Hidden
-	DataPath      = "DATA_PATH"
-	FrontendPath  = "FRONTEND_PATH"
-	DownloadsPath = "DOWNLOADS_PATH"
-	LibraryPath   = "LIBRARY_PATH"
-	TokenSecret   = "TOKEN_SECRET"
-)
-
-type env struct {
-	mu  *sync.Mutex
-	env map[string]string
-}
 
 type Settings struct {
 	Port          *string `json:"port,omitempty"`
@@ -47,15 +25,15 @@ type Settings struct {
 func (cfg *apiConfig) handlerGetSettings(w http.ResponseWriter, r *http.Request) {
 
 	settings := Settings{}
-	values := cfg.Env.GetMultiple(Port, GoogleApiKey, ScanFrequency)
+	values := cfg.Env.GetMultiple(env.Port, env.GoogleApiKey, env.ScanFrequency)
 
-	port := values[Port]
+	port := values[env.Port]
 	settings.Port = &port
 
-	googleKey := values[GoogleApiKey]
+	googleKey := values[env.GoogleApiKey]
 	settings.GoogleApiKey = &googleKey
 
-	scanFrequency := values[ScanFrequency]
+	scanFrequency := values[env.ScanFrequency]
 	settings.ScanFrequency = &scanFrequency
 
 	respondWithJson(w, http.StatusOK, settings)
@@ -81,15 +59,15 @@ func (cfg *apiConfig) handlerPostSettings(w http.ResponseWriter, r *http.Request
 		}
 
 		cfg.scanner.Frequency = time.Second * time.Duration(frequency)
-		update[ScanFrequency] = fmt.Sprint(cfg.scanner.Frequency.Seconds())
+		update[env.ScanFrequency] = fmt.Sprint(cfg.scanner.Frequency.Seconds())
 	}
 
 	if settings.Port != nil {
-		update[Port] = *settings.Port
+		update[env.Port] = *settings.Port
 	}
 
 	if settings.GoogleApiKey != nil {
-		update[GoogleApiKey] = *settings.GoogleApiKey
+		update[env.GoogleApiKey] = *settings.GoogleApiKey
 	}
 
 	err = cfg.Env.SetMultiple(update)
@@ -134,131 +112,21 @@ func (cfg *apiConfig) handlerGetLogs(w http.ResponseWriter, r *http.Request) {
 	}{Logs: logs})
 }
 
-// #region Env Functions
+func (cfg *apiConfig) handlerShutdown(shutdownChan chan os.Signal) func(w http.ResponseWriter, r *http.Request) {
 
-func initEnv() (env, error) {
-	values, err := godotenv.Read(EnvPath)
-	if err != nil {
-		return env{}, err
-	}
+	return func(w http.ResponseWriter, r *http.Request) {
 
-	needsUpdate := false
-
-	dataPath := ""
-	if path, ok := values[DataPath]; !ok || path == "" {
-		fmt.Println("No data path defined in the .env. Setting value to \"./data/\"")
-		dataPath = "./data/"
-		values[DataPath] = dataPath
-		needsUpdate = true
-	} else {
-		dataPath = path
-	}
-
-	if fPath, ok := values[FrontendPath]; !ok || fPath == "" {
-		fmt.Println("No frontend path defined in the .env. Setting value to \"./static/\"")
-		values[FrontendPath] = "./static/"
-		needsUpdate = true
-	}
-
-	if dPath, ok := values[DownloadsPath]; !ok || dPath == "" {
-		fmt.Println("No downloads path defined in the .env. Setting value to \"./downloads/\"")
-		values[DownloadsPath] = "./downloads/"
-		needsUpdate = true
-	}
-
-	if lPath, ok := values[LibraryPath]; !ok || lPath == "" {
-		fmt.Println("No library path defined in the .env. Setting value to \"./library\"")
-		values[LibraryPath] = "./library/"
-		needsUpdate = true
-	}
-
-	if port, ok := values[Port]; !ok || port == "" {
-		fmt.Println("No port defined in the .env. Setting value to 8080")
-		values[Port] = "8080"
-		needsUpdate = true
-	}
-
-	if key, ok := values[GoogleApiKey]; !ok || key == "" {
-		fmt.Println("No google books api key defined in the .env. Google Books will not work without it. This can also be set via the settings")
-	}
-
-	if secret, ok := values[TokenSecret]; !ok || secret == "" {
-		fmt.Println("No secret key defined in the .env. Applying a newly generated key.")
-		values[TokenSecret] = auth.MakeToken()
-		needsUpdate = true
-	}
-
-	if fStr, ok := values[ScanFrequency]; !ok || fStr == "" {
-		fmt.Println("No scan frequency was defined in the .env. Setting value to 5 seconds")
-		values[ScanFrequency] = "5"
-		needsUpdate = true
-	} else {
-		seconds, err := strconv.Atoi(fStr)
-		if err != nil || seconds < 1 {
-			log.Fatal("scan frequency must be a positive integer greater than 0")
-		}
-	}
-
-	if needsUpdate {
-		err = godotenv.Write(values, EnvPath)
+		_, err := authenticate(cfg.authRequired, r, cfg.Env.Get(env.TokenSecret))
 		if err != nil {
-			return env{}, err
+			respondWithError(w, http.StatusUnauthorized, AuthBadAuthorization, err)
+			return
 		}
+
+		w.WriteHeader(http.StatusOK)
+
+		log.Println("Shutdown command received")
+
+		close(shutdownChan)
 	}
 
-	return env{
-		&sync.Mutex{},
-		values,
-	}, nil
-}
-
-func (env *env) Get(key string) string {
-	(*env.mu).Lock()
-	defer (*env.mu).Unlock()
-	return env.env[key]
-}
-
-func (env *env) GetInt(key string) int {
-	str := env.Get(key)
-	if str == "" {
-		log.Fatalf("Number \"%s\" requested from the env variables, but nothing exists", key)
-	}
-
-	num, err := strconv.Atoi(str)
-	if err != nil {
-		log.Fatalf("Number \"%s\" requested from the env variables, but it's an invalid value: %v", key, err)
-	}
-
-	return num
-}
-
-func (env *env) GetMultiple(keys ...string) map[string]string {
-	(*env.mu).Lock()
-	defer (*env.mu).Unlock()
-
-	values := map[string]string{}
-	for _, key := range keys {
-		values[key] = env.env[key]
-	}
-
-	return values
-}
-
-func (env *env) Set(key, value string) error {
-	(*env.mu).Lock()
-	defer (*env.mu).Unlock()
-
-	env.env[key] = value
-	return godotenv.Write(env.env, EnvPath)
-}
-
-func (env *env) SetMultiple(values map[string]string) error {
-	(*env.mu).Lock()
-	defer (*env.mu).Unlock()
-
-	for key, value := range values {
-		env.env[key] = value
-	}
-
-	return godotenv.Write(env.env, EnvPath)
 }

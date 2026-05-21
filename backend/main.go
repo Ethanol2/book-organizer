@@ -16,6 +16,7 @@ import (
 	"github.com/Ethanol2/book-organizer/internal/auth"
 	"github.com/Ethanol2/book-organizer/internal/cache"
 	"github.com/Ethanol2/book-organizer/internal/database"
+	"github.com/Ethanol2/book-organizer/internal/env"
 	"github.com/Ethanol2/book-organizer/internal/fileManagement"
 	"github.com/Ethanol2/book-organizer/internal/logger"
 	"github.com/Ethanol2/book-organizer/internal/metadata"
@@ -30,7 +31,7 @@ type apiConfig struct {
 	scanner *fileManagement.Scanner
 
 	// Environment Variables
-	Env env
+	Env env.Env
 
 	// Folder Paths
 	metadataPath string
@@ -79,8 +80,12 @@ func main() {
 	log.Println("Environment variables and database loaded successfully")
 
 	mux := http.NewServeMux()
-	fHandler := http.FileServer(http.Dir(cfg.Env.Get(FrontendPath)))
+	fHandler := http.FileServer(http.Dir(cfg.Env.Get(env.FrontendPath)))
 	mux.Handle("/", fHandler)
+
+	// Create the channel that handles the shutdown signal
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
 
 	// Auth Endpoints
 	mux.HandleFunc("GET /api/auth/status", cfg.handlerGetAuthStatus)
@@ -94,6 +99,7 @@ func main() {
 	// Setting Endpoints
 	mux.HandleFunc("GET /api/settings", cfg.authMiddleware(cfg.handlerGetSettings))
 	mux.HandleFunc("POST /api/settings", cfg.authMiddleware(cfg.handlerPostSettings))
+	mux.HandleFunc("POST /api/settings/shutdown", cfg.handlerShutdown(sigChan))
 
 	// Logs Endpoints
 	mux.HandleFunc("GET /api/logs", cfg.authMiddleware(cfg.handlerGetLogs))
@@ -122,19 +128,19 @@ func main() {
 	mux.HandleFunc("GET /api/metadata/{id}", cfg.authMiddleware(cfg.handlerGetMetadataBookDetails))
 
 	// Media
-	mux.Handle("/media/downloads/", http.StripPrefix(cfg.downloadsName, http.FileServer(http.Dir(cfg.Env.Get(DownloadsPath)))))
-	mux.Handle("/media/library/", http.StripPrefix(cfg.libraryName, http.FileServer(http.Dir(cfg.Env.Get(LibraryPath)))))
+	mux.Handle("/media/downloads/", http.StripPrefix(cfg.downloadsName, http.FileServer(http.Dir(cfg.Env.Get(env.DownloadsPath)))))
+	mux.Handle("/media/library/", http.StripPrefix(cfg.libraryName, http.FileServer(http.Dir(cfg.Env.Get(env.LibraryPath)))))
 	mux.Handle("/media/metadata/", http.StripPrefix("/media/metadata/", http.FileServer(http.Dir(cfg.metadataPath))))
 
 	srv := &http.Server{
-		Addr:    ":" + cfg.Env.Get(Port),
+		Addr:    ":" + cfg.Env.Get(env.Port),
 		Handler: mux,
 	}
 
 	// Downloads Scanner
 	scanner := fileManagement.Scanner{
-		Frequency: time.Duration(cfg.Env.GetInt(ScanFrequency)) * time.Second,
-		Directory: cfg.Env.Get(DownloadsPath),
+		Frequency: time.Duration(cfg.Env.GetInt(env.ScanFrequency)) * time.Second,
+		Directory: cfg.Env.Get(env.DownloadsPath),
 
 		AddHandler:    cfg.db.AddDownloads,
 		UpdateHandler: cfg.db.UpdateDownloadFiles,
@@ -153,11 +159,8 @@ func main() {
 	cfg.refreshTokenCulling(time.Hour * 168)
 
 	// Start server in a goroutine to allow a controlled shutdown
-	sigChan := make(chan os.Signal, 1)
-	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
-
 	go func() {
-		log.Printf("Serving on: http://localhost:%s/\n", cfg.Env.Get(Port))
+		log.Printf("Serving on: http://localhost:%s/\n", cfg.Env.Get(env.Port))
 		log.Println("Starting server")
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			log.Fatalf("listen: %s\n", err)
@@ -259,12 +262,12 @@ func initConfig(flags cliFlags) (*apiConfig, error) {
 
 	// #region Env File
 
-	env, err := initEnv()
+	envObj, err := env.GetEnv()
 	if err != nil {
 		return nil, err
 	}
 
-	dataPath := env.Get(DataPath)
+	dataPath := envObj.Get(env.DataPath)
 	metadataPath := path.Join(dataPath, "metadata")
 	logsPath := path.Join(dataPath, "logs")
 	dbPath := path.Join(dataPath, "appData.db")
@@ -272,7 +275,7 @@ func initConfig(flags cliFlags) (*apiConfig, error) {
 	// Making this a func so that the test data folder can be handled only if required
 	generateFolders := func(paths ...string) error {
 		for i, path := range paths {
-			if _, err := os.Stat(path); err != nil {
+			if _, err := os.Stat(path); os.IsNotExist(err) {
 				err = os.Mkdir(path, 0755)
 				if err != nil {
 					fmt.Println("Error creating directory for \"", path, "\". #", i, "in the list")
@@ -282,7 +285,7 @@ func initConfig(flags cliFlags) (*apiConfig, error) {
 		}
 		return nil
 	}
-	err = generateFolders(dataPath, metadataPath, logsPath, env.Get(DownloadsPath), env.Get(LibraryPath))
+	err = generateFolders(dataPath, metadataPath, logsPath, envObj.Get(env.DownloadsPath), envObj.Get(env.LibraryPath))
 	if err != nil {
 		return nil, err
 	}
@@ -336,7 +339,7 @@ func initConfig(flags cliFlags) (*apiConfig, error) {
 	}
 
 	if flags.clearDownloads {
-		err = fileManagement.RemoveDirectoryContents(env.Get(DownloadsPath))
+		err = fileManagement.RemoveDirectoryContents(envObj.Get(env.DownloadsPath))
 		if err != nil {
 			return nil, err
 		}
@@ -344,7 +347,7 @@ func initConfig(flags cliFlags) (*apiConfig, error) {
 
 	if flags.clearLibrary {
 		fmt.Println("Deleting library")
-		err = fileManagement.RemoveDirectoryContents(env.Get(LibraryPath))
+		err = fileManagement.RemoveDirectoryContents(envObj.Get(env.LibraryPath))
 		if err != nil {
 			return nil, err
 		}
@@ -426,7 +429,7 @@ func initConfig(flags cliFlags) (*apiConfig, error) {
 				handleDirs := func(book database.Book) (string, error) {
 					bookPath := book.Authors[0].Name
 
-					err = fileManagement.CreateDirectory(path.Join(env.Get(LibraryPath), bookPath))
+					err = fileManagement.CreateDirectory(path.Join(envObj.Get(env.LibraryPath), bookPath))
 					if err != nil {
 						return "", err
 					}
@@ -440,7 +443,7 @@ func initConfig(flags cliFlags) (*apiConfig, error) {
 							bookDir = *book.Series[0].Index + " - " + bookDir
 						}
 
-						err = fileManagement.CreateDirectory(path.Join(env.Get(LibraryPath), bookPath))
+						err = fileManagement.CreateDirectory(path.Join(envObj.Get(env.LibraryPath), bookPath))
 						if err != nil {
 							return "", err
 						}
@@ -460,7 +463,7 @@ func initConfig(flags cliFlags) (*apiConfig, error) {
 
 					book.Files, err = fileManagement.CreateTestDirectory(
 						bookPath,
-						env.Get(LibraryPath),
+						envObj.Get(env.LibraryPath),
 						nil,
 						path.Join(metadataPath, book.Id.String()+".jpg"), rand.Intn(10)+1, rand.Intn(10)+1,
 					)
@@ -481,7 +484,7 @@ func initConfig(flags cliFlags) (*apiConfig, error) {
 
 					book.Files, err = fileManagement.CreateTestDirectory(
 						bookPath,
-						env.Get(LibraryPath),
+						envObj.Get(env.LibraryPath),
 						metadata.BookToMetadata(book),
 						path.Join(metadataPath, book.Id.String()+".jpg"), rand.Intn(10)+1, rand.Intn(10)+1,
 					)
@@ -545,7 +548,7 @@ func initConfig(flags cliFlags) (*apiConfig, error) {
 
 					_, err = fileManagement.CreateTestDirectory(
 						path.Join(d.title),
-						env.Get(DownloadsPath),
+						envObj.Get(env.DownloadsPath),
 						d.md,
 						d.cover,
 						d.audio, d.text,
@@ -571,7 +574,7 @@ func initConfig(flags cliFlags) (*apiConfig, error) {
 		db:      db,
 		mdCache: cache.NewCache(time.Minute * 5),
 
-		Env: env,
+		Env: envObj,
 
 		metadataPath: metadataPath,
 		logsPath:     logsPath,
@@ -639,7 +642,7 @@ func (cfg *apiConfig) uuidMiddleware(handler func(uuid.UUID, http.ResponseWriter
 			return
 		}
 
-		_, err = authenticate(cfg.authRequired, r, cfg.Env.Get(TokenSecret))
+		_, err = authenticate(cfg.authRequired, r, cfg.Env.Get(env.TokenSecret))
 		if err != nil {
 			respondWithError(w, http.StatusUnauthorized, AuthBadAuthorization, err)
 			return
@@ -654,7 +657,7 @@ func (cfg *apiConfig) authMiddleware(handler func(http.ResponseWriter, *http.Req
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		_, err := authenticate(cfg.authRequired, r, cfg.Env.Get(TokenSecret))
+		_, err := authenticate(cfg.authRequired, r, cfg.Env.Get(env.TokenSecret))
 		if err != nil {
 			respondWithError(w, http.StatusUnauthorized, AuthBadAuthorization, err)
 			return
@@ -663,6 +666,9 @@ func (cfg *apiConfig) authMiddleware(handler func(http.ResponseWriter, *http.Req
 		handler(w, r)
 	}
 }
+
+// #region Help Message
+// It's down here because it kept screwing up the collapsed functions and making editing this file annoying
 
 const helpMsg string = `
 	

@@ -32,7 +32,7 @@ go.work.sum
 .vscode/
 
 data/
-out
 appData.db
 appData.db-shm
 appData.db-wal
+bookOrganizerServer

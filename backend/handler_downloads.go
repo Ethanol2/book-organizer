@@ -10,6 +10,7 @@ import (
 	"os"
 	"path"
 
+	"github.com/Ethanol2/book-organizer/internal/env"
 	"github.com/Ethanol2/book-organizer/internal/fileManagement"
 	"github.com/Ethanol2/book-organizer/internal/metadata"
 	"github.com/google/uuid"
@@ -86,7 +87,7 @@ func (cfg *apiConfig) handlerAssociateDownloadToBook(downloadId uuid.UUID, w htt
 		return
 	}
 
-	oldPath, newPath, err := fileManagement.MoveFiles(downloadDir, cfg.Env.Get(DownloadsPath), bookDir, cfg.Env.Get(LibraryPath), authorDir, seriesDir)
+	oldPath, newPath, err := fileManagement.MoveFiles(downloadDir, cfg.Env.Get(env.DownloadsPath), bookDir, cfg.Env.Get(env.LibraryPath), authorDir, seriesDir)
 	if err != nil {
 		if os.IsExist(err) {
 			respondWithError(w, http.StatusConflict, "The library already has files at the book's location", err)
@@ -178,7 +179,7 @@ func (cfg *apiConfig) handlerGetDownloadCover(id uuid.UUID, w http.ResponseWrite
 		return
 	}
 
-	coverPath := path.Join(cfg.Env.Get(DownloadsPath), *download.Files.Root, *download.Files.Cover)
+	coverPath := path.Join(cfg.Env.Get(env.DownloadsPath), *download.Files.Root, *download.Files.Cover)
 	log.Println("Serving download cover from", coverPath)
 
 	http.ServeFile(w, r, coverPath)
@@ -200,7 +201,7 @@ func (cfg *apiConfig) handlerGetDownloadMetadata(id uuid.UUID, w http.ResponseWr
 		return
 	}
 
-	metadataFile, err := os.Open(path.Join(cfg.Env.Get(DownloadsPath), *download.Files.Root, "metadata.json"))
+	metadataFile, err := os.Open(path.Join(cfg.Env.Get(env.DownloadsPath), *download.Files.Root, "metadata.json"))
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, FileOpenError, err)
 		return

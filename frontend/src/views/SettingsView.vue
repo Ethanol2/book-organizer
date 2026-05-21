@@ -42,6 +42,9 @@ const usernameOk = () => username.value.length >= 3;
 const passwordOk = () => newPassword.value.length >= 3;
 const passwordConfirmOk = () => newPassword.value === passwordConfirm.value;
 
+// Restart Params
+const restartConfirm = ref(false);
+
 async function getUserSettings() {
     try {
         const resp = await api.get('/api/settings');
@@ -123,6 +126,16 @@ async function registerUser() {
         username: username.value,
         password: newPassword.value
     });
+}
+
+async function restartServer() {
+    try {
+        await api.post('/api/settings/shutdown')
+        useNotificationsStore().notifySuccess('Server restarted successfully!')
+    } catch (err) {
+        console.error('Error restarting server:', err);
+        useNotificationsStore().notifyError('Something went wrong while restarting the server')
+    }
 }
 
 async function changePassword() {
@@ -220,6 +233,21 @@ onMounted(async () => {
 
                     <button class="delete-button" :disabled="!deleterUserConfirm" @click="authStore.deleteUser">Remove
                         User</button>
+                </div>
+            </div>
+        </section>
+
+        <!-- Shutdown Controls -->
+        <h3>Restart</h3>
+        <section id="shutdown">
+            <div class="card">
+                <h4>Restart Server</h4>
+                <p>This will stop the server and restart it</p>
+                <div class="warning-box">
+                    <label for="restartConfirm">I understand <input type="checkbox" v-model="restartConfirm"
+                            id="restartConfirm"></label>
+                    <button class="delete-button" :disabled="!restartConfirm" @click="restartServer">Restart
+                        Server</button>
                 </div>
             </div>
         </section>

@@ -6,6 +6,7 @@ import (
 	"strconv"
 
 	"github.com/Ethanol2/book-organizer/internal/database"
+	"github.com/Ethanol2/book-organizer/internal/env"
 	"github.com/Ethanol2/book-organizer/internal/metadata"
 )
 
@@ -76,12 +77,12 @@ func (cfg *apiConfig) handlerMetadataSearch(w http.ResponseWriter, r *http.Reque
 		}
 
 	case "google books":
-		if cfg.Env.Get(GoogleApiKey) == "" {
+		if cfg.Env.Get(env.GoogleApiKey) == "" {
 			respondWithError(w, http.StatusInternalServerError, MetadataApiKeyMissing, fmt.Errorf(MetadataApiKeyMissing))
 			return
 		}
 
-		results, err = metadata.SearchGoogleBooks(searchParams, cfg.Env.Get(GoogleApiKey), &cfg.mdCache)
+		results, err = metadata.SearchGoogleBooks(searchParams, cfg.Env.Get(env.GoogleApiKey), &cfg.mdCache)
 		if err != nil {
 			respondWithError(w, http.StatusInternalServerError, MetadataFetchError, err)
 			return
@@ -132,12 +133,12 @@ func (cfg *apiConfig) handlerGetMetadataBookDetails(w http.ResponseWriter, r *ht
 		}
 
 	case "google books":
-		if cfg.Env.Get(GoogleApiKey) == "" {
+		if cfg.Env.Get(env.GoogleApiKey) == "" {
 			respondWithError(w, http.StatusInternalServerError, MetadataApiKeyMissing, fmt.Errorf(MetadataApiKeyMissing))
 			return
 		}
 
-		result, err = metadata.GetFromGoogleBooks(id, cfg.Env.Get(GoogleApiKey), &cfg.mdCache)
+		result, err = metadata.GetFromGoogleBooks(id, cfg.Env.Get(env.GoogleApiKey), &cfg.mdCache)
 		if err != nil {
 			respondWithError(w, http.StatusInternalServerError, MetadataFetchError, err)
 			return

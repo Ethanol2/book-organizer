@@ -1,3 +1,3 @@
 #!/bin/bash
 
-go build -C ./backend -o ../out && ./out $@
+go build -C ./backend -o ../bookOrganizerServer && ./bookOrganizerServer $@

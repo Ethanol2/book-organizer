@@ -11,7 +11,7 @@ interface Log {
 
 const waitingForStart = ref(true)
 const counts = [25, 50, 100, 200]
-const count = ref<number>(100)
+const count = ref<number>(25)
 const logs = ref<Log[]>([])
 const loading = ref(false)
 const errorMsg = ref<string | null>(null)

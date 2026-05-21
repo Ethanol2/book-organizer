@@ -11,6 +11,7 @@ import (
 
 	"github.com/Ethanol2/book-organizer/internal/auth"
 	"github.com/Ethanol2/book-organizer/internal/database"
+	"github.com/Ethanol2/book-organizer/internal/env"
 	"github.com/google/uuid"
 )
 
@@ -44,7 +45,7 @@ func (cfg *apiConfig) handlerGetAuthStatus(w http.ResponseWriter, r *http.Reques
 	}
 
 	var user *database.User
-	if id, err := authenticate(true, r, cfg.Env.Get(TokenSecret)); err == nil {
+	if id, err := authenticate(true, r, cfg.Env.Get(env.TokenSecret)); err == nil {
 		usr, _, err := cfg.db.GetUser(id)
 		if err != nil {
 			respondWithError(w, http.StatusInternalServerError, DatabaseError, err)
@@ -69,7 +70,7 @@ func (cfg *apiConfig) handlerRegister(w http.ResponseWriter, r *http.Request) {
 
 	// If there aren't any users, assume the first user is the admin
 	if count > 0 {
-		_, err := authenticate(true, r, cfg.Env.Get(TokenSecret))
+		_, err := authenticate(true, r, cfg.Env.Get(env.TokenSecret))
 		if err != nil {
 			respondWithError(w, http.StatusUnauthorized, AuthBadAuthorization, err)
 			return
@@ -142,7 +143,7 @@ func (cfg *apiConfig) handlerLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	token, err := auth.MakeJWT(user.Id, cfg.Env.Get(TokenSecret), time.Hour)
+	token, err := auth.MakeJWT(user.Id, cfg.Env.Get(env.TokenSecret), time.Hour)
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, "Failed to create token", err)
 		return
@@ -228,7 +229,7 @@ func (cfg *apiConfig) handlerRefresh(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	token, err := auth.MakeJWT(user.Id, cfg.Env.Get(TokenSecret), time.Hour)
+	token, err := auth.MakeJWT(user.Id, cfg.Env.Get(env.TokenSecret), time.Hour)
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, GenericError, err)
 		return
