@@ -1,0 +1,14 @@
+# Ignore local databases
+*.db
+*.sqlite
+*.sqlite3
+
+# Ignore local logs and data folders
+data/
+
+# Ignore local node modules
+node_modules/
+
+# Ignore binaries
+out
+bookOrganizerServer

@@ -3,6 +3,7 @@ package main
 import (
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
@@ -15,7 +16,7 @@ import (
 	"github.com/Ethanol2/book-organizer/internal/fileManagement"
 	"github.com/Ethanol2/book-organizer/internal/metadata"
 	"github.com/google/uuid"
-	"github.com/mattn/go-sqlite3"
+	"github.com/ncruces/go-sqlite3"
 )
 
 func (cfg *apiConfig) handlerGetBook(id uuid.UUID, w http.ResponseWriter, r *http.Request) {
@@ -134,8 +135,9 @@ func (cfg *apiConfig) handlerPostBook(w http.ResponseWriter, r *http.Request) {
 		return err
 	})
 	if err != nil {
-		if sqliteErr, ok := err.(sqlite3.Error); ok {
-			if sqliteErr.ExtendedCode == sqlite3.ErrConstraintUnique {
+		var sqliteErr *sqlite3.Error
+		if errors.As(err, &sqliteErr) {
+			if sqliteErr.Code() == sqlite3.CONSTRAINT {
 				respondWithError(w, http.StatusBadRequest, "Books can't share ISBN or ASIN numbers to prevent duplicates", err)
 				return
 			}

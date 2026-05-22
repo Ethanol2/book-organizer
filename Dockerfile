@@ -14,25 +14,22 @@ RUN npm run build
 
 # Build the Go application
 # Using alpine instead of debian because alpine is smaller and provides less attack surface
-FROM golang:1.22-alpine AS builder
+FROM golang:1.25-alpine AS builder
 
 # Set the working directory inside the container
 WORKDIR /app
 
 # Copy dependencies to improve build caching speeds
-COPY go.mod go.sum ./
+COPY backend/go.mod backend/go.sum ./
 RUN go mod download
 
 # Copy the source code
-COPY . .
-
-# Copy the compiled vue files to the backend
-COPY --from=frontend-builder /frontend/dist ./static
+COPY backend/ .
 
 # Build the Go application
 # CGO_ENABLED=0 creates a static self contained binary with no dependencies
 # GOOS=linux ensures it targets Linux architecture
-RUN CGO_Enabled=0 GOOS=linux go build -o /app/book-organizer-server ./backend/main.go
+RUN CGO_ENABLED=0 GOOS=linux go build -o ./book-organizer-server .
 
 
 # Step 3 ======================
@@ -47,6 +44,12 @@ RUN addgroup -S appgroup && adduser -S appuser -G appgroup
 # Sets the /app folder as the working directory
 WORKDIR /app
 
+# Copy the compiled binary from the builder stage
+COPY --from=builder /app/book-organizer-server ./book-organizer-server
+
+# Copy the compiled vue files to the backend
+COPY --from=frontend-builder /frontend/dist ./static
+
 # Ensure the app user owns the binary and folders
 RUN mkdir ./data
 RUN chown -R appuser:appgroup /app
@@ -56,4 +59,4 @@ USER appuser
 
 # Expose the port and run the server
 EXPOSE 8080
-CMD ["/app/book-organizer-server"]
+CMD ["./book-organizer-server"]

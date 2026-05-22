@@ -21,7 +21,7 @@ import (
 	"github.com/Ethanol2/book-organizer/internal/logger"
 	"github.com/Ethanol2/book-organizer/internal/metadata"
 	"github.com/google/uuid"
-	_ "github.com/mattn/go-sqlite3"
+	_ "github.com/ncruces/go-sqlite3/driver"
 )
 
 type apiConfig struct {
@@ -70,9 +70,9 @@ func main() {
 
 	fmt.Println("Starting book organizer")
 
-	cfg, err := initConfig(flags)
+	cfg, err := createConfig(flags)
 	if err != nil {
-		fmt.Println(err)
+		fmt.Println("Init Error:" + err.Error())
 		os.Exit(1)
 	}
 
@@ -80,7 +80,7 @@ func main() {
 	log.Println("Environment variables and database loaded successfully")
 
 	mux := http.NewServeMux()
-	fHandler := http.FileServer(http.Dir(cfg.Env.Get(env.FrontendPath)))
+	fHandler := http.FileServer(http.Dir("./static/"))
 	mux.Handle("/", fHandler)
 
 	// Create the channel that handles the shutdown signal
@@ -256,7 +256,7 @@ func getFlags(args []string) (cliFlags, error) {
 	return flags, nil
 }
 
-func initConfig(flags cliFlags) (*apiConfig, error) {
+func createConfig(flags cliFlags) (*apiConfig, error) {
 
 	// This function is so dumb it needs its own regions. Needs a refactor
 

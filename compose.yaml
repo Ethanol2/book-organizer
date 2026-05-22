@@ -1,14 +1,14 @@
 services:
-  book-organizer:
-    image: ethanol2/book-organizer:latest
+  app:
+    build: .
     container_name: book-organizer
     restart: unless-stopped
-    network_mode: host
+    ports:
+      - "${PORT}:${PORT}"
     environment:
       - PORT=${PORT}
       - GOOGLE_BOOKS_API_KEY=${GOOGLE_BOOKS_API_KEY}
       - TOKEN_SECRET=${TOKEN_SECRET}
-
       - LIBRARY_PATH=/library
       - DOWNLOADS_PATH=/downloads
       - DATA_PATH=/data
