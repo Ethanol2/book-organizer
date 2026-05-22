@@ -115,7 +115,7 @@ func HandleTestCover(testPath, metadataPath, imgSource string) error {
 	defer coverFile.Close()
 
 	log.Println("Moving file to \"", testPath, "\"")
-	err = MoveFilesWithPaths(coverFile.Name(), testPath)
+	err = MoveFiles(coverFile.Name(), testPath)
 	if err != nil {
 		return err
 	}

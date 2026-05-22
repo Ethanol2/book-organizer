@@ -147,7 +147,7 @@ func (cfg *apiConfig) handlerPostBook(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if coverFile != nil {
-		err = fileManagement.MoveFilesWithPaths(coverFile.Name(), path.Join(cfg.metadataPath, book.Id.String()+path.Ext(coverFile.Name())))
+		err = fileManagement.MoveFiles(coverFile.Name(), path.Join(cfg.metadataPath, book.Id.String()+path.Ext(coverFile.Name())))
 		if err != nil {
 			respondWithError(w, http.StatusInternalServerError, FileMoveError, err)
 			return
@@ -209,34 +209,19 @@ func (cfg *apiConfig) handlerUpdateBook(id uuid.UUID, w http.ResponseWriter, r *
 	}
 
 	if needsFileUpdate {
-		authorDir, seriesDir, bookDir, err := cfg.db.GetPathComponents(id)
+		newPath, err := cfg.db.GetBookPath(id)
 		if err != nil {
 			respondWithError(w, http.StatusInternalServerError, FileMoveError, err)
 			return
 		}
-
-		err = fileManagement.CreateDirectory(path.Join(cfg.Env.Get(env.LibraryPath), authorDir))
-		if err != nil {
-			respondWithError(w, http.StatusInternalServerError, FileMoveError, err)
-			return
-		}
-
-		err = fileManagement.CreateDirectory(path.Join(cfg.Env.Get(env.LibraryPath), authorDir, seriesDir))
-		if err != nil {
-			respondWithError(w, http.StatusInternalServerError, FileMoveError, err)
-			return
-		}
-
-		newPath := path.Join(authorDir, seriesDir, bookDir)
 
 		if book.Files.Root != &newPath {
-			err = fileManagement.MoveFilesWithPaths(path.Join(cfg.Env.Get(env.LibraryPath), *oldPath), path.Join(cfg.Env.Get(env.LibraryPath), newPath))
+			err = fileManagement.MoveFiles(path.Join(cfg.Env.Get(env.LibraryPath), *oldPath), path.Join(cfg.Env.Get(env.LibraryPath), newPath))
 			if err != nil {
 				respondWithError(w, http.StatusInternalServerError, FileMoveError, err)
 				return
 			}
 		}
-
 	}
 
 	if newCover != nil {
@@ -255,7 +240,7 @@ func (cfg *apiConfig) handlerUpdateBook(id uuid.UUID, w http.ResponseWriter, r *
 			return
 		}
 
-		err = fileManagement.MoveFilesWithPaths(newCover.Name(), coverPath)
+		err = fileManagement.MoveFiles(newCover.Name(), coverPath)
 		if err != nil {
 			respondWithError(w, http.StatusInternalServerError, FileMoveError, err)
 		}

@@ -81,13 +81,16 @@ func (cfg *apiConfig) handlerAssociateDownloadToBook(downloadId uuid.UUID, w htt
 		return
 	}
 
-	authorDir, seriesDir, bookDir, err := cfg.db.GetPathComponents(bookIdStruct.BookId)
+	bookPath, err := cfg.db.GetBookPath(bookIdStruct.BookId)
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, DatabaseError, err)
 		return
 	}
 
-	oldPath, newPath, err := fileManagement.MoveFiles(downloadDir, cfg.Env.Get(env.DownloadsPath), bookDir, cfg.Env.Get(env.LibraryPath), authorDir, seriesDir)
+	oldPath := path.Join(cfg.Env.Get(env.DownloadsPath), downloadDir)
+	newPath := path.Join(cfg.Env.Get(env.LibraryPath), bookPath)
+
+	err = fileManagement.MoveFiles(oldPath, newPath)
 	if err != nil {
 		if os.IsExist(err) {
 			respondWithError(w, http.StatusConflict, "The library already has files at the book's location", err)
@@ -97,10 +100,10 @@ func (cfg *apiConfig) handlerAssociateDownloadToBook(downloadId uuid.UUID, w htt
 		return
 	}
 
-	book, err := cfg.db.AssociateBookAndDownload(bookIdStruct.BookId, downloadId, authorDir, seriesDir, bookDir)
+	book, err := cfg.db.AssociateBookAndDownload(bookIdStruct.BookId, downloadId, bookPath)
 	if err != nil {
 		log.Println(err)
-		err = fileManagement.MoveFilesWithPaths(newPath, oldPath)
+		err = fileManagement.MoveFiles(newPath, oldPath)
 		if err != nil {
 			respondWithError(w, http.StatusInternalServerError, "Failed to associate the book and files, and failed to move files back from the library to downloads", err)
 			return
@@ -144,7 +147,7 @@ func (cfg *apiConfig) handlerAssociateDownloadToBook(downloadId uuid.UUID, w htt
 				return
 			}
 
-			err = fileManagement.MoveFilesWithPaths(metadataCoverPath, newCoverPath)
+			err = fileManagement.MoveFiles(metadataCoverPath, newCoverPath)
 			if err != nil {
 				log.Println("Failed to move metadata cover to the library")
 			}

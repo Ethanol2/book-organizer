@@ -353,7 +353,7 @@ func (c *Client) GetBooksSummary(filters map[string][]string) (BookSearchResults
 	}, nil
 }
 
-func (c *Client) AssociateBookAndDownload(bookId, downloadId uuid.UUID, author, series, bookDir string) (Book, error) {
+func (c *Client) AssociateBookAndDownload(bookId, downloadId uuid.UUID, bookPath string) (Book, error) {
 
 	var files fileManagement.Files
 	var Audio *string
@@ -375,7 +375,7 @@ func (c *Client) AssociateBookAndDownload(bookId, downloadId uuid.UUID, author, 
 		return Book{}, err
 	}
 
-	files.UpdateDirectory(path.Join(author, series, bookDir))
+	files.UpdateDirectory(bookPath)
 	tmpBook := Book{Id: &bookId, Files: files}
 	err = tmpBook.ApplyBookFiles(c)
 	if err != nil {
@@ -532,12 +532,12 @@ func (c *Client) UpdateBook(id uuid.UUID, update BookParams) (Book, bool, error)
 	needsFileUpdate = needsFileUpdate && book.Files.Root != nil
 
 	if needsFileUpdate {
-		authorDir, seriesDir, bookDir, err := c.GetPathComponents(id)
+		bookPath, err := c.GetBookPath(id)
 		if err != nil {
 			return Book{}, false, err
 		}
 
-		book.Files.UpdateDirectory(path.Join(authorDir, seriesDir, bookDir))
+		book.Files.UpdateDirectory(bookPath)
 		err = book.ApplyBookFiles(c)
 		if err != nil {
 			return Book{}, false, err
@@ -577,12 +577,12 @@ func (c *Client) UpdateBookCover(id uuid.UUID, ext string) (string, string, erro
 }
 
 // Author -> Series -> Book Title
-func (c *Client) GetPathComponents(id uuid.UUID) (string, string, string, error) {
+func (c *Client) GetBookPath(id uuid.UUID) (string, error) {
 
 	authorDir := "Unknown"
 	authors, err := c.GetCategoryTypesAssociatedWithBook(id.String(), Authors)
 	if err != nil {
-		return "", "", "", err
+		return "", err
 	}
 	if len(authors) > 0 {
 		authorDir = authors[0].Name
@@ -592,7 +592,7 @@ func (c *Client) GetPathComponents(id uuid.UUID) (string, string, string, error)
 	indexStr := ""
 	series, err := c.GetCategoryTypesAssociatedWithBook(id.String(), Series)
 	if err != nil {
-		return "", "", "", err
+		return "", err
 	}
 	if len(series) > 0 {
 		seriesDir = series[0].Name
@@ -604,11 +604,11 @@ func (c *Client) GetPathComponents(id uuid.UUID) (string, string, string, error)
 	title := ""
 	err = c.handler.QueryRow("SELECT title FROM books WHERE id = ?", id).Scan(&title)
 	if err != nil {
-		return "", "", "", err
+		return "", err
 	}
 	title = indexStr + title
 
-	return authorDir, seriesDir, title, nil
+	return path.Join(authorDir, seriesDir, title), nil
 }
 
 func (c *Client) DeleteBook(id uuid.UUID) error {

@@ -3,7 +3,6 @@ package fileManagement
 import (
 	"fmt"
 	"os"
-	"path"
 )
 
 func CreateDirectory(path string) error {
@@ -18,33 +17,14 @@ func CreateDirectory(path string) error {
 	return nil
 }
 
-func MoveFiles(oldDirName, oldDir, newDirName, newDir, author, series string) (string, string, error) {
+func MoveFiles(oldPath, newPath string) error {
 
-	authorDir := path.Join(newDir, author)
-	err := CreateDirectory(authorDir)
+	err := os.MkdirAll(newPath, 0755)
 	if err != nil {
-		return "", "", err
+		return err
 	}
-
-	seriesDir := path.Join(authorDir, series)
-	err = CreateDirectory(seriesDir)
-	if err != nil {
-		return "", "", err
-	}
-
-	oldPath := path.Join(oldDir, oldDirName)
-	newPath := path.Join(seriesDir, newDirName)
 
 	err = os.Rename(oldPath, newPath)
-	if err != nil {
-		return "", "", err
-	}
-
-	return oldPath, newPath, nil
-}
-
-func MoveFilesWithPaths(oldPath, newPath string) error {
-	err := os.Rename(oldPath, newPath)
 	if err != nil {
 		return err
 	}
