@@ -113,7 +113,9 @@ func (scan *Scanner) ScanNew(toIgnore []string) error {
 			continue
 		}
 
-		filesList = append(filesList, files)
+		if !files.HasNoFiles() {
+			filesList = append(filesList, files)
+		}
 	}
 
 	err = scan.AddHandler(filesList)
@@ -145,9 +147,17 @@ func (scan *Scanner) ScanExisting(ids []uuid.UUID, dirs []string) error {
 			continue
 		}
 
-		err = scan.UpdateHandler(ids[i], newFiles)
-		if err != nil {
-			return err
+		if newFiles.HasNoFiles() {
+			err = scan.DeleteHandler(ids[i])
+			if err != nil {
+				log.Println(err)
+			}
+			log.Println("\"", dir, "\" was found but is empty")
+		} else {
+			err = scan.UpdateHandler(ids[i], newFiles)
+			if err != nil {
+				return err
+			}
 		}
 	}
 

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import BookItem from '@/components/LibraryItem.vue';
 import type { BookSummary } from '@/types/book';
-import { onMounted, ref } from 'vue';
+import { onBeforeUnmount, onMounted, nextTick, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import { useNotificationsStore } from '@/stores/notifications';
 import api from '@/services/api';
@@ -18,6 +18,8 @@ const itemsPerPage = ref(20);
 const totalResults = ref(0);
 const isLoading = ref(false);
 const hasLoadedAll = ref(false);
+const sentinel = ref<HTMLElement | null>(null);
+let observer: IntersectionObserver | null = null;
 
 function buildQueryString(page?: number) {
     var params = new URLSearchParams();
@@ -141,10 +143,8 @@ async function loadMore() {
 onMounted(async () => {
     searchTerms.value.sort = 'title';
     searchTerms.value.order = 'asc';
-    await fetchBooks(false);
 
-    // Set up intersection observer for infinite scroll
-    const observer = new IntersectionObserver(
+    observer = new IntersectionObserver(
         (entries) => {
             if (entries[0]?.isIntersecting) {
                 loadMore();
@@ -153,11 +153,24 @@ onMounted(async () => {
         { threshold: 0.1 }
     );
 
-    // Get the sentinel element (will be the last child that loads more when visible)
-    const sentinel = document.querySelector('.library-sentinel');
-    if (sentinel) {
-        observer.observe(sentinel);
-    }
+    watch(
+        () => [sentinel.value, hasLoadedAll.value],
+        async () => {
+            await nextTick();
+            if (!observer) return;
+
+            observer.disconnect();
+            if (sentinel.value && !hasLoadedAll.value) {
+                observer.observe(sentinel.value);
+            }
+        },
+        { flush: 'post' }
+    );
+});
+
+onBeforeUnmount(() => {
+    observer?.disconnect();
+    observer = null;
 });
 
 </script>
@@ -169,7 +182,7 @@ onMounted(async () => {
     </div>
 
     <section>
-        <SearchControls placeholder="Search title, subtitle, or description" :metadata="false"
+        <SearchControls placeholder="Search title, subtitle, or description" :search-on-load="true" :metadata="false"
             @search="searchBooksWithNewSearch($event)" @reset="searchBooksWithNewSearch(NewSearchTerms())">
         </SearchControls>
 
@@ -178,7 +191,7 @@ onMounted(async () => {
             <div v-if="isLoading" class="library-loading">
                 <div class="spinner"></div>
             </div>
-            <div v-if="!hasLoadedAll && books.length > 0" class="library-sentinel"></div>
+            <div v-if="!hasLoadedAll && books.length > 0" ref="sentinel" class="library-sentinel"></div>
         </div>
     </section>
 </template>

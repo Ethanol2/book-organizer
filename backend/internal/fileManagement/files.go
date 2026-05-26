@@ -122,7 +122,10 @@ func (files *Files) applyModifier(mod func([]string) *[]string) {
 }
 
 func (files *Files) HasNoFiles() bool {
-	return (files.AudioFiles == nil || len(*files.AudioFiles) == 0) && (files.TextFiles == nil || len(*files.TextFiles) == 0)
+	return (files.AudioFiles == nil || len(*files.AudioFiles) == 0) &&
+		(files.TextFiles == nil || len(*files.TextFiles) == 0) &&
+		(files.OtherFiles == nil || len(*files.OtherFiles) == 0) &&
+		!files.HasMetadata
 }
 
 func OpenMetadataFile(filePath string) (*MetadataFile, error) {

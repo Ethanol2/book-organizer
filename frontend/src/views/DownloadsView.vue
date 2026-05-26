@@ -125,7 +125,7 @@ async function importWithNewBook(params: BookParams) {
         await new Promise(resolve => setTimeout(resolve, 500));
 
         try {
-            const resp = await api.post("/api/downloads/" + selectedDownload.value.id + "/associate", { book_id: newBookId });
+            const resp = await api.post("/api/downloads/" + selectedDownload.value.id + "/associate", { book_id: newBookId, use_downloaded_cover: true });
             useNotificationsStore().notifySuccess('Download associated successfully!');
             downloads.value = downloads.value.filter(download => download.id !== selectedDownload.value.id);
         }

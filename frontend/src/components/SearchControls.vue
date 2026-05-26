@@ -33,6 +33,7 @@ const availableFields = ref<SearchParams>()
 
 const props = defineProps<{
     placeholder?: string;
+    searchOnLoad?: boolean;
     metadata: boolean;
 }>();
 
@@ -147,6 +148,10 @@ onMounted(() => {
     if (hasAdvancedSearchTerms()) {
         showAdvanced.value = true;
         emit('search', buildSearchTerms());
+    }
+
+    if (props.searchOnLoad) {
+        search();
     }
 });
 

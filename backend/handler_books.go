@@ -103,13 +103,16 @@ func (cfg *apiConfig) handlerPostBook(w http.ResponseWriter, r *http.Request) {
 
 	var coverFile *os.File
 	if params.Cover != nil {
-		coverFile, err = fileManagement.DownloadTempFile(*params.Cover)
-		if err != nil {
-			respondWithError(w, http.StatusBadRequest, CoverURLError, err)
-			log.Println("Image:", *params.Cover)
-			return
+		if !strings.Contains(*params.Cover, cfg.downloadsName) && !strings.Contains(*params.Cover, cfg.libraryName) {
+
+			coverFile, err = fileManagement.DownloadTempFile(*params.Cover)
+			if err != nil {
+				respondWithError(w, http.StatusBadRequest, CoverURLError, err)
+				log.Println("Image:", *params.Cover)
+				return
+			}
+			defer coverFile.Close()
 		}
-		defer coverFile.Close()
 	}
 
 	if params.ISBN != nil {

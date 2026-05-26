@@ -218,5 +218,9 @@ func (cfg *apiConfig) handlerGetDownloadMetadata(id uuid.UUID, w http.ResponseWr
 		return
 	}
 
-	respondWithJson(w, http.StatusOK, metadata.MetadataToBookParams(metadataContent))
+	metadataData := metadata.MetadataToBookParams(metadataContent)
+	coverPath := path.Join(cfg.downloadsName, *download.Files.Cover)
+	metadataData.Cover = &coverPath
+
+	respondWithJson(w, http.StatusOK, metadataData)
 }
