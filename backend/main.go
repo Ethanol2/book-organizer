@@ -21,7 +21,6 @@ import (
 	"github.com/Ethanol2/book-organizer/internal/logger"
 	"github.com/Ethanol2/book-organizer/internal/metadata"
 	"github.com/google/uuid"
-	_ "github.com/ncruces/go-sqlite3/driver"
 )
 
 type apiConfig struct {
@@ -72,7 +71,7 @@ func main() {
 
 	cfg, err := createConfig(flags)
 	if err != nil {
-		fmt.Println("Init Error:" + err.Error())
+		fmt.Println("Init Error: " + err.Error())
 		os.Exit(1)
 	}
 
@@ -272,21 +271,26 @@ func createConfig(flags cliFlags) (*apiConfig, error) {
 	logsPath := path.Join(dataPath, "logs")
 	dbPath := path.Join(dataPath, "appData.db")
 
-	// Making this a func so that the test data folder can be handled only if required
-	generateFolders := func(paths ...string) error {
-		for i, path := range paths {
-			if _, err := os.Stat(path); os.IsNotExist(err) {
-				err = os.Mkdir(path, 0755)
-				if err != nil {
-					fmt.Println("Error creating directory for \"", path, "\". #", i, "in the list")
-					return err
-				}
-			}
-		}
-		return nil
+	if err = os.MkdirAll(dataPath, 0755); err != nil {
+		fmt.Println("Error creating data folder")
+		return nil, err
 	}
-	err = generateFolders(dataPath, metadataPath, logsPath, envObj.Get(env.DownloadsPath), envObj.Get(env.LibraryPath))
-	if err != nil {
+	if err = os.MkdirAll(metadataPath, 0755); err != nil {
+		fmt.Println("Error creating metadata folder")
+		return nil, err
+	}
+	if err = os.MkdirAll(logsPath, 0755); err != nil {
+		fmt.Println("Error creating logs folder")
+		return nil, err
+	}
+
+	if err = os.MkdirAll(envObj.Get(env.DownloadsPath), 0755); err != nil {
+		fmt.Println("Error creating downloads folder")
+		return nil, err
+	}
+
+	if err = os.MkdirAll(envObj.Get(env.LibraryPath), 0755); err != nil {
+		fmt.Println("Error creating library folder")
 		return nil, err
 	}
 
@@ -323,7 +327,7 @@ func createConfig(flags cliFlags) (*apiConfig, error) {
 		// Remove the database file
 		err := os.Remove(dbPath)
 		if err != nil {
-			fmt.Println(err)
+			return nil, err
 		}
 
 		// Clear the metadata folder
@@ -333,6 +337,7 @@ func createConfig(flags cliFlags) (*apiConfig, error) {
 		}
 	}
 
+	// Initialize the database
 	db, err := database.NewClient(dbPath)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't open database: %v", err)
@@ -353,6 +358,7 @@ func createConfig(flags cliFlags) (*apiConfig, error) {
 		}
 	}
 
+	// Handle the initial operations
 	authRequired := false
 	err = db.HandleTransaction(func(c *database.Client) error {
 
@@ -398,174 +404,162 @@ func createConfig(flags cliFlags) (*apiConfig, error) {
 		}
 		authRequired = count > 0
 
-		if flags.dbTestData {
-
-			testdataPath := path.Join(dataPath, "test-data")
-			err = generateFolders(testdataPath)
-			if err != nil {
-				return err
-			}
-
-			fmt.Println("Creating test data path")
-			err = fileManagement.CreateDirectory(testdataPath)
-			if err != nil {
-				return err
-			}
-
-			testBooks, err := c.InsertTestData(metadataPath, testdataPath)
-			if err != nil {
-				return err
-			}
-
-			// Insert Library
-			if flags.libTestData {
-
-				// Inserts 15 books with random text and audio files. All books will have a cover.
-				// Half will have a metadata file.
-
-				fmt.Println()
-				fmt.Println("======= Creating test library =======")
-
-				handleDirs := func(book database.Book) (string, error) {
-					bookPath := book.Authors[0].Name
-
-					err = fileManagement.CreateDirectory(path.Join(envObj.Get(env.LibraryPath), bookPath))
-					if err != nil {
-						return "", err
-					}
-
-					bookDir := book.Title
-					if len(book.Series) > 0 {
-
-						bookPath = path.Join(bookPath, book.Series[0].Name)
-
-						if book.Series[0].Index != nil {
-							bookDir = *book.Series[0].Index + " - " + bookDir
-						}
-
-						err = fileManagement.CreateDirectory(path.Join(envObj.Get(env.LibraryPath), bookPath))
-						if err != nil {
-							return "", err
-						}
-					}
-
-					bookPath = path.Join(bookPath, bookDir)
-					return bookPath, nil
-				}
-
-				// No metadata
-				for _, book := range testBooks[:7] {
-
-					bookPath, err := handleDirs(book)
-					if err != nil {
-						return err
-					}
-
-					book.Files, err = fileManagement.CreateTestDirectory(
-						bookPath,
-						envObj.Get(env.LibraryPath),
-						nil,
-						path.Join(metadataPath, book.Id.String()+".jpg"), rand.Intn(10)+1, rand.Intn(10)+1,
-					)
-
-					err = book.ApplyBookFiles(&db)
-					if err != nil {
-						return err
-					}
-				}
-
-				// With metadata
-				for _, book := range testBooks[8:15] {
-
-					bookPath, err := handleDirs(book)
-					if err != nil {
-						return err
-					}
-
-					book.Files, err = fileManagement.CreateTestDirectory(
-						bookPath,
-						envObj.Get(env.LibraryPath),
-						metadata.BookToMetadata(book),
-						path.Join(metadataPath, book.Id.String()+".jpg"), rand.Intn(10)+1, rand.Intn(10)+1,
-					)
-
-					err = book.ApplyBookFiles(&db)
-					if err != nil {
-						return err
-					}
-				}
-
-			}
-
-			// Insert downloads
-			if flags.downTestData {
-				// Count | Has Cover | Has Metadata | Audio Files | Text Files
-				// 	-----------------------------------------------------------
-				// 	  1   |    true   |     false    |      1      |     1
-				// 	  1   |    false  |     false    |      1      |     1
-				// 	  1   |    true   |     false    |      10     |     1
-				// 	  1   |    false  |     false    |      1      |     10
-				// 	  3   |    true   |     true     |      5      |     1
-				// 	  3   |    false  |     true     |      1      |     5
-
-				fmt.Println()
-				fmt.Println("======= Creating test downloads =======")
-
-				testDownloads := []struct {
-					title, cover string
-					md           *fileManagement.MetadataFile
-					audio        int
-					text         int
-				}{
-					{
-						title: testBooks[0].Title, cover: testBooks[0].Id.String() + ".jpg", md: nil, audio: 1, text: 1,
-					}, {
-						title: testBooks[1].Title, cover: "", md: nil, audio: 1, text: 1,
-					}, {
-						title: testBooks[2].Title, cover: testBooks[2].Id.String() + ".jpg", md: nil, audio: 10, text: 1,
-					}, {
-						title: testBooks[3].Title, cover: "", md: nil, audio: 1, text: 10,
-					}, {
-						title: testBooks[4].Title, cover: testBooks[4].Id.String() + ".jpg", md: metadata.BookToMetadata(testBooks[4]), audio: 5, text: 1,
-					}, {
-						title: testBooks[5].Title, cover: testBooks[5].Id.String() + ".jpg", md: metadata.BookToMetadata(testBooks[5]), audio: 5, text: 1,
-					}, {
-						title: testBooks[6].Title, cover: testBooks[6].Id.String() + ".jpg", md: metadata.BookToMetadata(testBooks[6]), audio: 5, text: 1,
-					}, {
-						title: testBooks[7].Title, cover: "", md: metadata.BookToMetadata(testBooks[7]), audio: 1, text: 5,
-					}, {
-						title: testBooks[8].Title, cover: "", md: metadata.BookToMetadata(testBooks[8]), audio: 1, text: 5,
-					}, {
-						title: testBooks[9].Title, cover: "", md: metadata.BookToMetadata(testBooks[9]), audio: 1, text: 5,
-					},
-				}
-
-				for _, d := range testDownloads {
-
-					if d.cover != "" {
-						d.cover = path.Join(metadataPath, d.cover)
-					}
-
-					_, err = fileManagement.CreateTestDirectory(
-						path.Join(d.title),
-						envObj.Get(env.DownloadsPath),
-						d.md,
-						d.cover,
-						d.audio, d.text,
-					)
-					if err != nil {
-						return err
-					}
-				}
-
-			}
-
-		}
-
 		return nil
 	})
 	if err != nil {
 		return nil, err
+	}
+
+	// Handle test data
+	if flags.dbTestData {
+
+		testdataPath := path.Join(dataPath, "test-data")
+		if err = os.MkdirAll(testdataPath, 0755); err != nil {
+			fmt.Println("Error creating test data folder")
+			return nil, err
+		}
+
+		// Insert the rows first
+		var testBooks []database.Book
+		err = db.HandleTransaction(func(c *database.Client) error {
+			testBooks, err = c.InsertTestData(metadataPath, testdataPath)
+			if err != nil {
+				return err
+			}
+			return nil
+		})
+
+		// Create the test Library
+		if flags.libTestData {
+
+			// Inserts 15 books with random text and audio files. All books will have a cover.
+			// Half will have a metadata file.
+
+			fmt.Println()
+			fmt.Println("======= Creating test library =======")
+
+			handleDirs := func(book database.Book) (string, error) {
+				author := "Unknown"
+				if len(book.Authors) > 0 {
+					author = book.Authors[0].Name
+				}
+				series := ""
+				if len(book.Series) > 0 {
+					series = book.Series[0].Name
+				}
+				bookPath := path.Join(author, series, book.Title)
+
+				return bookPath, nil
+			}
+
+			// No metadata
+			for i := range testBooks[:7] {
+
+				bookPath, err := handleDirs(testBooks[i])
+				if err != nil {
+					return nil, err
+				}
+
+				testBooks[i].Files, err = fileManagement.CreateTestDirectory(
+					bookPath,
+					envObj.Get(env.LibraryPath),
+					nil,
+					path.Join(metadataPath, testBooks[i].Id.String()+".jpg"), rand.Intn(10)+1, rand.Intn(10)+1,
+				)
+			}
+
+			// With metadata
+			for i := range testBooks[8:15] {
+
+				bookPath, err := handleDirs(testBooks[i])
+				if err != nil {
+					return nil, err
+				}
+
+				testBooks[i].Files, err = fileManagement.CreateTestDirectory(
+					bookPath,
+					envObj.Get(env.LibraryPath),
+					metadata.BookToMetadata(testBooks[i]),
+					path.Join(metadataPath, testBooks[i].Id.String()+".jpg"), rand.Intn(10)+1, rand.Intn(10)+1,
+				)
+			}
+		}
+
+		// Create test downloads
+		if flags.downTestData {
+			// Count | Has Cover | Has Metadata | Audio Files | Text Files
+			// 	-----------------------------------------------------------
+			// 	  1   |    true   |     false    |      1      |     1
+			// 	  1   |    false  |     false    |      1      |     1
+			// 	  1   |    true   |     false    |      10     |     1
+			// 	  1   |    false  |     false    |      1      |     10
+			// 	  3   |    true   |     true     |      5      |     1
+			// 	  3   |    false  |     true     |      1      |     5
+
+			fmt.Println()
+			fmt.Println("======= Creating test downloads =======")
+
+			testDownloads := []struct {
+				title, cover string
+				md           *fileManagement.MetadataFile
+				audio        int
+				text         int
+			}{
+				{
+					title: testBooks[0].Title, cover: testBooks[0].Id.String() + ".jpg", md: nil, audio: 1, text: 1,
+				}, {
+					title: testBooks[1].Title, cover: "", md: nil, audio: 1, text: 1,
+				}, {
+					title: testBooks[2].Title, cover: testBooks[2].Id.String() + ".jpg", md: nil, audio: 10, text: 1,
+				}, {
+					title: testBooks[3].Title, cover: "", md: nil, audio: 1, text: 10,
+				}, {
+					title: testBooks[4].Title, cover: testBooks[4].Id.String() + ".jpg", md: metadata.BookToMetadata(testBooks[4]), audio: 5, text: 1,
+				}, {
+					title: testBooks[5].Title, cover: testBooks[5].Id.String() + ".jpg", md: metadata.BookToMetadata(testBooks[5]), audio: 5, text: 1,
+				}, {
+					title: testBooks[6].Title, cover: testBooks[6].Id.String() + ".jpg", md: metadata.BookToMetadata(testBooks[6]), audio: 5, text: 1,
+				}, {
+					title: testBooks[7].Title, cover: "", md: metadata.BookToMetadata(testBooks[7]), audio: 1, text: 5,
+				}, {
+					title: testBooks[8].Title, cover: "", md: metadata.BookToMetadata(testBooks[8]), audio: 1, text: 5,
+				}, {
+					title: testBooks[9].Title, cover: "", md: metadata.BookToMetadata(testBooks[9]), audio: 1, text: 5,
+				},
+			}
+
+			for _, d := range testDownloads {
+
+				if d.cover != "" {
+					d.cover = path.Join(metadataPath, d.cover)
+				}
+
+				_, err = fileManagement.CreateTestDirectory(
+					path.Join(d.title),
+					envObj.Get(env.DownloadsPath),
+					d.md,
+					d.cover,
+					d.audio, d.text,
+				)
+				if err != nil {
+					return nil, err
+				}
+			}
+		}
+
+		err = db.HandleTransaction(func(c *database.Client) error {
+
+			for _, book := range testBooks[:15] {
+				err = book.ApplyBookFiles(c)
+				if err != nil {
+					return err
+				}
+			}
+			return nil
+		})
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	// #region Return apiConfig

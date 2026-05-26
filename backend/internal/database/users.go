@@ -175,6 +175,7 @@ func (c *Client) CullRefreshTokens(cutoff time.Time) error {
 	if err != nil {
 		return err
 	}
+	defer rows.Close()
 
 	var id string
 	var expiry time.Time

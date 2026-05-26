@@ -142,9 +142,12 @@ function changeSortValue(overwrite: boolean = false) {
 
 onMounted(() => {
     resetFiltersFromRoute();
-    showAdvanced.value = hasAdvancedSearchTerms();
     availableFields.value = props.metadata ? metadataSearchFields.get(metadataSource.value) : librarySearchFields;
     changeSortValue();
+    if (hasAdvancedSearchTerms()) {
+        showAdvanced.value = true;
+        emit('search', buildSearchTerms());
+    }
 });
 
 watch(() => metadataSource.value, () => {

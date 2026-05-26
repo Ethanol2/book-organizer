@@ -7,6 +7,7 @@ import (
 	"log"
 	"path"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 
@@ -180,11 +181,45 @@ func (c *Client) AddBook(params BookParams) (Book, error) {
 func (c *Client) GetBook(id uuid.UUID) (Book, error) {
 
 	var book Book
-	var tagsStr *string
-	var audioStr *string
-	var textStr *string
+	var tagsStr, audioStr, textStr *string
+	var authors, narrators, series, genres *string
 
-	err := c.handler.QueryRow("SELECT * FROM books WHERE id = ?", id).Scan(
+	query := `
+	SELECT
+		*,
+		(
+			SELECT GROUP_CONCAT(authors.name || x'09' || authors.id, x'0909')
+			FROM authors
+			INNER JOIN books_authors ON books_authors.author_id = authors.id
+			WHERE books_authors.book_id = books.id
+			ORDER BY books_authors.rank ASC
+		) as authors,
+		(
+			SELECT GROUP_CONCAT(narrators.name || x'09' || narrators.id, x'0909')
+			FROM narrators
+			INNER JOIN books_narrators ON books_narrators.narrator_id = narrators.id
+			WHERE books_narrators.book_id = books.id
+			ORDER BY books_narrators.rank ASC
+		) as narrators,
+		(
+			SELECT GROUP_CONCAT(genres.name || x'09' || genres.id, x'0909')
+			FROM genres
+			INNER JOIN books_genres ON books_genres.genre_id = genres.id
+			WHERE books_genres.book_id = books.id
+			ORDER BY books_genres.rank ASC
+		) as genres,
+		(
+			SELECT GROUP_CONCAT(series.name || x'09' || series.id, x'0909')
+			FROM series
+			INNER JOIN books_series ON books_series.series_id = series.id
+			WHERE books_series.book_id = books.id
+			ORDER BY books_series.rank ASC
+		) as series
+	FROM books
+	WHERE id = ?	
+	`
+
+	err := c.handler.QueryRow(query, id).Scan(
 		&book.Id,
 		&book.Title,
 		&book.Subtitle,
@@ -200,6 +235,8 @@ func (c *Client) GetBook(id uuid.UUID) (Book, error) {
 		&book.Files.Cover,
 		&book.CreatedAt,
 		&book.UpdatedAt,
+
+		&authors, &narrators, &genres, &series,
 	)
 	if err != nil {
 		return Book{}, err
@@ -226,10 +263,10 @@ func (c *Client) GetBook(id uuid.UUID) (Book, error) {
 		}
 	}
 
-	err = book.getBookCategories(c)
-	if err != nil {
-		return Book{}, err
-	}
+	book.Authors = append(book.Authors, parseConcateGroupString(authors)...)
+	book.Narrators = append(book.Narrators, parseConcateGroupString(narrators)...)
+	book.Series = append(book.Series, parseConcateGroupString(series)...)
+	book.Genres = append(book.Genres, parseConcateGroupString(genres)...)
 
 	//defer log.Println("Retrieved \"", book.Title, "\" from books")
 
@@ -240,10 +277,50 @@ func (c *Client) GetBooks(filters map[string][]string) (BookSearchResults[[]Book
 
 	books := []Book{}
 
+	joins, filter, order, searchTerms := buildSearchQuery(filters)
 	count, page, pageQuery := buildPageQuery(filters)
-	searchQuery, searchTerms := buildSearchQuery(filters)
 
-	query := "SELECT *, (SELECT COUNT(*) FROM books) AS total_count FROM books " + searchQuery + pageQuery
+	//query := "SELECT *, (SELECT COUNT(*) FROM books) AS total_count FROM books " + joins + filter + order + pageQuery
+	query := fmt.Sprintf(`
+	SELECT
+		books.*,
+		(SELECT COUNT(*) FROM books) AS total_count,
+		(
+			SELECT GROUP_CONCAT(authors.name || x'09' || authors.id, x'0909')
+			FROM authors
+			INNER JOIN books_authors ON books_authors.author_id = authors.id
+			WHERE books_authors.book_id = books.id
+			ORDER BY books_authors.rank ASC
+		) as authors,
+		(
+			SELECT GROUP_CONCAT(narrators.name || x'09' || narrators.id, x'0909')
+			FROM narrators
+			INNER JOIN books_narrators ON books_narrators.narrator_id = narrators.id
+			WHERE books_narrators.book_id = books.id
+			ORDER BY books_narrators.rank ASC
+		) as narrators,
+		(
+			SELECT GROUP_CONCAT(genres.name || x'09' || genres.id, x'0909')
+			FROM genres
+			INNER JOIN books_genres ON books_genres.genre_id = genres.id
+			WHERE books_genres.book_id = books.id
+			ORDER BY books_genres.rank ASC
+		) as genres,
+		(
+			SELECT GROUP_CONCAT(series.name || x'09' || series.id, x'0909')
+			FROM series
+			INNER JOIN books_series ON books_series.series_id = series.id
+			WHERE books_series.book_id = books.id
+			ORDER BY books_series.rank ASC
+		) as series
+	FROM books
+	%s
+	%s
+	GROUP BY books.id
+	%s
+	%s
+	`, joins, filter, order, pageQuery)
+
 	rows, err := c.handler.Query(query, searchTerms...)
 	if err != nil {
 		log.Println("Query:\n", query)
@@ -254,9 +331,8 @@ func (c *Client) GetBooks(filters map[string][]string) (BookSearchResults[[]Book
 	totalCount := 0
 	for rows.Next() {
 		var book Book
-		var tagsStr *string
-		var audioStr *string
-		var textStr *string
+		var tagsStr, audioStr, textStr *string
+		var authors, narrators, series, genres *string
 
 		err := rows.Scan(
 			&book.Id,
@@ -275,6 +351,8 @@ func (c *Client) GetBooks(filters map[string][]string) (BookSearchResults[[]Book
 			&book.CreatedAt,
 			&book.UpdatedAt,
 			&totalCount,
+
+			&authors, &narrators, &genres, &series,
 		)
 		if err != nil {
 			log.Println(err)
@@ -295,11 +373,10 @@ func (c *Client) GetBooks(filters map[string][]string) (BookSearchResults[[]Book
 			}
 		}
 
-		err = book.getBookCategories(c)
-		if err != nil {
-			log.Println(err)
-			continue
-		}
+		book.Authors = append(book.Authors, parseConcateGroupString(authors)...)
+		book.Narrators = append(book.Narrators, parseConcateGroupString(narrators)...)
+		book.Series = append(book.Series, parseConcateGroupString(series)...)
+		book.Genres = append(book.Genres, parseConcateGroupString(genres)...)
 
 		books = append(books, book)
 	}
@@ -315,8 +392,26 @@ func (c *Client) GetBooks(filters map[string][]string) (BookSearchResults[[]Book
 func (c *Client) GetBooksSummary(filters map[string][]string) (BookSearchResults[[]BookOverview], error) {
 
 	countLimit, page, pageQuery := buildPageQuery(filters)
-	searchQuery, searchTerms := buildSearchQuery(filters)
-	query := "SELECT books.id, books.title, books.subtitle, books.cover, books.directory, (SELECT COUNT(*) FROM books) AS total_count  FROM books " + searchQuery + pageQuery
+	joins, filter, order, searchTerms := buildSearchQuery(filters)
+
+	query := fmt.Sprintf(`
+	SELECT 
+		books.id, books.title, books.subtitle, books.cover, books.directory, 
+		(SELECT COUNT(*) FROM books) AS total_count,
+		(
+			SELECT GROUP_CONCAT(authors.name || x'09' || authors.id, x'0909')
+			FROM authors
+			INNER JOIN books_authors ON books_authors.author_id = authors.id
+			WHERE books_authors.book_id = books.id
+			ORDER BY books_authors.rank ASC
+		) as authors
+	FROM books
+	%s
+	%s
+	GROUP BY books.id
+	%s
+	%s
+	`, joins, filter, order, pageQuery)
 
 	rows, err := c.handler.Query(query, searchTerms...)
 	if err != nil {
@@ -330,15 +425,13 @@ func (c *Client) GetBooksSummary(filters map[string][]string) (BookSearchResults
 	for rows.Next() {
 		var book BookOverview
 		var dir *string
-		err = rows.Scan(&book.Id, &book.Title, &book.Subtitle, &book.Cover, &dir, &totalCount)
+		var authorsStr *string
+		err = rows.Scan(&book.Id, &book.Title, &book.Subtitle, &book.Cover, &dir, &totalCount, &authorsStr)
 		if err != nil {
 			return BookSearchResults[[]BookOverview]{}, err
 		}
 
-		book.Authors, err = c.GetCategoryTypesAssociatedWithBook(book.Id.String(), Authors)
-		if err != nil {
-			return BookSearchResults[[]BookOverview]{}, err
-		}
+		book.Authors = append(book.Authors, parseConcateGroupString(authorsStr)...)
 
 		book.HasFiles = dir != nil
 
@@ -645,6 +738,7 @@ func (c *Client) GetAllBooksDirectories() ([]uuid.UUID, []string, error) {
 	if err != nil {
 		return []uuid.UUID{}, []string{}, err
 	}
+	defer rows.Close()
 
 	ids := []uuid.UUID{}
 	dirs := []string{}
@@ -727,31 +821,64 @@ func (c *Client) RemoveAllBooks() error {
 
 // #region Book Methods
 
-func (book *Book) getBookCategories(c *Client) error {
+// func (book *Book) getBookCategories(c *Client) error {
 
-	var err error
+// 	var err error
 
-	book.Authors, err = c.GetCategoryTypesAssociatedWithBook(book.Id.String(), Authors)
-	if err != nil {
-		return err
+// 	book.Authors, err = c.GetCategoryTypesAssociatedWithBook(book.Id.String(), Authors)
+// 	if err != nil {
+// 		return err
+// 	}
+
+// 	book.Genres, err = c.GetCategoryTypesAssociatedWithBook(book.Id.String(), Genres)
+// 	if err != nil {
+// 		return err
+// 	}
+
+// 	book.Series, err = c.GetCategoryTypesAssociatedWithBook(book.Id.String(), Series)
+// 	if err != nil {
+// 		return err
+// 	}
+
+// 	book.Narrators, err = c.GetCategoryTypesAssociatedWithBook(book.Id.String(), Narrators)
+// 	if err != nil {
+// 		return err
+// 	}
+
+// 	return nil
+// }
+
+func parseConcateGroupString(str *string) []Category {
+
+	cats := []Category{}
+	if str == nil {
+		return cats
 	}
 
-	book.Genres, err = c.GetCategoryTypesAssociatedWithBook(book.Id.String(), Genres)
-	if err != nil {
-		return err
+	sep := "\t"
+
+	rows := strings.Split(*str, sep+sep)
+	for _, row := range rows {
+		columns := strings.Split(row, sep)
+
+		var name string
+		var id *int
+
+		if len(columns) > 0 {
+			name = columns[0]
+		}
+		if len(columns) > 1 {
+			val, err := strconv.Atoi(columns[1])
+			if err != nil {
+				log.Println(err)
+			} else {
+				id = &val
+			}
+		}
+		cats = append(cats, Category{Id: id, Name: name})
 	}
 
-	book.Series, err = c.GetCategoryTypesAssociatedWithBook(book.Id.String(), Series)
-	if err != nil {
-		return err
-	}
-
-	book.Narrators, err = c.GetCategoryTypesAssociatedWithBook(book.Id.String(), Narrators)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return cats
 }
 
 // Inserts files into a book directly, bypassing the update or association functions. Don't use this unless you have a good reason. Requires an active db transaction.

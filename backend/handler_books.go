@@ -49,6 +49,8 @@ func (cfg *apiConfig) handlerGetBooks(w http.ResponseWriter, r *http.Request) {
 
 	switch getFullResults {
 	case "full":
+		log.Println("Fetching book details")
+
 		results, err := cfg.db.GetBooks(r.URL.Query())
 		if err != nil {
 			respondWithError(w, http.StatusInternalServerError, DatabaseError, err)
@@ -59,12 +61,12 @@ func (cfg *apiConfig) handlerGetBooks(w http.ResponseWriter, r *http.Request) {
 			results.Items[i].Files.Prepend(cfg.libraryName)
 		}
 
-		log.Println("Fetching book details")
-
 		respondWithJson(w, http.StatusOK, results)
 
 	case "":
 	case "summary":
+		log.Println("Fetching book summaries")
+
 		results, err := cfg.db.GetBooksSummary(r.URL.Query())
 		if err != nil {
 			respondWithError(w, http.StatusInternalServerError, DatabaseError, err)
@@ -78,8 +80,6 @@ func (cfg *apiConfig) handlerGetBooks(w http.ResponseWriter, r *http.Request) {
 				results.Items[i].Cover = &cover
 			}
 		}
-
-		log.Println("Fetching book summaries")
 
 		respondWithJson(w, http.StatusOK, results)
 

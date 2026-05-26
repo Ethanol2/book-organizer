@@ -138,7 +138,7 @@ func HandleTestCover(testPath, metadataPath, imgSource string) error {
 func CreateTestDirectory(dirPath, pathPrefix string, metadata *MetadataFile, coverSourcePath string, fakeAudioCount, fakeTextCount int) (Files, error) {
 
 	log.Println("Creating directory at \"", dirPath, "\"")
-	err := CreateDirectory(path.Join(pathPrefix, dirPath))
+	err := os.MkdirAll(path.Join(pathPrefix, dirPath), 0755)
 	if err != nil {
 		return Files{}, err
 	}
@@ -177,6 +177,7 @@ func CreateTestDirectory(dirPath, pathPrefix string, metadata *MetadataFile, cov
 
 	if fakeAudioCount > 0 {
 
+		log.Println("Writing fake audio files to disk", fakeAudioCount, "times")
 		fileList := []string{}
 
 		// Logic provided by ai
@@ -235,6 +236,7 @@ func CreateTestDirectory(dirPath, pathPrefix string, metadata *MetadataFile, cov
 		}
 
 		files.AudioFiles = &fileList
+		log.Println("Done")
 	}
 
 	if fakeTextCount > 0 {
@@ -310,6 +312,7 @@ func CreateTestDirectory(dirPath, pathPrefix string, metadata *MetadataFile, cov
 		}
 
 		files.TextFiles = &fileList
+		log.Println("Done")
 	}
 
 	return files, nil

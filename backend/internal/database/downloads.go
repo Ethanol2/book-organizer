@@ -167,6 +167,7 @@ func (c *Client) GetDownloads() ([]Download, error) {
 	if err != nil {
 		return []Download{}, err
 	}
+	defer rows.Close()
 
 	var downloads []Download
 

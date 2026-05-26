@@ -35,10 +35,7 @@ func (cfg *apiConfig) handlerGetAuthStatus(w http.ResponseWriter, r *http.Reques
 	var err error
 	count := -1
 
-	err = cfg.db.HandleTransaction(func(c *database.Client) error {
-		count, err = c.CountUsers()
-		return err
-	})
+	count, err = cfg.db.CountUsers()
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, DatabaseError, err)
 		return

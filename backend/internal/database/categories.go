@@ -73,6 +73,7 @@ func (c Client) DeleteCategoryWithID(categoryType CategoryType, id int) error {
 	if err != nil {
 		return err
 	}
+	defer row.Close()
 
 	var value string
 	err = row.Scan(&value)
@@ -111,6 +112,7 @@ func (c Client) GetAllOfCategory(categoryType CategoryType) ([]Category, error) 
 	if err != nil {
 		return []Category{}, err
 	}
+	defer rows.Close()
 
 	categories := []Category{}
 	for rows.Next() {
@@ -198,6 +200,7 @@ func (c Client) GetCategoryTypesAssociatedWithBook(bookId string, categoryType C
 		//fmt.Println(query)
 		return []Category{}, err
 	}
+	defer rows.Close()
 
 	cats := []Category{}
 	for rows.Next() {

@@ -188,7 +188,10 @@ onMounted(async () => {
   <div class="book-details">
     <div class="vue-heading">
       <h2>Book Details</h2>
-      <button class="toggle-button" type="button" @click="openEditModal">Edit Book</button>
+      <div class="button-group">
+        <button class="toggle-button" type="button" @click="openEditModal">Edit Book</button>
+        <button class="toggle-button" type="button" @click="$router.go(-1)">Back</button>
+      </div>
     </div>
 
     <div v-if="loading" class="status-message">Loading book details…</div>
@@ -305,6 +308,11 @@ onMounted(async () => {
   padding: 1.5rem;
   padding-bottom: 10rem;
   overflow-y: auto;
+}
+
+.button-group {
+  display: flex;
+  gap: 0.5rem;
 }
 
 .status-message {

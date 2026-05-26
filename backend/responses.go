@@ -35,13 +35,12 @@ func respondWithError(w http.ResponseWriter, code int, msg string, err error) {
 
 		details := ""
 		if _, file, line, ok := runtime.Caller(1); ok {
-			details = fmt.Sprintf("\n\nCalled from %s:%d\n", file, line)
+			details = fmt.Sprintf("\nCalled from %s:%d\n", file, line)
 		}
 		slog.Error(err.Error() + details)
-		fmt.Println()
 	}
 	if code > 499 {
-		slog.Error("Responding with 5XX error: %s\n" + msg)
+		slog.Error("Responding with 5XX error:\n" + msg)
 	}
 	type errorResponse struct {
 		Error string `json:"error"`

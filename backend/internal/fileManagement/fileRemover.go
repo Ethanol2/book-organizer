@@ -24,3 +24,8 @@ func RemoveDirectoryContents(dirPath string) error {
 
 	return nil
 }
+
+func DeleteFiles(path string) error {
+	err := os.RemoveAll(path)
+	return err
+}

@@ -5,12 +5,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"os"
 	"path"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/Ethanol2/book-organizer/internal/fileManagement"
+	_ "github.com/ncruces/go-sqlite3/driver"
 )
 
 type Handler interface {
@@ -26,30 +27,37 @@ type Client struct {
 
 func NewClient(dbPath string) (Client, error) {
 
-	// Add _journal_mode=WAL and _busy_timeout=5000
-	dsn := dbPath + "?_foreign_keys=on&_journal_mode=WAL&_busy_timeout=5000"
+	// Add _journal_mode=WAL, _busy_timeout=5000 and foreign_keys=on
+	dsn := "file:" + dbPath + "?_txlock=immediate&_pragma=foreign_keys(on)&_pragma=journal_mode(WAL)&_pragma=busy_timeout(5000)"
 	db, err := sql.Open("sqlite3", dsn)
-
-	db.SetMaxOpenConns(10)           // Allow multiple concurrent reads
-	db.SetMaxIdleConns(10)           // Keep connections warm for speed
-	db.SetConnMaxLifetime(time.Hour) // Standard cleanup
-
 	if err != nil {
 		return Client{}, err
 	}
+
+	db.SetMaxOpenConns(1)
+	db.SetMaxIdleConns(1)
+	db.SetConnMaxLifetime(0)
+
+	err = db.Ping()
+	if err != nil {
+		return Client{}, err
+	}
+
 	c := Client{db: db, handler: db}
 	err = c.handleMigration()
 	if err != nil {
 		return Client{}, err
 	}
+
 	return c, nil
 }
 
 func (c *Client) handleMigration() error {
 
-	// Authentication
+	return c.HandleTransaction(func(c *Client) error {
+		// Authentication
 
-	usersTable := `
+		usersTable := `
 	CREATE TABLE IF NOT EXISTS users (
 		id TEXT PRIMARY KEY,
 		username TEXT UNIQUE NOT NULL,
@@ -58,12 +66,12 @@ func (c *Client) handleMigration() error {
 		updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 	);
 	`
-	_, err := c.db.Exec(usersTable)
-	if err != nil {
-		return err
-	}
+		_, err := c.handler.Exec(usersTable)
+		if err != nil {
+			return err
+		}
 
-	refreshTokensTable := `
+		refreshTokensTable := `
 	CREATE TABLE IF NOT EXISTS refresh_tokens (
 		token TEXT PRIMARY KEY,
 		created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -74,14 +82,14 @@ func (c *Client) handleMigration() error {
 		FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 	);
 	`
-	_, err = c.db.Exec(refreshTokensTable)
-	if err != nil {
-		return err
-	}
+		_, err = c.handler.Exec(refreshTokensTable)
+		if err != nil {
+			return err
+		}
 
-	// Library
+		// Library
 
-	downloadsTable := `
+		downloadsTable := `
 	CREATE TABLE IF NOT EXISTS downloads (
 		id TEXT PRIMARY KEY,
 		dir_name TEXT NOT NULL,
@@ -92,12 +100,12 @@ func (c *Client) handleMigration() error {
 		created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 	);	
 	`
-	_, err = c.db.Exec(downloadsTable)
-	if err != nil {
-		return err
-	}
+		_, err = c.handler.Exec(downloadsTable)
+		if err != nil {
+			return err
+		}
 
-	booksTable := `
+		booksTable := `
 	CREATE TABLE IF NOT EXISTS books (
 		id TEXT PRIMARY KEY,
 		title TEXT NOT NULL,
@@ -116,59 +124,59 @@ func (c *Client) handleMigration() error {
 		updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 	);
 	`
-	_, err = c.db.Exec(booksTable)
-	if err != nil {
-		return err
-	}
+		_, err = c.handler.Exec(booksTable)
+		if err != nil {
+			return err
+		}
 
-	authorsTable := `
+		authorsTable := `
 	CREATE TABLE IF NOT EXISTS authors (
 		id INTEGER PRIMARY KEY AUTOINCREMENT,
 		name TEXT UNIQUE NOT NULL	
 	);	
 	`
-	_, err = c.db.Exec(authorsTable)
-	if err != nil {
-		return err
-	}
+		_, err = c.handler.Exec(authorsTable)
+		if err != nil {
+			return err
+		}
 
-	narratorsTable := `
+		narratorsTable := `
 	CREATE TABLE IF NOT EXISTS narrators (
 		id INTEGER PRIMARY KEY AUTOINCREMENT,
 		name TEXT UNIQUE NOT NULL
 	);
 	`
-	_, err = c.db.Exec(narratorsTable)
-	if err != nil {
-		return err
-	}
+		_, err = c.handler.Exec(narratorsTable)
+		if err != nil {
+			return err
+		}
 
-	seriesTable := `
+		seriesTable := `
 	CREATE TABLE IF NOT EXISTS series (
 		id INTEGER PRIMARY KEY AUTOINCREMENT,
 		name TEXT UNIQUE NOT NULL
 	);
 	`
-	_, err = c.db.Exec(seriesTable)
-	if err != nil {
-		return err
-	}
+		_, err = c.handler.Exec(seriesTable)
+		if err != nil {
+			return err
+		}
 
-	genresTable := `
+		genresTable := `
 	CREATE TABLE IF NOT EXISTS genres (
 		id INTEGER PRIMARY KEY AUTOINCREMENT,
 		name TEXT UNIQUE NOT NULL
 	);
 	`
-	_, err = c.db.Exec(genresTable)
-	if err != nil {
-		return err
-	}
+		_, err = c.handler.Exec(genresTable)
+		if err != nil {
+			return err
+		}
 
-	// Joining Tables
+		// Joining Tables
 
-	booksSeriestable :=
-		`
+		booksSeriestable :=
+			`
 		CREATE TABLE IF NOT EXISTS books_series (
 			book_id TEXT NOT NULL,
 			series_id TEXT NOT NULL,
@@ -179,27 +187,28 @@ func (c *Client) handleMigration() error {
 			FOREIGN KEY (series_id) REFERENCES series(id) ON DELETE CASCADE
 		);
 		`
-	_, err = c.db.Exec(booksSeriestable)
-	if err != nil {
-		return err
-	}
+		_, err = c.handler.Exec(booksSeriestable)
+		if err != nil {
+			return err
+		}
 
-	err = c.generateJoiningTable("book", "books", categorySingular[Authors], string(Authors))
-	if err != nil {
-		return err
-	}
+		err = c.generateJoiningTable("book", "books", categorySingular[Authors], string(Authors))
+		if err != nil {
+			return err
+		}
 
-	err = c.generateJoiningTable("book", "books", categorySingular[Narrators], string(Narrators))
-	if err != nil {
-		return err
-	}
+		err = c.generateJoiningTable("book", "books", categorySingular[Narrators], string(Narrators))
+		if err != nil {
+			return err
+		}
 
-	err = c.generateJoiningTable("book", "books", categorySingular[Genres], string(Genres))
-	if err != nil {
-		return err
-	}
+		err = c.generateJoiningTable("book", "books", categorySingular[Genres], string(Genres))
+		if err != nil {
+			return err
+		}
 
-	return nil
+		return nil
+	})
 }
 
 func (c *Client) generateJoiningTable(type1, type1Table, type2, type2Table string) error {
@@ -216,7 +225,7 @@ func (c *Client) generateJoiningTable(type1, type1Table, type2, type2Table strin
 		`,
 		type1Table, type2Table, type1, type2, type1, type2, type1, type1Table, type2, type2Table,
 	)
-	_, err := c.db.Exec(table)
+	_, err := c.handler.Exec(table)
 	return err
 }
 
@@ -232,7 +241,7 @@ func (c *Client) InsertTestData(metadataPath, coversPath string) ([]Book, error)
 		return []Book{}, err
 	}
 
-	err = fileManagement.CreateDirectory(coversPath)
+	err = os.MkdirAll(coversPath, 0755)
 	if err != nil {
 		fmt.Println("Error while creating the test covers directory \"", coversPath, "\"")
 		return []Book{}, err
@@ -268,7 +277,7 @@ func (c *Client) InsertTestData(metadataPath, coversPath string) ([]Book, error)
 
 func (c *Client) HandleTransaction(transaction func(c *Client) error) error {
 
-	if c.db == nil {
+	if c.handler == nil {
 		return fmt.Errorf("can't handle a transaction without a db. Is there already an active transaction?")
 	}
 
@@ -299,7 +308,7 @@ func (c *Client) Close() {
 	}
 }
 
-func buildSearchQuery(filters map[string][]string) (string, []any) {
+func buildSearchQuery(filters map[string][]string) (string, string, string, []any) {
 	var advSearchFields = [...]string{"authors", "narrators", "genres", "series", "publisher", "publish_year", "isbn", "asin", "tags"}
 	joinList := map[CategoryType]bool{
 		Authors:   false,
@@ -363,30 +372,34 @@ func buildSearchQuery(filters map[string][]string) (string, []any) {
 		filter = "WHERE " + filter
 	}
 
+	sortType := filters["sortBy"]
+
+	if len(sortType) == 0 {
+		sortType = append(sortType, "title")
+	}
+
 	sort := ""
-	if sortType, ok := filters["sortBy"]; ok {
-		order := ""
-		if o, ok := filters["sortOrder"]; ok {
-			switch o[0] {
-			case "asc":
-				order = "ASC"
-			case "desc":
-				order = "DESC"
-			}
+	order := ""
+	if o, ok := filters["sortOrder"]; ok {
+		switch o[0] {
+		case "asc":
+			order = "ASC"
+		case "desc":
+			order = "DESC"
 		}
+	}
 
-		switch sortType[0] {
-		case "title", "publisher", "created_at", "publish_year":
-			sort = " ORDER BY " + sortType[0] + " " + order
+	switch sortType[0] {
+	case "title", "publisher", "created_at", "publish_year":
+		sort = " ORDER BY " + sortType[0] + " " + order
 
-		default:
-			cat := stringToCategoryType(sortType[0])
-			joinList[cat] = true
-			sort = " ORDER BY " + string(cat) + ".name " + order
+	default:
+		cat := stringToCategoryType(sortType[0])
+		joinList[cat] = true
+		sort = " ORDER BY " + string(cat) + ".name " + order
 
-			if cat == Series {
-				sort += ", books_series.series_index " + order
-			}
+		if cat == Series {
+			sort += ", books_series.series_index " + order
 		}
 	}
 
@@ -408,7 +421,7 @@ func buildSearchQuery(filters map[string][]string) (string, []any) {
 
 	//fmt.Println(join + filter + strings.Join(advFilter, " AND ") + sort)
 
-	return join + filter + strings.Join(advFilter, " AND ") + sort, searchTerms
+	return join, filter + strings.Join(advFilter, " AND "), sort, searchTerms
 }
 func buildPageQuery(filters map[string][]string) (int, int, string) {
 
