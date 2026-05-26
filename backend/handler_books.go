@@ -103,7 +103,7 @@ func (cfg *apiConfig) handlerPostBook(w http.ResponseWriter, r *http.Request) {
 
 	var coverFile *os.File
 	if params.Cover != nil {
-		if !strings.Contains(*params.Cover, cfg.downloadsName) && !strings.Contains(*params.Cover, cfg.libraryName) {
+		if !strings.HasPrefix(*params.Cover, cfg.downloadsName) && !strings.HasPrefix(*params.Cover, cfg.libraryName) {
 
 			coverFile, err = fileManagement.DownloadTempFile(*params.Cover)
 			if err != nil {

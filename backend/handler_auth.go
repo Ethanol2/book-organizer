@@ -72,11 +72,6 @@ func (cfg *apiConfig) handlerRegister(w http.ResponseWriter, r *http.Request) {
 			respondWithError(w, http.StatusUnauthorized, AuthBadAuthorization, err)
 			return
 		}
-	} else {
-		log.Println("THE FIRST USER HAS BEEN REGISTERED. AUTHENTICATION NOW REQUIRED")
-		log.Println(`If this was not intentional or wasn't caused by you, restart the backend using -u flag. 
-		This will clear all users and remove the need for authentication. Consider using anthentication to 
-		protect your information.`)
 	}
 
 	var params database.UserParams
@@ -101,7 +96,7 @@ func (cfg *apiConfig) handlerRegister(w http.ResponseWriter, r *http.Request) {
 
 	var user database.User
 	err = cfg.db.HandleTransaction(func(c *database.Client) error {
-		user, _, err = cfg.db.AddUser(params)
+		user, _, err = c.AddUser(params)
 		return err
 	})
 	if err != nil {
@@ -112,6 +107,13 @@ func (cfg *apiConfig) handlerRegister(w http.ResponseWriter, r *http.Request) {
 	respondWithJson(w, http.StatusOK, user)
 
 	log.Printf("New user \"%s\" created\n", params.Username)
+
+	if count == 0 {
+		log.Println("THE FIRST USER HAS BEEN REGISTERED. AUTHENTICATION IS NOW REQUIRED")
+		log.Println(`If this was not intentional or wasn't caused by you, restart the backend using -u flag. 
+		This will clear all users and remove the need for authentication. Consider using anthentication to 
+		protect your information.`)
+	}
 }
 
 func (cfg *apiConfig) handlerLogin(w http.ResponseWriter, r *http.Request) {

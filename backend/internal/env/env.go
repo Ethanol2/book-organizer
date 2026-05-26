@@ -20,7 +20,6 @@ const (
 
 	// Hidden
 	DataPath      = "DATA_PATH"
-	FrontendPath  = "FRONTEND_PATH"
 	DownloadsPath = "DOWNLOADS_PATH"
 	LibraryPath   = "LIBRARY_PATH"
 	TokenSecret   = "TOKEN_SECRET"
@@ -96,12 +95,6 @@ func GetEnv() (Env, error) {
 		needsUpdate = true
 	} else {
 		dataPath = path
-	}
-
-	if fPath, ok := values[FrontendPath]; !ok || fPath == "" {
-		fmt.Println("No frontend path defined in the .env. Setting value to \"./static/\"")
-		values[FrontendPath] = "./static/"
-		needsUpdate = true
 	}
 
 	if dPath, ok := values[DownloadsPath]; !ok || dPath == "" {

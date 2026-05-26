@@ -8,7 +8,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
-	"path"
+	"path/filepath"
 	"strings"
 	"syscall"
 	"time"
@@ -79,12 +79,14 @@ func main() {
 	log.Println("Environment variables and database loaded successfully")
 
 	mux := http.NewServeMux()
-	fHandler := http.FileServer(http.Dir("./static/"))
-	mux.Handle("/", fHandler)
 
 	// Create the channel that handles the shutdown signal
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
+
+	// General Handlers
+	mux.HandleFunc("/", handlerFrontend)
+	mux.HandleFunc("/health-check", cfg.handlerHealthCheckfunc)
 
 	// Auth Endpoints
 	mux.HandleFunc("GET /api/auth/status", cfg.handlerGetAuthStatus)
@@ -267,9 +269,9 @@ func createConfig(flags cliFlags) (*apiConfig, error) {
 	}
 
 	dataPath := envObj.Get(env.DataPath)
-	metadataPath := path.Join(dataPath, "metadata")
-	logsPath := path.Join(dataPath, "logs")
-	dbPath := path.Join(dataPath, "appData.db")
+	metadataPath := filepath.Join(dataPath, "metadata")
+	logsPath := filepath.Join(dataPath, "logs")
+	dbPath := filepath.Join(dataPath, "appData.db")
 
 	if err = os.MkdirAll(dataPath, 0755); err != nil {
 		fmt.Println("Error creating data folder")
@@ -304,7 +306,7 @@ func createConfig(flags cliFlags) (*apiConfig, error) {
 					if file.IsDir() {
 						continue
 					}
-					err = os.Remove(path.Join(metadataPath, file.Name()))
+					err = os.Remove(filepath.Join(metadataPath, file.Name()))
 					if err != nil {
 						fmt.Println("Error while trying to delete the file \"", file.Name(), "\" => ", err)
 					}
@@ -413,7 +415,7 @@ func createConfig(flags cliFlags) (*apiConfig, error) {
 	// Handle test data
 	if flags.dbTestData {
 
-		testdataPath := path.Join(dataPath, "test-data")
+		testdataPath := filepath.Join(dataPath, "test-data")
 		if err = os.MkdirAll(testdataPath, 0755); err != nil {
 			fmt.Println("Error creating test data folder")
 			return nil, err
@@ -447,7 +449,7 @@ func createConfig(flags cliFlags) (*apiConfig, error) {
 				if len(book.Series) > 0 {
 					series = book.Series[0].Name
 				}
-				bookPath := path.Join(author, series, book.Title)
+				bookPath := filepath.Join(author, series, book.Title)
 
 				return bookPath, nil
 			}
@@ -464,7 +466,7 @@ func createConfig(flags cliFlags) (*apiConfig, error) {
 					bookPath,
 					envObj.Get(env.LibraryPath),
 					nil,
-					path.Join(metadataPath, testBooks[i].Id.String()+".jpg"), rand.Intn(10)+1, rand.Intn(10)+1,
+					filepath.Join(metadataPath, testBooks[i].Id.String()+".jpg"), rand.Intn(10)+1, rand.Intn(10)+1,
 				)
 			}
 
@@ -480,7 +482,7 @@ func createConfig(flags cliFlags) (*apiConfig, error) {
 					bookPath,
 					envObj.Get(env.LibraryPath),
 					metadata.BookToMetadata(testBooks[i]),
-					path.Join(metadataPath, testBooks[i].Id.String()+".jpg"), rand.Intn(10)+1, rand.Intn(10)+1,
+					filepath.Join(metadataPath, testBooks[i].Id.String()+".jpg"), rand.Intn(10)+1, rand.Intn(10)+1,
 				)
 			}
 		}
@@ -531,11 +533,11 @@ func createConfig(flags cliFlags) (*apiConfig, error) {
 			for _, d := range testDownloads {
 
 				if d.cover != "" {
-					d.cover = path.Join(metadataPath, d.cover)
+					d.cover = filepath.Join(metadataPath, d.cover)
 				}
 
 				_, err = fileManagement.CreateTestDirectory(
-					path.Join(d.title),
+					filepath.Join(d.title),
 					envObj.Get(env.DownloadsPath),
 					d.md,
 					d.cover,
@@ -621,6 +623,40 @@ func authenticate(required bool, r *http.Request, secret string) (uuid.UUID, err
 		return uuid.Nil, err
 	}
 	return id, nil
+}
+
+func handlerFrontend(w http.ResponseWriter, r *http.Request) {
+
+	fHandler := http.FileServer(http.Dir("./static/"))
+	fullPath := filepath.Join("./static", filepath.Clean(r.URL.Path))
+
+	// Check if the requested file exists
+	info, err := os.Stat(fullPath)
+
+	// If the asset exists on disk and is a file, serve it directly (CSS, JS, PNGs)
+	if err == nil && !info.IsDir() {
+		fHandler.ServeHTTP(w, r)
+		return
+	}
+
+	// SPA FALLBACK: The file doesn't exist, meaning it's a Vue client path (e.g., /login).
+	// Serve index.html and let Vue Router handle the user destination.
+	http.ServeFile(w, r, "./static/index.html")
+}
+
+func (cfg *apiConfig) handlerHealthCheckfunc(w http.ResponseWriter, r *http.Request) {
+
+	ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
+	defer cancel()
+
+	err := cfg.db.PingContext(ctx)
+	if err != nil {
+		respondWithError(w, http.StatusServiceUnavailable, "UNHEALTHY: Database connection failed", nil)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte("OK"))
 }
 
 // #region Middleware

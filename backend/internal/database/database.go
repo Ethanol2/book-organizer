@@ -1,6 +1,7 @@
 package database
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"fmt"
@@ -50,6 +51,10 @@ func NewClient(dbPath string) (Client, error) {
 	}
 
 	return c, nil
+}
+
+func (c *Client) PingContext(ctx context.Context) error {
+	return c.db.PingContext(ctx)
 }
 
 func (c *Client) handleMigration() error {
@@ -423,6 +428,7 @@ func buildSearchQuery(filters map[string][]string) (string, string, string, []an
 
 	return join, filter + strings.Join(advFilter, " AND "), sort, searchTerms
 }
+
 func buildPageQuery(filters map[string][]string) (int, int, string) {
 
 	countStr, hasCount := filters["count"]

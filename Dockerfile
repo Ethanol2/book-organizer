@@ -36,7 +36,7 @@ RUN CGO_ENABLED=0 GOOS=linux go build -o ./book-organizer-server .
 
 # Build the runtine container
 # Not using :latest to avoid unexpected behaviour from new updates
-FROM alpine:3.19
+FROM alpine:3.21.7
 
 # Security best practice: Creates a non-root system user
 RUN addgroup -S appgroup && adduser -S appuser -G appgroup

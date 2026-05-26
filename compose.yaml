@@ -1,6 +1,7 @@
 services:
   app:
     build: .
+    image: ethanasc/book-organizer:latest
     container_name: book-organizer
     restart: unless-stopped
     ports:
@@ -16,3 +17,11 @@ services:
       - ${DATA_PATH}:/data
       - ${LIBRARY_PATH}:/library
       - ${DOWNLOADS_PATH}:/downloads
+
+    healthcheck:
+      # Alpine containers include 'wget' by default. This calls your Go backend.
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:${PORT}/health-check"]
+      interval: 30s    # How often to run the check
+      timeout: 5s      # How long to wait for a response before failing
+      retries: 3       # Number of consecutive failures before marking 'unhealthy'
+      start_period: 5s # Give the container 5 seconds to run migrations before checking
