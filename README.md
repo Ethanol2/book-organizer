@@ -12,20 +12,23 @@ I wanted to make this app because I have a big audiobook library and I wanted a 
 
 ## Quick Start
 
-At the moment I haven't moved to get the project onto docker.
+The app is now available for Docker-based deployment.
 
-Clone or download the repo to your local machine. I'm not sure if it works using github codespaces, but let me know if you try it and it does.
+Clone or download the repo to your local machine. This project includes both a `Dockerfile` and `compose.yaml` for containerized startup.
 
 - Backend
   - Setup your `.env` file. Use the `.env (example)` as a base.
       - `DB_PATH`: The app will create the file automatically at the set location
-      - `FRONTEND_PATH`: Leave default. Not currently used
       - `DOWNLOADS_PATH`: The app will search this directory for new downloads.
       - `LIBRARY_PATH`: Directory where books are moved once they're associated with a download.
-      - `PORT`: Leave defaulf if unsure. The frontend is setup to use this port during development. 
-      - `GOOGLE_BOOKS_API_KEY`: Fill if you want google books metadata fetching. This involves figuring out google's api keys with your own google account.
+      - `PORT`: Leave default if unsure. The frontend is setup to use this port during development.
+      - `GOOGLE_BOOKS_API_KEY`: Fill if you want Google Books metadata fetching. This involves figuring out Google API keys with your own account.
 
     The directories must exist
+
+  - Authentication
+    - The backend supports optional authentication.
+    - When the first user is registered, API access is protected and authenticated requests use JWT cookies.
 
 - Frontend
   - Install npm
@@ -57,6 +60,13 @@ Clone or download the repo to your local machine. I'm not sure if it works using
     ```
     The frontend will be available at the local development server (typically `http://localhost:5173`)
 
+- **Run with Docker:**
+  - Build and start the app via compose:
+    ```bash
+    docker compose up --build
+    ```
+  - The backend will run on the configured `PORT` and the container mounts defined in `compose.yaml` will wire your `downloads`, `library`, and `data` folders into the app.
+
 ### Frontend Development
 
 Build and production:
@@ -70,14 +80,14 @@ npm run lint       # Lint and format code
 
 ## Contributing
 
-If you'd like to contribute, please fork the repository and open a pull request to the `main` branch.
+If you'd like to contribute, please fork the repository at `https://github.com/Ethanol2/book-organizer` and open a pull request to the `main` branch.
  
 ## Technologies
 
 - **Language**: Go (backend)
 - **Frontend**: Vue 3 with TypeScript, Vite bundler, Pinia state management
 - **Database**: SQLite
-- **Runtime**: Docker *(planned)*
+- **Runtime**: Docker
 
 ### Frontend Stack
 - Vue 3 (Composition API)
@@ -138,6 +148,59 @@ After the core library flow is working, the app will integrate with qBittorrent 
 ## API Reference ✅
 
 Below are the current HTTP endpoints and the JSON structures they expect and return.
+
+---
+
+### Authentication 🔐
+
+- **POST /api/auth/register**
+  - **Description:** Create the first user or add a new user when already authenticated
+  - **Request JSON:**
+    ```json
+    {
+      "username": "<string>",
+      "password": "<string>"
+    }
+    ```
+  - **Response:** 200 OK — created `User` object
+
+- **POST /api/auth/login**
+  - **Description:** Authenticate and receive session cookies for protected API access
+  - **Request JSON:**
+    ```json
+    {
+      "username": "<string>",
+      "password": "<string>"
+    }
+    ```
+  - **Response:** 200 OK — authenticated `User` object
+
+- **POST /api/auth/logout**
+  - **Description:** Invalidate session cookies and log out the current user
+  - **Response:** 200 OK — no content
+
+- **POST /api/auth/refresh**
+  - **Description:** Refresh session tokens using the refresh cookie
+  - **Response:** 204 No Content
+
+- **GET /api/auth/status**
+  - **Description:** Check whether authentication is enabled and get the current user if authenticated
+  - **Response:** 200 OK — object containing `user` and `user_count`
+
+- **DELETE /api/auth/users/{id}**
+  - **Description:** Delete a user account by UUID
+  - **Response:** 200 OK — confirmation or deleted user info
+
+- **PUT /api/auth/users/{id}/reset-password**
+  - **Description:** Update a user's password by UUID
+  - **Request JSON:**
+    ```json
+    {
+      "old_password": "<string>",
+      "new_password": "<string>"
+    }
+    ```
+  - **Response:** 200 OK — no content
 
 ---
 
@@ -305,6 +368,16 @@ These are served directly from the configured folders:
   curl -X POST http://localhost:8080/api/downloads/<DOWNLOAD_ID>/associate \
     -H "Content-Type: application/json" \
     -d '{"book_id":"<BOOK_ID>"}' | jq .
+  ```
+
+### Authentication
+
+- Login and begin a protected session:
+  ```bash
+  curl -X POST http://localhost:8080/api/auth/login \
+    -H "Content-Type: application/json" \
+    -d '{"username":"<username>","password":"<password>"}' \
+    -c cookies.txt | jq .
   ```
 
 ### Books

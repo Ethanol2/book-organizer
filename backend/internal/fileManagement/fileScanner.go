@@ -15,9 +15,10 @@ import (
 )
 
 type Scanner struct {
-	Frequency time.Duration
-	Directory string
-	running   bool
+	Frequency    time.Duration
+	Directory    string
+	IncludeEmpty bool
+	running      bool
 
 	AddHandler    func([]Files) error
 	DeleteHandler func(uuid.UUID) error
@@ -113,7 +114,7 @@ func (scan *Scanner) ScanNew(toIgnore []string) error {
 			continue
 		}
 
-		if !files.HasNoFiles() {
+		if !files.HasNoFiles() || scan.IncludeEmpty {
 			filesList = append(filesList, files)
 		}
 	}
@@ -147,7 +148,7 @@ func (scan *Scanner) ScanExisting(ids []uuid.UUID, dirs []string) error {
 			continue
 		}
 
-		if newFiles.HasNoFiles() {
+		if newFiles.HasNoFiles() && !scan.IncludeEmpty {
 			err = scan.DeleteHandler(ids[i])
 			if err != nil {
 				log.Println(err)

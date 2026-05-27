@@ -38,8 +38,7 @@ RUN CGO_ENABLED=0 GOOS=linux go build -o ./book-organizer-server .
 # Not using :latest to avoid unexpected behaviour from new updates
 FROM alpine:3.21.7
 
-# Security best practice: Creates a non-root system user
-RUN addgroup -S appgroup && adduser -S appuser -G appgroup
+RUN apk add --no-cache wget
 
 # Sets the /app folder as the working directory
 WORKDIR /app
@@ -52,10 +51,6 @@ COPY --from=frontend-builder /frontend/dist ./static
 
 # Ensure the app user owns the binary and folders
 RUN mkdir ./data
-RUN chown -R appuser:appgroup /app
-
-# Switch to the non-root user
-USER appuser
 
 # Expose the port and run the server
 EXPOSE 8080

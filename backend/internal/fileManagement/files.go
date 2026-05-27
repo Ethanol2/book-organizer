@@ -19,28 +19,19 @@ type Files struct {
 
 // Matches AudioBookshelf's metadata format
 type MetadataFile struct {
-	Tags     []string `json:"tags"`
-	Chapters []struct {
-		ID    int     `json:"id"`
-		Start int     `json:"start"`
-		End   float64 `json:"end"`
-		Title string  `json:"title"`
-	} `json:"chapters,omitempty"`
 	Title         string   `json:"title"`
 	Subtitle      *string  `json:"subtitle,omitempty"`
 	Authors       []string `json:"authors"`
 	Narrators     []string `json:"narrators"`
 	Series        []string `json:"series"`
 	Genres        []string `json:"genres"`
+	Tags          []string `json:"tags"`
 	PublishedYear string   `json:"publishedYear"`
-	PublishedDate *string  `json:"publishedDate"`
 	Publisher     string   `json:"publisher"`
 	Description   string   `json:"description"`
 	Isbn          string   `json:"isbn"`
 	Asin          string   `json:"asin"`
 	Language      string   `json:"language"`
-	Explicit      bool     `json:"explicit,omitempty"`
-	Abridged      bool     `json:"abridged,omitempty"`
 }
 
 func (files Files) FileListsToJson() (*string, *string, error) {

@@ -211,16 +211,6 @@ function closeModal() {
   }
 }
 
-/* Search metadata display */
-.search-meta {
-  margin-bottom: 0.8rem;
-  font-size: 0.9rem;
-  color: var(--color-text);
-  display: flex;
-  gap: 1rem;
-  padding-top: 1rem;
-}
-
 /* Error message styling */
 .error {
   color: var(--color-error);

@@ -15,7 +15,7 @@ const searchTerms = ref<SearchTerms>(NewSearchTerms());
 // Pagination state
 const currentPage = ref(1);
 const itemsPerPage = ref(20);
-const totalResults = ref(0);
+const totalResults = ref(-1);
 const isLoading = ref(false);
 const hasLoadedAll = ref(false);
 const sentinel = ref<HTMLElement | null>(null);
@@ -185,6 +185,11 @@ onBeforeUnmount(() => {
         <SearchControls placeholder="Search title, subtitle, or description" :search-on-load="true" :metadata="false"
             @search="searchBooksWithNewSearch($event)" @reset="searchBooksWithNewSearch(NewSearchTerms())">
         </SearchControls>
+
+        <div class="search-meta">
+            <span v-if="totalResults > -1">Results: {{ totalResults }}</span>
+            <span v-if="isLoading">Loading ...</span>
+        </div>
 
         <div class="library">
             <BookItem v-for="book in books" :key="book.id" :book="book"></BookItem>

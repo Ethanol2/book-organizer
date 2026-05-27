@@ -383,6 +383,8 @@ func (cfg *apiConfig) handlerGetScanLibrary(w http.ResponseWriter, r *http.Reque
 				AddHandler:    addHandler,
 				UpdateHandler: updateHandler(relativePath),
 				DeleteHandler: deleteHandler,
+
+				IncludeEmpty: true,
 			}
 
 			// Scan new folders. Use the known folders as the ignore list
@@ -444,6 +446,10 @@ func (cfg *apiConfig) handlerGetScanLibrary(w http.ResponseWriter, r *http.Reque
 					}
 
 					libraryParams[metadata.MetadataToBookParams(*md)] = item
+					continue
+				}
+
+				if len(pathComponents) == 0 {
 					continue
 				}
 

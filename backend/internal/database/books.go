@@ -284,7 +284,7 @@ func (c *Client) GetBooks(filters map[string][]string) (BookSearchResults[[]Book
 	query := fmt.Sprintf(`
 	SELECT
 		books.*,
-		(SELECT COUNT(*) FROM books) AS total_count,
+		COUNT(*) OVER() AS total_count,
 		(
 			SELECT GROUP_CONCAT(authors.name || x'09' || authors.id, x'0909')
 			FROM authors
@@ -397,7 +397,7 @@ func (c *Client) GetBooksSummary(filters map[string][]string) (BookSearchResults
 	query := fmt.Sprintf(`
 	SELECT 
 		books.id, books.title, books.subtitle, books.cover, books.directory, 
-		(SELECT COUNT(*) FROM books) AS total_count,
+		COUNT(*) OVER() AS total_count,
 		(
 			SELECT GROUP_CONCAT(authors.name || x'09' || authors.id, x'0909')
 			FROM authors

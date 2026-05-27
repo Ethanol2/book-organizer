@@ -198,6 +198,16 @@
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
 }
 
+/* Search metadata display */
+.search-meta {
+  margin-bottom: 0.8rem;
+  font-size: 0.9rem;
+  color: var(--color-text);
+  display: flex;
+  gap: 1rem;
+  padding-top: 1rem;
+}
+
 @media (max-width: 900px) {
   .search-row {
     grid-template-columns: 1fr;
