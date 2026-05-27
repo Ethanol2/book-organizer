@@ -49,7 +49,7 @@ func GetEnv() (Env, error) {
 		fmt.Println("Loaded master .env file successfully")
 	}
 
-	envPath := "./data/.env"
+	envPath := "/data/.env"
 
 	err := os.MkdirAll(path.Dir(envPath), 0755)
 	if err != nil {
@@ -62,9 +62,9 @@ func GetEnv() (Env, error) {
 			initialValues := map[string]string{
 				Port:          getVarWithFallback(Port, "8080"),
 				TokenSecret:   getVarWithFallback(TokenSecret, ""),
-				DataPath:      getVarWithFallback(DataPath, "./data"),
-				DownloadsPath: getVarWithFallback(DownloadsPath, "./downloads"),
-				LibraryPath:   getVarWithFallback(LibraryPath, "./library"),
+				DataPath:      getVarWithFallback(DataPath, "/data"),
+				DownloadsPath: getVarWithFallback(DownloadsPath, "/downloads"),
+				LibraryPath:   getVarWithFallback(LibraryPath, "/library"),
 				GoogleApiKey:  getVarWithFallback(GoogleApiKey, ""),
 			}
 
@@ -87,55 +87,61 @@ func GetEnv() (Env, error) {
 
 	needsUpdate := false
 
-	dataPath := ""
+	// Data Path (logs, metadata, testdata, database)
 	if path, ok := values[DataPath]; !ok || path == "" {
-		fmt.Println("No data path defined in the .env. Setting value to \"./data/\"")
-		dataPath = "./data/"
-		values[DataPath] = dataPath
-		needsUpdate = true
-	} else {
-		dataPath = path
-	}
-
-	if dPath, ok := values[DownloadsPath]; !ok || dPath == "" {
-		fmt.Println("No downloads path defined in the .env. Setting value to \"./downloads/\"")
-		values[DownloadsPath] = "./downloads/"
+		values[DataPath] = "/data/"
 		needsUpdate = true
 	}
 
-	if lPath, ok := values[LibraryPath]; !ok || lPath == "" {
-		fmt.Println("No library path defined in the .env. Setting value to \"./library\"")
-		values[LibraryPath] = "./library/"
+	// Downloads
+	if path, ok := values[DownloadsPath]; !ok || path == "" {
+		values[DownloadsPath] = "/downloads/"
 		needsUpdate = true
 	}
 
+	// Library
+	if path, ok := values[LibraryPath]; !ok || path == "" {
+		values[LibraryPath] = "/library/"
+		needsUpdate = true
+	}
+
+	// Port
 	if port, ok := values[Port]; !ok || port == "" {
-		fmt.Println("No port defined in the .env. Setting value to 8080")
+		fmt.Println("No port defined in the environment variables. Setting value to 8080")
 		values[Port] = "8080"
 		needsUpdate = true
+	} else if port != "" {
+		portInt, err := strconv.Atoi(port)
+		if err != nil || portInt < 0 || portInt > 65535 {
+			log.Fatal("The port defined in the environment variables is invalid")
+		}
 	}
 
+	// Google Books API key
 	if key, ok := values[GoogleApiKey]; !ok || key == "" {
-		fmt.Println("No google books api key defined in the .env. Google Books will not work without it. This can also be set via the settings")
+		fmt.Println("No google books api key defined in the environment variables. Google Books will not work without it. This can also be set via the settings")
 	}
 
+	// Token Secret
 	if secret, ok := values[TokenSecret]; !ok || secret == "" {
-		fmt.Println("No secret key defined in the .env. Applying a newly generated key.")
+		fmt.Println("No secret key defined in the environment variables. Applying a newly generated key")
 		values[TokenSecret] = auth.MakeToken()
 		needsUpdate = true
 	}
 
+	// Scan Frequency
 	if fStr, ok := values[ScanFrequency]; !ok || fStr == "" {
-		fmt.Println("No scan frequency was defined in the .env. Setting value to 5 seconds")
+		fmt.Println("No scan frequency was defined in the environment variables. Setting value to 5 seconds")
 		values[ScanFrequency] = "5"
 		needsUpdate = true
 	} else {
 		seconds, err := strconv.Atoi(fStr)
 		if err != nil || seconds < 1 {
-			log.Fatal("scan frequency must be a positive integer greater than 0")
+			log.Fatal("The defined scan frequency in the environment variables is invalid. The value must be an integer greater than 0")
 		}
 	}
 
+	// Update the env file
 	if needsUpdate {
 		err = godotenv.Write(values, envPath)
 		if err != nil {

@@ -49,9 +49,6 @@ COPY --from=builder /app/book-organizer-server ./book-organizer-server
 # Copy the compiled vue files to the backend
 COPY --from=frontend-builder /frontend/dist ./static
 
-# Ensure the app user owns the binary and folders
-RUN mkdir ./data
-
 # Expose the port and run the server
 EXPOSE 8080
 CMD ["./book-organizer-server"]

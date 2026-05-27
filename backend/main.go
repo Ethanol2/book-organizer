@@ -273,10 +273,6 @@ func createConfig(flags cliFlags) (*apiConfig, error) {
 	logsPath := filepath.Join(dataPath, "logs")
 	dbPath := filepath.Join(dataPath, "appData.db")
 
-	if err = os.MkdirAll(dataPath, 0755); err != nil {
-		fmt.Println("Error creating data folder")
-		return nil, err
-	}
 	if err = os.MkdirAll(metadataPath, 0755); err != nil {
 		fmt.Println("Error creating metadata folder")
 		return nil, err
