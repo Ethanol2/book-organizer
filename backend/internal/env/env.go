@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"path"
+	"path/filepath"
 	"strconv"
 	"sync"
 
@@ -33,7 +33,7 @@ type Env struct {
 
 func getVarWithFallback(key, fallback string) string {
 	if val := os.Getenv(key); val != "" {
-		fmt.Println(val)
+		fmt.Println(key, ":", val)
 		return val
 	}
 	return fallback
@@ -49,9 +49,9 @@ func GetEnv() (Env, error) {
 		fmt.Println("Loaded master .env file successfully")
 	}
 
-	envPath := "/data/.env"
+	envPath := filepath.Join(getVarWithFallback(DataPath, "/data"), ".env")
 
-	err := os.MkdirAll(path.Dir(envPath), 0755)
+	err := os.MkdirAll(filepath.Dir(envPath), 0755)
 	if err != nil {
 		return Env{}, err
 	}

@@ -209,7 +209,7 @@ func (c *Client) GetBook(id uuid.UUID) (Book, error) {
 			ORDER BY books_genres.rank ASC
 		) as genres,
 		(
-			SELECT GROUP_CONCAT(series.name || x'09' || series.id, x'0909')
+			SELECT GROUP_CONCAT(series.name || x'09' || series.id || x'09' || books_series.series_index, x'0909')
 			FROM series
 			INNER JOIN books_series ON books_series.series_id = series.id
 			WHERE books_series.book_id = books.id
@@ -307,7 +307,7 @@ func (c *Client) GetBooks(filters map[string][]string) (BookSearchResults[[]Book
 			ORDER BY books_genres.rank ASC
 		) as genres,
 		(
-			SELECT GROUP_CONCAT(series.name || x'09' || series.id, x'0909')
+			SELECT GROUP_CONCAT(series.name || x'09' || series.id || x'09' || books_series.series_index, x'0909')
 			FROM series
 			INNER JOIN books_series ON books_series.series_id = series.id
 			WHERE books_series.book_id = books.id
@@ -819,35 +819,6 @@ func (c *Client) RemoveAllBooks() error {
 	return nil
 }
 
-// #region Book Methods
-
-// func (book *Book) getBookCategories(c *Client) error {
-
-// 	var err error
-
-// 	book.Authors, err = c.GetCategoryTypesAssociatedWithBook(book.Id.String(), Authors)
-// 	if err != nil {
-// 		return err
-// 	}
-
-// 	book.Genres, err = c.GetCategoryTypesAssociatedWithBook(book.Id.String(), Genres)
-// 	if err != nil {
-// 		return err
-// 	}
-
-// 	book.Series, err = c.GetCategoryTypesAssociatedWithBook(book.Id.String(), Series)
-// 	if err != nil {
-// 		return err
-// 	}
-
-// 	book.Narrators, err = c.GetCategoryTypesAssociatedWithBook(book.Id.String(), Narrators)
-// 	if err != nil {
-// 		return err
-// 	}
-
-// 	return nil
-// }
-
 func parseConcateGroupString(str *string) []Category {
 
 	cats := []Category{}
@@ -863,6 +834,7 @@ func parseConcateGroupString(str *string) []Category {
 
 		var name string
 		var id *int
+		var index *string
 
 		if len(columns) > 0 {
 			name = columns[0]
@@ -875,7 +847,11 @@ func parseConcateGroupString(str *string) []Category {
 				id = &val
 			}
 		}
-		cats = append(cats, Category{Id: id, Name: name})
+		if len(columns) > 2 {
+			indexStr := columns[2]
+			index = &indexStr
+		}
+		cats = append(cats, Category{Id: id, Name: name, Index: index})
 	}
 
 	return cats

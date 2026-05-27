@@ -203,7 +203,7 @@ func (cfg *apiConfig) handlerUpdateBook(id uuid.UUID, w http.ResponseWriter, r *
 	needsFileUpdate := false
 
 	err = cfg.db.HandleTransaction(func(c *database.Client) error {
-		book, needsFileUpdate, err = cfg.db.UpdateBook(id, params)
+		book, needsFileUpdate, err = c.UpdateBook(id, params)
 		return err
 	})
 	if err != nil {
@@ -449,15 +449,14 @@ func (cfg *apiConfig) handlerGetScanLibrary(w http.ResponseWriter, r *http.Reque
 					continue
 				}
 
-				if len(pathComponents) == 0 {
-					continue
-				}
-
 				// Get the book title from the folder
 				title := path.Base(*item.Root)
 
 				// Get the author from the topmost folder
-				authors := []database.Category{{Name: pathComponents[0]}}
+				authors := []database.Category{}
+				if len(pathComponents) > 0 {
+					authors = append(authors, database.Category{Name: pathComponents[0]})
+				}
 
 				// Get the series from the second folder. Extract the series index from the title, if it exists.
 				var series []database.Category
@@ -508,6 +507,7 @@ func (cfg *apiConfig) handlerGetScanLibrary(w http.ResponseWriter, r *http.Reque
 
 		// Main Logic ======================================================================
 
+		fmt.Println()
 		log.Println("Starting library scan")
 
 		// Get existing library to prevent duplicates

@@ -78,7 +78,7 @@ export function getBookCoverSrc(book: Book): string {
 }
 
 export function getAuthorsList(authors: Author[]): string {
-    if (authors.length == 0) {
+    if (authors == null || authors.length == 0) {
         return ""
     }
 

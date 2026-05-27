@@ -9,11 +9,6 @@ import { basename } from '@/types/download';
 import api from '@/services/api';
 import FilesView from '@/components/FilesView.vue';
 
-type CategoryList = {
-  showAll: boolean;
-  shortList: Category[];
-}
-
 const route = useRoute();
 const router = useRouter();
 const book = ref<Book | null>(null);
@@ -24,15 +19,14 @@ const editParams = ref<BookParams | null>(null);
 const deleting = ref(false);
 const notifications = useNotificationsStore();
 
+var submitEditBusy: boolean = false;
+
 const coverSrc = computed(() => {
   if (!book.value) {
     return '';
   }
   return book.value.files?.cover || `/media/metadata/${book.value.id}.jpg`;
 });
-
-const audioFiles = computed(() => book.value?.files?.audio_files ?? []);
-const textFiles = computed(() => book.value?.files?.text_files ?? []);
 
 function buildEditParams(book: Book): BookParams {
   return {
@@ -78,9 +72,11 @@ function isIdentical(newData: Category[] | null | undefined, oldData: Category[]
 }
 
 async function submitEdit(newData: BookParams) {
-  if (!book.value) {
+  
+  if (!book.value || submitEditBusy) {
     return;
   }
+  submitEditBusy = true;
 
   newData.title = newData.title == book.value.title ? undefined : newData.title;
   newData.subtitle = newData.subtitle == book.value.subtitle ? undefined : newData.subtitle;
@@ -110,6 +106,8 @@ async function submitEdit(newData: BookParams) {
     console.error('Update book error:', err);
     notifications.notifyError('Failed to update book: ' + (err instanceof Error ? err.message : String(err)));
   }
+
+  submitEditBusy = false;
 }
 
 async function deleteBook(payload: { deleteBook: boolean, deleteFiles: boolean }) {
@@ -291,7 +289,7 @@ onMounted(async () => {
           <div class="section-heading">
             <h2>Files</h2>
           </div>
-          <FilesView :files="book.files" />
+          <FilesView :files="book.files" :show-root="true" />
         </section>
       </div>
     </div>

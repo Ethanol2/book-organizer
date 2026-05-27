@@ -65,11 +65,11 @@ const toggleShowAdvanced = () => {
     showAdvanced.value = !showAdvanced.value;
 }
 
-function normalizeQueryValue(value: LocationQueryValue | LocationQueryValue[] | undefined): string {
+function normalizeQueryValue(value: LocationQueryValue | LocationQueryValue[] | undefined, fallback: string = ''): string {
     if (Array.isArray(value)) {
-        return String(value[0] ?? '');
+        return String(value[0] ?? fallback);
     }
-    return String(value ?? '');
+    return String(value ?? fallback);
 }
 
 function resetFiltersFromRoute() {
@@ -85,6 +85,7 @@ function resetFiltersFromRoute() {
     genres.value = normalizeQueryValue(route.query.genres);
     authors.value = normalizeQueryValue(route.query.authors);
     narrators.value = normalizeQueryValue(route.query.narrators);
+    files.value = normalizeQueryValue(route.query.files, "all");
 }
 
 function buildSearchTerms(): SearchTerms {
@@ -120,7 +121,8 @@ function hasAdvancedSearchTerms(): boolean {
         || series.value !== ''
         || tags.value !== ''
         || genres.value !== ''
-        || year.value !== '';
+        || year.value !== ''
+        || files.value !== 'all';
 }
 
 function changeSortValue(overwrite: boolean = false) {

@@ -212,11 +212,11 @@ func getFlags(args []string) (cliFlags, error) {
 			flags.downloadsReset = true
 
 		case "-cl", "--clear-library":
-			fmt.Println("Clear library flag (-l)")
+			fmt.Println("Clear library flag (-cl)")
 			flags.clearLibrary = true
 
 		case "-cd", "--clear-downloads":
-			fmt.Println("Clear downloads flag (-d)")
+			fmt.Println("Clear downloads flag (-cd)")
 			flags.clearDownloads = true
 
 		case "-t", "--test-dataset":
@@ -232,8 +232,10 @@ func getFlags(args []string) (cliFlags, error) {
 
 				switch args[k] {
 				case "l", "test-library":
+					fmt.Println("Will build test library (-t l)")
 					flags.libTestData = true
 				case "d", "test-downloads":
+					fmt.Println("Will build test downloads (-t d)")
 					flags.downTestData = true
 				}
 				i = k
@@ -428,32 +430,46 @@ func createConfig(flags cliFlags) (*apiConfig, error) {
 		})
 
 		// Create the test Library
+		testLibrarySize := 30
 		if flags.libTestData {
 
-			// Inserts 15 books with random text and audio files. All books will have a cover.
+			// Inserts 30 books with random text and audio files. All books will have a cover.
 			// Half will have a metadata file.
 
 			fmt.Println()
 			fmt.Println("======= Creating test library =======")
 
-			handleDirs := func(book database.Book) (string, error) {
-				author := "Unknown"
-				if len(book.Authors) > 0 {
-					author = book.Authors[0].Name
+			handleDirs := func(book database.Book, useAuthor, useSeries bool) (string, error) {
+
+				author := ""
+				if useAuthor {
+					author = "Unknown"
+					if len(book.Authors) > 0 {
+						author = book.Authors[0].Name
+					}
 				}
+
 				series := ""
-				if len(book.Series) > 0 {
+				title := book.Title
+				if useSeries && len(book.Series) > 0 {
 					series = book.Series[0].Name
+					// Randomly add the series index
+					if book.Series[0].Index != nil && rand.Float32() > 0.5 {
+						title = *book.Series[0].Index + " - " + title
+					}
 				}
-				bookPath := filepath.Join(author, series, book.Title)
+
+				bookPath := filepath.Join(author, series, title)
 
 				return bookPath, nil
 			}
 
-			// No metadata
-			for i := range testBooks[:7] {
+			offset := testLibrarySize / 2
 
-				bookPath, err := handleDirs(testBooks[i])
+			// No metadata
+			for i := 0; i < offset; i++ {
+
+				bookPath, err := handleDirs(testBooks[i], rand.Float32() > 0.5, rand.Float32() > 0.5)
 				if err != nil {
 					return nil, err
 				}
@@ -464,12 +480,16 @@ func createConfig(flags cliFlags) (*apiConfig, error) {
 					nil,
 					filepath.Join(metadataPath, testBooks[i].Id.String()+".jpg"), rand.Intn(10)+1, rand.Intn(10)+1,
 				)
+				if err != nil {
+					testBooks[i].Files = fileManagement.Files{}
+					fmt.Println("Failed to build test folder for \"" + bookPath + "\": " + err.Error())
+				}
 			}
 
 			// With metadata
-			for i := range testBooks[8:15] {
+			for i := offset; i < testLibrarySize; i++ {
 
-				bookPath, err := handleDirs(testBooks[i])
+				bookPath, err := handleDirs(testBooks[i], rand.Float32() > 0.5, rand.Float32() > 0.5)
 				if err != nil {
 					return nil, err
 				}
@@ -480,6 +500,10 @@ func createConfig(flags cliFlags) (*apiConfig, error) {
 					metadata.BookToMetadata(testBooks[i]),
 					filepath.Join(metadataPath, testBooks[i].Id.String()+".jpg"), rand.Intn(10)+1, rand.Intn(10)+1,
 				)
+				if err != nil {
+					testBooks[i].Files = fileManagement.Files{}
+					fmt.Println("Failed to build test folder for \"" + bookPath + "\": " + err.Error())
+				}
 			}
 		}
 
@@ -547,7 +571,7 @@ func createConfig(flags cliFlags) (*apiConfig, error) {
 
 		err = db.HandleTransaction(func(c *database.Client) error {
 
-			for _, book := range testBooks[:15] {
+			for _, book := range testBooks[:testLibrarySize] {
 				err = book.ApplyBookFiles(c)
 				if err != nil {
 					return err
@@ -737,7 +761,7 @@ My LinkedIn:	https://www.linkedin.com/in/ethan-colucci/
 
 	<l, test-library>:
 		Clears the library and creates a test library structure using the test dataset.
-		Inserts 15 books with random text and audio files. All books will have a cover.
+		Inserts 30 books with random text and audio files. All books will have a cover.
 		Half will have a metadata file.
 	
 	<d, test-downloads>:

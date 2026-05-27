@@ -9,12 +9,26 @@ const showOtherFiles = ref(false);
 
 const props = defineProps<{
     files: BookFiles
+    showRoot?: boolean
 }>();
+
+function trimRoot(path: string): string {
+    return path.replace("/media/", "");
+}
 
 </script>
 
 <template>
     <div class="files-view">
+
+        <!-- Root -->
+        <div class="file-header root" v-if="props.showRoot && props.files.root">
+            <svg viewBox="0 0 123 123">
+                <path class="st0"
+                    d="M7.27,8.75h7.18V0h41.95v8.75h59.17v11.71l-108.3-5.2V8.75L7.27,8.75z M0,21.61h122.88l-9.07,66.7 c-0.42,3.11-2.59,5.72-5.73,5.72H12.73c-3.14,0-5.4-2.59-5.73-5.73L0,21.61L0,21.61z" />
+            </svg>
+            <p>{{ trimRoot(props.files.root) }}</p>
+        </div>
 
         <!-- Metadata -->
         <div class="file-header metadata" v-if="props.files.has_metadata">
@@ -139,6 +153,10 @@ const props = defineProps<{
     align-items: center;
     cursor: pointer;
 }
+.file-header p {
+    max-width: 80%;
+    text-align: right;
+}
 
 .file-header:hover {
     text-decoration: underline;
@@ -146,6 +164,11 @@ const props = defineProps<{
 
 .file-header.metadata {
     background: var(--color-primary-purple);
+    cursor: default;
+    text-decoration: none;
+}
+
+.file-header.root {
     cursor: default;
     text-decoration: none;
 }
@@ -176,5 +199,4 @@ const props = defineProps<{
         border-bottom: none;
     }
 }
-
 </style>
