@@ -323,11 +323,16 @@ func (cfg *apiConfig) handlerGetScanLibrary(w http.ResponseWriter, r *http.Reque
 		Folders []string
 		Ids     []uuid.UUID
 	}
+	type scanError struct {
+		Type  string `json:"type"`
+		Path  string `json:"path"`
+		Error string `json:"error"`
+	}
 
 	// Global vars
 	libraryParams := map[database.BookParams]fileManagement.Files{} // New Books in the library
 	knownDirs := map[string]foldersIds{}                            // Known directories in the library, mapped to their parent folders
-	scanErrors := []string{}                                        // Errors that occur during the scan that aren't cause for panic. The list is returned in the response
+	scanErrors := []scanError{}                                     // Errors that occur during the scan that aren't cause for panic. The list is returned in the response
 
 	// Start the transaction
 	err := cfg.db.HandleTransaction(func(c *database.Client) error {
@@ -355,7 +360,12 @@ func (cfg *apiConfig) handlerGetScanLibrary(w http.ResponseWriter, r *http.Reque
 			if len(pathComponents) > 3 {
 				err := fmt.Sprintf("scan max depth (3) exceeded: %d", len(pathComponents))
 				log.Println(err)
-				scanErrors = append(scanErrors, err)
+				scanErrors = append(scanErrors,
+					scanError{
+						Type:  "Processing",
+						Path:  path.Join(pathPrefix, currentDirectory),
+						Error: "maximum recursion depth exceeded",
+					})
 				return
 			}
 
@@ -392,7 +402,11 @@ func (cfg *apiConfig) handlerGetScanLibrary(w http.ResponseWriter, r *http.Reque
 			if err != nil {
 				strErr := fmt.Sprintln("Error trying to read the folder at \"", currentPath, "\" =>", err)
 				log.Print(strErr)
-				scanErrors = append(scanErrors, strErr)
+				scanErrors = append(scanErrors, scanError{
+					Type:  "Read Error",
+					Path:  currentPath,
+					Error: err.Error(),
+				})
 				return
 			}
 
@@ -401,7 +415,11 @@ func (cfg *apiConfig) handlerGetScanLibrary(w http.ResponseWriter, r *http.Reque
 			if err != nil {
 				strErr := fmt.Sprintln("Error trying to update books at \"", currentPath, "\" =>", err)
 				log.Print(strErr)
-				scanErrors = append(scanErrors, strErr)
+				scanErrors = append(scanErrors, scanError{
+					Type:  "Read Error",
+					Path:  currentPath,
+					Error: err.Error(),
+				})
 				return
 			}
 
@@ -421,7 +439,11 @@ func (cfg *apiConfig) handlerGetScanLibrary(w http.ResponseWriter, r *http.Reque
 				if item.Root == nil {
 					err := fmt.Sprintln("An item with no root appeared in \"", pathPrefix, "\"")
 					log.Print(err)
-					scanErrors = append(scanErrors, err)
+					scanErrors = append(scanErrors, scanError{
+						Type:  "Invalid Data",
+						Path:  currentPath,
+						Error: "item found with no root",
+					})
 					continue
 				}
 
@@ -441,7 +463,11 @@ func (cfg *apiConfig) handlerGetScanLibrary(w http.ResponseWriter, r *http.Reque
 					if err != nil {
 						strErr := fmt.Sprintln("Error trying to open metadata file in \"", *item.Root, "\" =>", err)
 						log.Print(strErr)
-						scanErrors = append(scanErrors, strErr)
+						scanErrors = append(scanErrors, scanError{
+							Type:  "Read Error",
+							Path:  *item.Root,
+							Error: err.Error(),
+						})
 						continue
 					}
 
@@ -539,19 +565,26 @@ func (cfg *apiConfig) handlerGetScanLibrary(w http.ResponseWriter, r *http.Reque
 			// If the book has metadata and an ISBN 13 number, validate it and try to match it with an existing book
 			if params.ISBN != nil {
 
-				isbnStr := strings.ToUpper(strings.TrimSpace(*params.ISBN))
-				if isbnStr == "NULL" {
+				if *params.ISBN == "" {
 					params.ISBN = nil
 				} else {
 
 					if !metadata.IsValidISBN13(*params.ISBN) {
-						scanErrors = append(scanErrors, "ISBN not valid => "+*files.Root)
+						scanErrors = append(scanErrors, scanError{
+							Type:  "Invalid Data",
+							Path:  *files.Root,
+							Error: "invalid ISBN-13 number: " + *params.ISBN,
+						})
 						continue
 					} else if ok, id, _ := c.CheckBookExistsISBN(*params.ISBN); ok {
 
 						err := updateExistingBook(id, params, files)
 						if err != nil {
-							scanErrors = append(scanErrors, err.Error())
+							scanErrors = append(scanErrors, scanError{
+								Type:  "Update Error",
+								Path:  *files.Root,
+								Error: err.Error(),
+							})
 						}
 						continue
 					}
@@ -561,20 +594,26 @@ func (cfg *apiConfig) handlerGetScanLibrary(w http.ResponseWriter, r *http.Reque
 			// Do the same with the ASIN number
 			if params.ASIN != nil {
 
-				asinStr := strings.ToUpper(strings.TrimSpace(*params.ASIN))
-				if asinStr == "NULL" {
+				if *params.ASIN == "" {
 					params.ASIN = nil
 				} else {
 
-					if !metadata.IsValidASIN(asinStr) {
-						scanErrors = append(scanErrors, "ASIN not valid => "+*files.Root)
+					if !metadata.IsValidASIN(*params.ASIN) {
+						scanErrors = append(scanErrors, scanError{
+							Type:  "Invalid Data",
+							Path:  *files.Root,
+							Error: "invalid ASIN number: " + *params.ASIN,
+						})
 						continue
-					} else if ok, id, _ := c.CheckBookExistsASIN(asinStr); ok {
+					} else if ok, id, _ := c.CheckBookExistsASIN(*params.ASIN); ok {
 
-						params.ASIN = &asinStr
 						err := updateExistingBook(id, params, files)
 						if err != nil {
-							return err
+							scanErrors = append(scanErrors, scanError{
+								Type:  "Update Error",
+								Path:  *files.Root,
+								Error: err.Error(),
+							})
 						}
 						continue
 					}
@@ -623,6 +662,6 @@ func (cfg *apiConfig) handlerGetScanLibrary(w http.ResponseWriter, r *http.Reque
 	// Send response
 	respondWithJson(w, http.StatusOK, struct {
 		database.BookSearchResults[[]database.BookOverview] `json:"results"`
-		Errors                                              []string `json:"errors"`
+		Errors                                              []scanError `json:"errors"`
 	}{BookSearchResults: results, Errors: scanErrors})
 }

@@ -404,7 +404,7 @@ func buildSearchQuery(filters map[string][]string) (string, string, string, []an
 		sort = " ORDER BY " + string(cat) + ".name " + order
 
 		if cat == Series {
-			sort += ", books_series.series_index " + order
+			sort += ", CAST(books_series.series_index AS REAL) " + order
 		}
 	}
 
