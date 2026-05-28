@@ -538,31 +538,46 @@ func (cfg *apiConfig) handlerGetScanLibrary(w http.ResponseWriter, r *http.Reque
 
 			// If the book has metadata and an ISBN 13 number, validate it and try to match it with an existing book
 			if params.ISBN != nil {
-				if !metadata.IsValidISBN13(*params.ISBN) {
-					scanErrors = append(scanErrors, "ISBN not valid => "+*files.Root)
-					continue
-				} else if ok, id, _ := c.CheckBookExistsISBN(*params.ISBN); ok {
 
-					err := updateExistingBook(id, params, files)
-					if err != nil {
-						scanErrors = append(scanErrors, err.Error())
+				isbnStr := strings.ToUpper(strings.TrimSpace(*params.ISBN))
+				if isbnStr == "NULL" {
+					params.ISBN = nil
+				} else {
+
+					if !metadata.IsValidISBN13(*params.ISBN) {
+						scanErrors = append(scanErrors, "ISBN not valid => "+*files.Root)
+						continue
+					} else if ok, id, _ := c.CheckBookExistsISBN(*params.ISBN); ok {
+
+						err := updateExistingBook(id, params, files)
+						if err != nil {
+							scanErrors = append(scanErrors, err.Error())
+						}
+						continue
 					}
-					continue
 				}
 			}
 
 			// Do the same with the ASIN number
 			if params.ASIN != nil {
-				if !metadata.IsValidASIN(*params.ASIN) {
-					scanErrors = append(scanErrors, "ASIN not valid => "+*files.Root)
-					continue
-				} else if ok, id, _ := c.CheckBookExistsASIN(*params.ISBN); ok {
 
-					err := updateExistingBook(id, params, files)
-					if err != nil {
-						return err
+				asinStr := strings.ToUpper(strings.TrimSpace(*params.ASIN))
+				if asinStr == "NULL" {
+					params.ASIN = nil
+				} else {
+
+					if !metadata.IsValidASIN(asinStr) {
+						scanErrors = append(scanErrors, "ASIN not valid => "+*files.Root)
+						continue
+					} else if ok, id, _ := c.CheckBookExistsASIN(asinStr); ok {
+
+						params.ASIN = &asinStr
+						err := updateExistingBook(id, params, files)
+						if err != nil {
+							return err
+						}
+						continue
 					}
-					continue
 				}
 			}
 

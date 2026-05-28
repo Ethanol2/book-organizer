@@ -312,6 +312,7 @@ func IsValidASIN(asin string) bool {
 	return isValidISBN10(asin)
 }
 
+// Validates the ISBN13 number
 func isValidISBN10(isbn string) bool {
 	if len(isbn) != 10 {
 		return false

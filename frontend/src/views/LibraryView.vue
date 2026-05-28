@@ -113,7 +113,7 @@ async function scanLibrary() {
         }
         else {
             useNotificationsStore().notifyError(`${errors.length} errors occured during the scan. See console for details`)
-            console.error("Scan complete with " + errors.length + " errors \n\n" + errors)
+            console.error("Scan complete with " + errors.length + " errors \n\n" + errors.join("\n"));
         }
 
     } catch (error) {
