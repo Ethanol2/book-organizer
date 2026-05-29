@@ -149,9 +149,9 @@ func (c *Client) GetRefreshToken(token string) (RefreshTokenInfo, error) {
 	return info, nil
 }
 
-func (c *Client) RevokeRefreshToken(token string) error {
+func (c *Client) RevokeRefreshToken(token string, expirationTime time.Time) error {
 
-	_, err := c.handler.Exec("UPDATE refresh_tokens SET revoked_at = ? WHERE token = ?", time.Now().UTC(), token)
+	_, err := c.handler.Exec("UPDATE refresh_tokens SET revoked_at = ? WHERE token = ?", expirationTime, token)
 	if err != nil {
 		return err
 	}

@@ -165,7 +165,7 @@ func (cfg *apiConfig) handlerLogin(w http.ResponseWriter, r *http.Request) {
 func (cfg *apiConfig) handlerLogout(w http.ResponseWriter, r *http.Request) {
 
 	if refresh, err := r.Cookie("refresh_token"); err == nil {
-		err = cfg.db.RevokeRefreshToken(refresh.Value)
+		err = cfg.db.RevokeRefreshToken(refresh.Value, time.Now().UTC())
 		if err != nil {
 			clearAuthCookies(w)
 			respondWithError(w, http.StatusInternalServerError, DatabaseError, err)
@@ -216,7 +216,7 @@ func (cfg *apiConfig) handlerRefresh(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = cfg.db.DeleteRefreshToken(refresh)
+	err = cfg.db.RevokeRefreshToken(refresh, time.Now().UTC().Add(time.Minute))
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, DatabaseError, nil)
 		return

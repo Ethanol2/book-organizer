@@ -494,6 +494,9 @@ func (c *Client) UpdateBook(id uuid.UUID, update BookParams) (Book, bool, error)
 		add("title", update.Title)
 		needsFileUpdate = true
 	}
+	if update.Subtitle != nil {
+		add("subtitle", update.Subtitle)
+	}
 	if update.Year != nil {
 		add("publish_year", update.Year)
 	}
