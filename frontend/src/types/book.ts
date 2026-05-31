@@ -37,6 +37,8 @@ export type BookParams = {
 
   cover?: string | null
   key?: string | null
+
+  moveFiles?: boolean | null
 }
 
 export type BookSummary = {

@@ -162,7 +162,10 @@ func (cfg *apiConfig) handlerPostBook(w http.ResponseWriter, r *http.Request) {
 
 func (cfg *apiConfig) handlerUpdateBook(id uuid.UUID, w http.ResponseWriter, r *http.Request) {
 
-	var params database.BookParams
+	var params struct {
+		database.BookParams
+		MoveFiles bool `json:"move_files"`
+	}
 	err := json.NewDecoder(r.Body).Decode(&params)
 	if err != nil {
 		respondWithError(w, http.StatusBadRequest, BodyDecodeError, err)
@@ -203,7 +206,7 @@ func (cfg *apiConfig) handlerUpdateBook(id uuid.UUID, w http.ResponseWriter, r *
 	needsFileUpdate := false
 
 	err = cfg.db.HandleTransaction(func(c *database.Client) error {
-		book, needsFileUpdate, err = c.UpdateBook(id, params)
+		book, needsFileUpdate, err = c.UpdateBook(id, params.BookParams)
 		return err
 	})
 	if err != nil {
@@ -211,7 +214,7 @@ func (cfg *apiConfig) handlerUpdateBook(id uuid.UUID, w http.ResponseWriter, r *
 		return
 	}
 
-	if needsFileUpdate {
+	if needsFileUpdate && params.MoveFiles {
 		newPath, err := cfg.db.GetBookPath(id)
 		if err != nil {
 			respondWithError(w, http.StatusInternalServerError, FileMoveError, err)

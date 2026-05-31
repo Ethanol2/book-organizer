@@ -74,12 +74,16 @@ async function searchBooks() {
 // Pagination handlers
 function prevPage() {
   if (page.value > 1) {
+    document.getElementById('search-controls')?.scrollIntoView({ behavior: 'smooth' })
+    results.value = []
     page.value--
     searchBooks()
   }
 }
 
 function nextPage() {
+  document.getElementById('search-controls')?.scrollIntoView({ behavior: 'smooth' })
+  results.value = []
   page.value++
   searchBooks()
 }

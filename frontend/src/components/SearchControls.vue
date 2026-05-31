@@ -177,7 +177,7 @@ watch(() => audibleRegion.value, () => {
 </script>
 
 <template>
-    <div class="search-controls">
+    <section class="search-controls" id="search-controls">
 
         <!-- Metadata Controls -->
         <div class="source-region" v-if="props.metadata">
@@ -205,7 +205,7 @@ watch(() => audibleRegion.value, () => {
             <button class="toggle-button" type="button" @click="reset()">Reset</button>
         </div>
 
-    </div>
+    </section>
 
     <!-- Advanced Search Fields -->
     <div class="advanced-search" v-if="showAdvanced && availableFields">
