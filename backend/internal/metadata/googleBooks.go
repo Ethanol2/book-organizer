@@ -223,13 +223,11 @@ func (result *GoogleBooksItem) parse() (database.BookParams, error) {
 	}
 
 	key := fmt.Sprintf("/api/metadata/%s?source=%s", result.ID, "google%20books")
-	desc := stripTags(result.VolumeInfo.Description)
-	//desc := result.VolumeInfo.Description
 
 	return database.BookParams{
 		Title:       &result.VolumeInfo.Title,
 		Subtitle:    &result.VolumeInfo.Subtitle,
-		Description: &desc,
+		Description: &result.VolumeInfo.Description,
 		Year:        &year,
 		Publisher:   &result.VolumeInfo.Publisher,
 		ISBN:        &isbn,

@@ -89,13 +89,9 @@ func TestUpdateBook(t *testing.T) {
 		Year: &newYear,
 	}
 
-	updatedBook, needsFileUpdate, err := client.UpdateBook(*addedBook.Id, updateParams)
+	updatedBook, err := client.UpdateBook(*addedBook.Id, updateParams)
 	if err != nil {
 		t.Fatalf("UpdateBook failed: %v", err)
-	}
-
-	if needsFileUpdate {
-		t.Error("File update should not be needed for year change")
 	}
 
 	if updatedBook.Year == nil || *updatedBook.Year != newYear {

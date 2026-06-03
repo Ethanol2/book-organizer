@@ -247,6 +247,13 @@ a {
   padding: 3px;
 }
 
+strong,
+b {
+  font-weight: 700;
+  color: #f4efe6;
+  letter-spacing: 0.3px;
+}
+
 @media (hover: hover) {
   a:hover {
     background-color: var(--vt-c-nav-hover-bg);

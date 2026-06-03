@@ -81,7 +81,7 @@ func (cfg *apiConfig) handlerAssociateDownloadToBook(downloadId uuid.UUID, w htt
 		return
 	}
 
-	bookPath, err := cfg.db.GetBookPath(bookIdStruct.BookId)
+	bookPath, err := cfg.db.BuildBookPath(bookIdStruct.BookId)
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, DatabaseError, err)
 		return

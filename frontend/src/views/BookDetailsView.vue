@@ -62,6 +62,7 @@ function closeEditModal() {
 
 function isIdentical(newData: Category[] | null | undefined, oldData: Category[] | null | undefined): boolean {
   if (!newData) return !oldData
+  if (!oldData && newData.length == 0) return true
   if (!oldData) return !newData
   if (newData.length != oldData.length) return false
 
@@ -71,25 +72,45 @@ function isIdentical(newData: Category[] | null | undefined, oldData: Category[]
   return true
 }
 
+function compareStrParam(original: string | null | undefined, update: string | null | undefined): string | null | undefined {
+  if (original == update) {
+    return
+  }
+  if (update === "" && (original === undefined || original === null)) {
+    return
+  }
+  return update
+}
+function compareNumberParam(original: number | null | undefined, update: number | null | undefined): number | null | undefined {
+  if (original == update) {
+    return
+  }
+  if (update === 0 && (original === undefined || original === null)) {
+    return
+  }
+  return update
+}
+
 async function submitEdit(newData: BookParams) {
-  
+
   if (!book.value || submitEditBusy) {
     return;
   }
   submitEditBusy = true;
 
-  newData.title = newData.title == book.value.title ? undefined : newData.title;
-  newData.subtitle = newData.subtitle == book.value.subtitle ? undefined : newData.subtitle;
-  newData.description = newData.description == book.value.description ? undefined : newData.description;
-  newData.year = newData.year == book.value.year ? undefined : newData.year;
-  newData.isbn = newData.isbn == book.value.isbn ? undefined : newData.isbn;
-  newData.publisher = newData.publisher == book.value.publisher ? undefined : newData.publisher;
+  newData.title = compareStrParam(book.value.title, newData.title);
+  newData.subtitle = compareStrParam(book.value.subtitle, newData.subtitle);
+  newData.description = compareStrParam(book.value.description, newData.description);
+  newData.year = compareNumberParam(book.value.year, newData.year);
+  newData.isbn = compareStrParam(book.value.isbn, newData.isbn);
+  newData.asin = compareStrParam(book.value.asin, newData.asin);
+  newData.publisher = compareStrParam(book.value.publisher, newData.publisher);
   newData.series = isIdentical(newData?.series, book.value.series) ? undefined : newData.series;
   newData.authors = isIdentical(newData?.authors, book.value.authors) ? undefined : newData.authors;
   newData.genres = isIdentical(newData?.genres, book.value.genres) ? undefined : newData.genres;
   newData.narrators = isIdentical(newData?.narrators, book.value.narrators) ? undefined : newData.narrators;
   newData.tags = newData?.tags === book.value.tags ? undefined : newData.tags;
-  
+
   var coverChanged = newData?.cover !== book.value.files?.cover;
   newData.cover = coverChanged ? newData.cover : undefined;
 
@@ -134,10 +155,10 @@ async function deleteBook(payload: { deleteBook: boolean, deleteFiles: boolean }
       notifications.notifySuccess('Book deleted successfully!');
     }
     else if (payload.deleteFiles) {
-      notifications.notifySuccess('Files deleted successfully!');    
+      notifications.notifySuccess('Files deleted successfully!');
     }
     await router.push('/');
-    
+
   } catch (err) {
     console.error('Delete book error:', err);
     notifications.notifyError('Failed to delete book: ' + (err instanceof Error ? err.message : String(err)));
@@ -174,7 +195,7 @@ onMounted(async () => {
 
   } catch (err) {
     console.error('Error fetching book details:', err);
-    error.value = 'Unable to load book details.';  
+    error.value = 'Unable to load book details.';
 
   } finally {
     loading.value = false;
@@ -209,11 +230,13 @@ onMounted(async () => {
           <dl class="hero-info-grid">
             <div>
               <dt>Year</dt>
-              <dd v-if="book.year" ><a class="hero-info-button" @click="openLibrarySearch({year: book.year})">{{book.year}}</a></dd>
+              <dd v-if="book.year"><a class="hero-info-button" @click="openLibrarySearch({ year: book.year })">{{
+                  book.year }}</a></dd>
             </div>
             <div>
               <dt>Publisher</dt>
-              <dd v-if="book.publisher"><a class="hero-info-button" @click="openLibrarySearch({publisher: book.publisher})">{{ book.publisher }}</a></dd>
+              <dd v-if="book.publisher"><a class="hero-info-button"
+                  @click="openLibrarySearch({ publisher: book.publisher })">{{ book.publisher }}</a></dd>
             </div>
             <div>
               <dt>ISBN</dt>
@@ -224,45 +247,20 @@ onMounted(async () => {
               <dd>{{ book.asin || '' }}</dd>
             </div>
 
-            <BookDetailsCategoryListView
-              :list="book.authors"
-              title="Authors"
-              fieldName="authors"
-              :listLimit="3"
-              @itemClick="openLibrarySearch"
-            />
+            <BookDetailsCategoryListView :list="book.authors" title="Authors" fieldName="authors" :listLimit="3"
+              @itemClick="openLibrarySearch" />
 
-            <BookDetailsCategoryListView
-              :list="book.genres"
-              title="Genres"
-              fieldName="genres"
-              :listLimit="5"
-              @itemClick="openLibrarySearch"
-            />
-            
-            <BookDetailsCategoryListView
-              :list="book.series"
-              title="Series"
-              fieldName="series"
-              :listLimit="3"
-              @itemClick="openLibrarySearch"
-            />
-            
-            <BookDetailsCategoryListView
-              :list="book.narrators"
-              title="Narrators"
-              fieldName="narrators"
-              :listLimit="3"
-              @itemClick="openLibrarySearch"
-            />
-            
-            <BookDetailsCategoryListView
-              :list="book.tags"
-              title="Tags"
-              fieldName="tags"
-              :listLimit="5"
-              @itemClick="openLibrarySearch"
-            />
+            <BookDetailsCategoryListView :list="book.genres" title="Genres" fieldName="genres" :listLimit="5"
+              @itemClick="openLibrarySearch" />
+
+            <BookDetailsCategoryListView :list="book.series" title="Series" fieldName="series" :listLimit="3"
+              @itemClick="openLibrarySearch" />
+
+            <BookDetailsCategoryListView :list="book.narrators" title="Narrators" fieldName="narrators" :listLimit="3"
+              @itemClick="openLibrarySearch" />
+
+            <BookDetailsCategoryListView :list="book.tags" title="Tags" fieldName="tags" :listLimit="5"
+              @itemClick="openLibrarySearch" />
 
             <div>
               <dt>Created</dt>
@@ -281,7 +279,7 @@ onMounted(async () => {
           <div class="section-heading">
             <h2>Summary</h2>
           </div>
-          <p v-if="book.description" class="description">{{ book.description }}</p>
+          <div v-if="book.description" class="description" v-html="book.description"></div>
           <p v-else class="description muted">No description available for this book.</p>
         </section>
 
@@ -295,8 +293,8 @@ onMounted(async () => {
     </div>
     <div v-else class="status-message">Book not found.</div>
 
-    <AddBookModal :show="showEditModal" :params="editParams" :isEditMode="true" :has-files="book?.files !== null && book?.files.root !== null"
-     @close="closeEditModal" @add-book="submitEdit" @delete-book="deleteBook"/>
+    <AddBookModal :show="showEditModal" :params="editParams" :isEditMode="true" :bookRoot="book?.files.root"
+      @close="closeEditModal" @add-book="submitEdit" @delete-book="deleteBook" />
   </div>
 </template>
 
@@ -500,6 +498,53 @@ onMounted(async () => {
   margin: 0;
   color: var(--color-text);
   line-height: 1.75;
+}
+
+.description p {
+  margin: 0.5rem 0;
+}
+
+.description strong,
+.description b {
+  font-weight: 600;
+}
+
+.description em,
+.description i {
+  font-style: italic;
+}
+
+.description h1,
+.description h2,
+.description h3,
+.description h4,
+.description h5,
+.description h6 {
+  margin: 1rem 0 0.5rem 0;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.description h1 {
+  font-size: 1.75rem;
+}
+
+.description h2 {
+  font-size: 1.5rem;
+}
+
+.description h3 {
+  font-size: 1.25rem;
+}
+
+.description ul,
+.description ol {
+  margin: 0.5rem 0;
+  padding-left: 1.5rem;
+}
+
+.description li {
+  margin: 0.25rem 0;
 }
 
 .muted {

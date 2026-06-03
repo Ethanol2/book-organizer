@@ -479,45 +479,53 @@ func (c *Client) AssociateBookAndDownload(bookId, downloadId uuid.UUID, bookPath
 }
 
 // Returns the updated book and a bool that says whether the file path has updated
-func (c *Client) UpdateBook(id uuid.UUID, update BookParams) (Book, bool, error) {
+func (c *Client) UpdateBook(id uuid.UUID, update BookParams) (Book, error) {
 
 	setParts := []string{"updated_at = CURRENT_TIMESTAMP"}
 	args := []interface{}{}
-	needsFileUpdate := false
 
 	add := func(part string, arg interface{}) {
 		setParts = append(setParts, part+" = ?")
 		args = append(args, arg)
 	}
+	checkEmpty := func(str *string) *string {
+		if *str == "" {
+			return nil
+		}
+		return str
+	}
 
 	if update.Title != nil {
-		add("title", update.Title)
-		needsFileUpdate = true
+		add("title", checkEmpty(update.Title))
 	}
 	if update.Subtitle != nil {
-		add("subtitle", update.Subtitle)
+		add("subtitle", checkEmpty(update.Subtitle))
 	}
 	if update.Year != nil {
-		add("publish_year", update.Year)
+		if *update.Year == 0 {
+			add("publish_year", nil)
+		} else {
+			add("publish_year", update.Year)
+		}
 	}
 	if update.Description != nil {
-		add("description", update.Description)
+		add("description", checkEmpty(update.Description))
 	}
 	if update.Tags != nil {
 		tagsJson, err := json.Marshal(update.Tags)
 		if err != nil {
-			return Book{}, false, err
+			return Book{}, err
 		}
 		add("tags", string(tagsJson))
 	}
 	if update.ISBN != nil {
-		add("isbn", update.ISBN)
+		add("isbn", checkEmpty(update.ISBN))
 	}
 	if update.ASIN != nil {
-		add("asin", update.ASIN)
+		add("asin", checkEmpty(update.ASIN))
 	}
 	if update.Publisher != nil {
-		add("publisher", update.Publisher)
+		add("publisher", checkEmpty(update.Publisher))
 	}
 
 	if len(setParts) > 0 {
@@ -525,7 +533,7 @@ func (c *Client) UpdateBook(id uuid.UUID, update BookParams) (Book, bool, error)
 		args = append(args, id)
 		_, err := c.handler.Exec(query, args...)
 		if err != nil {
-			return Book{}, false, err
+			return Book{}, err
 		}
 	}
 
@@ -570,79 +578,60 @@ func (c *Client) UpdateBook(id uuid.UUID, update BookParams) (Book, bool, error)
 	if update.Authors != nil {
 		old, err := c.GetCategoryTypesAssociatedWithBook(id.String(), Authors)
 		if err != nil {
-			return Book{}, false, err
+			return Book{}, err
 		}
 		err = handleCategories("DELETE FROM books_authors WHERE book_id = ? AND author_id = ?", *update.Authors, old, Authors)
 		if err != nil {
-			return Book{}, false, err
+			return Book{}, err
 		}
-
-		needsFileUpdate = true
 	}
 
 	if update.Genres != nil {
 		old, err := c.GetCategoryTypesAssociatedWithBook(id.String(), Genres)
 		if err != nil {
-			return Book{}, false, err
+			return Book{}, err
 		}
 		err = handleCategories("DELETE FROM books_genres WHERE book_id = ? AND genre_id = ?", *update.Genres, old, Genres)
 		if err != nil {
-			return Book{}, false, err
+			return Book{}, err
 		}
 	}
 
 	if update.Series != nil {
 		old, err := c.GetCategoryTypesAssociatedWithBook(id.String(), Series)
 		if err != nil {
-			return Book{}, false, err
+			return Book{}, err
 		}
 		err = handleCategories("DELETE FROM books_series WHERE book_id = ? AND series_id = ?", *update.Series, old, Series)
 		if err != nil {
-			return Book{}, false, err
+			return Book{}, err
 		}
-
-		needsFileUpdate = true
 	}
 
 	if update.Narrators != nil {
 		old, err := c.GetCategoryTypesAssociatedWithBook(id.String(), Narrators)
 		if err != nil {
-			return Book{}, false, err
+			return Book{}, err
 		}
 		err = handleCategories("DELETE FROM books_narrators WHERE book_id = ? AND narrator_id = ?", *update.Narrators, old, Narrators)
 		if err != nil {
-			return Book{}, false, err
+			return Book{}, err
 		}
 	}
 
 	err := c.CleanupCategories()
 	if err != nil {
-		return Book{}, false, err
+		return Book{}, err
 	}
 
 	book, err := c.GetBook(id)
 	if err != nil {
-		return Book{}, false, err
-	}
-
-	needsFileUpdate = needsFileUpdate && book.Files.Root != nil
-
-	if needsFileUpdate {
-		bookPath, err := c.GetBookPath(id)
-		if err != nil {
-			return Book{}, false, err
-		}
-
-		book.Files.UpdateDirectory(bookPath)
-		err = book.ApplyBookFiles(c)
-		if err != nil {
-			return Book{}, false, err
-		}
+		return Book{}, err
 	}
 
 	log.Println("Updated book", id)
 
-	return book, needsFileUpdate, nil
+	return book, nil
 }
 
 func (c *Client) UpdateBookCover(id uuid.UUID, ext string) (string, string, error) {
@@ -672,8 +661,18 @@ func (c *Client) UpdateBookCover(id uuid.UUID, ext string) (string, string, erro
 	return *cover, newCover, nil
 }
 
+func (c *Client) GetBookPath(id uuid.UUID) (*string, error) {
+	var path *string
+	err := c.handler.QueryRow("SELECT directory FROM BOOKS WHERE id=?", id).Scan(path)
+	if err != nil {
+		return nil, err
+	}
+	return path, nil
+}
+
+// Builds the book path according to the following scheme. Does not fetch the actual real path
 // Author -> Series -> Book Title
-func (c *Client) GetBookPath(id uuid.UUID) (string, error) {
+func (c *Client) BuildBookPath(id uuid.UUID) (string, error) {
 
 	authorDir := "Unknown"
 	authors, err := c.GetCategoryTypesAssociatedWithBook(id.String(), Authors)

@@ -203,10 +203,9 @@ func (cfg *apiConfig) handlerUpdateBook(id uuid.UUID, w http.ResponseWriter, r *
 	oldPath, err := cfg.db.GetBookDirectory(id)
 
 	var book database.Book
-	needsFileUpdate := false
 
 	err = cfg.db.HandleTransaction(func(c *database.Client) error {
-		book, needsFileUpdate, err = c.UpdateBook(id, params.BookParams)
+		book, err = c.UpdateBook(id, params.BookParams)
 		return err
 	})
 	if err != nil {
@@ -214,15 +213,25 @@ func (cfg *apiConfig) handlerUpdateBook(id uuid.UUID, w http.ResponseWriter, r *
 		return
 	}
 
-	if needsFileUpdate && params.MoveFiles {
-		newPath, err := cfg.db.GetBookPath(id)
+	if params.MoveFiles {
+		newPath, err := cfg.db.BuildBookPath(id)
 		if err != nil {
-			respondWithError(w, http.StatusInternalServerError, FileMoveError, err)
+			respondWithError(w, http.StatusInternalServerError, DatabaseError, err)
 			return
 		}
 
 		if book.Files.Root != &newPath {
-			err = fileManagement.MoveFiles(path.Join(cfg.Env.Get(env.LibraryPath), *oldPath), path.Join(cfg.Env.Get(env.LibraryPath), newPath))
+
+			book.Files.Root = &newPath
+			err = book.ApplyBookFiles(&cfg.db)
+			if err != nil {
+				respondWithError(w, http.StatusInternalServerError, DatabaseError, err)
+				return
+			}
+
+			libPath := cfg.Env.Get(env.LibraryPath)
+
+			err = fileManagement.MoveFiles(path.Join(libPath, *oldPath), path.Join(libPath, newPath))
 			if err != nil {
 				respondWithError(w, http.StatusInternalServerError, FileMoveError, err)
 				return
@@ -520,7 +529,7 @@ func (cfg *apiConfig) handlerGetScanLibrary(w http.ResponseWriter, r *http.Reque
 				return fmt.Errorf("Duplicate files for %s exist at %s", *params.Title, *files.Root)
 			}
 
-			book, _, err := c.UpdateBook(id, params)
+			book, err := c.UpdateBook(id, params)
 			if err != nil {
 				return err
 			}

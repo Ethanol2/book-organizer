@@ -145,8 +145,6 @@ func GetFromOpenLibrary(id string, cache *cache.Cache) (database.BookParams, err
 		return database.BookParams{}, err
 	}
 
-	desc := stripTags(string(olItem.Description))
-
 	genres := []database.Category{}
 	series := []database.Category{}
 
@@ -181,6 +179,8 @@ func GetFromOpenLibrary(id string, cache *cache.Cache) (database.BookParams, err
 			}
 		}
 	}
+
+	desc := string(olItem.Description)
 
 	return database.BookParams{
 		Description: &desc,

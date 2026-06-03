@@ -179,12 +179,3 @@ func IsValidISBN13(isbn string) bool {
 	// 4. Check if the final sum is a multiple of 10
 	return sum%10 == 0
 }
-
-func stripTags(s string) string {
-
-	s = strings.ReplaceAll(s, "<br>", "\n")
-
-	// Regular expression to match any content within brackets
-	re := regexp.MustCompile(`<.*?>`)
-	return re.ReplaceAllString(s, "")
-}

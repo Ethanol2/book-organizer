@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
+import { QuillEditor } from '@vueup/vue-quill'
+import '@vueup/vue-quill/dist/vue-quill.snow.css'
 import type { BookParams } from '@/types/book'
 import { getCategoriesString, getCategoriesArray, getSeriesArray, getSeriesString } from '@/types/book'
 
@@ -7,31 +9,37 @@ enum deleteMode {
   BookAndFiles = "Delete book and files",
   BookOnly = "Delete book only",
   FilesOnly = "Delete files only"
-}
+};
 
 // Modal component for adding/editing books with form fields and submission
-const titleInput = ref('')
-const subtitleInput = ref('')
-const descriptionInput = ref('')
-const yearInput = ref('')
-const isbnInput = ref('')
-const asinInput = ref('')
-const publisherInput = ref('')
-const coverInput = ref('')
-const authorsInput = ref('')
-const narratorsInput = ref('')
-const seriesInput = ref('')
-const genresInput = ref('')
-const tagsInput = ref('')
-const showDeleteConfirm = ref(false)
-const deleteBookText = ref('Delete Book')
-const deleteModeSelection = ref<deleteMode>(deleteMode.BookAndFiles)
+const descriptionContent = ref('');
+const titleInput = ref('');
+const subtitleInput = ref('');
+const yearInput = ref<number|null>();
+const isbnInput = ref('');
+const asinInput = ref('');
+const publisherInput = ref('');
+const coverInput = ref('');
+const authorsInput = ref('');
+var authorsStr: string = '';
+const narratorsInput = ref('');
+const seriesInput = ref('');
+var seriesStr: string = '';
+const genresInput = ref('');
+const tagsInput = ref('');
+
+var hasOddPath = false;
+const moveFiles = ref(false);
+
+const showDeleteConfirm = ref(false);
+const deleteBookText = ref('Delete Book');
+const deleteModeSelection = ref<deleteMode>(deleteMode.BookAndFiles);
 
 interface ModalProps {
   show: boolean
   params: BookParams | null
   isEditMode?: boolean
-  hasFiles?: boolean
+  bookRoot?: string | null
 }
 
 const props = withDefaults(defineProps<ModalProps>(), {
@@ -57,15 +65,15 @@ function resetFormFields() {
 
   titleInput.value = params?.title ?? ''
   subtitleInput.value = params?.subtitle ?? ''
-  descriptionInput.value = params?.description ?? ''
-  yearInput.value = params?.year != null ? String(params.year) : ''
+  descriptionContent.value = params?.description ?? ''
+  yearInput.value = params?.year != null ? params.year : null
   isbnInput.value = params?.isbn ?? ''
   asinInput.value = params?.asin ?? ''
   publisherInput.value = params?.publisher ?? ''
   coverInput.value = params?.cover ?? ''
-  authorsInput.value = getCategoriesString(params?.authors ?? [])
+  authorsInput.value = authorsStr = getCategoriesString(params?.authors ?? [])
   narratorsInput.value = getCategoriesString(params?.narrators ?? [])
-  seriesInput.value = getSeriesString(params?.series ?? [])
+  seriesInput.value = seriesStr = getSeriesString(params?.series ?? [])
   genresInput.value = getCategoriesString(params?.genres ?? [])
   tagsInput.value = params?.tags ? params.tags.join(', ') : ''
   resetConfirmState()
@@ -73,22 +81,25 @@ function resetFormFields() {
 
 function handleSubmit() {
   const baseParams = props.params ? { ...props.params } : {}
-  const yearValue = yearInput.value.trim()
+  
+  const yearValue = yearInput.value != null ? yearInput.value : 0;
+
   const params: BookParams = {
     ...baseParams,
-    title: titleInput.value.trim() || null,
-    subtitle: subtitleInput.value.trim() || null,
-    description: descriptionInput.value.trim() || null,
-    publisher: publisherInput.value.trim() || null,
-    isbn: isbnInput.value.trim() || null,
-    asin: asinInput.value.trim() || null,
-    cover: coverInput.value.trim() || null,
-    year: yearValue ? Number(yearValue) : null,
+    title: titleInput.value.trim(),
+    subtitle: subtitleInput.value.trim(),
+    description: descriptionContent.value,
+    publisher: publisherInput.value.trim(),
+    isbn: isbnInput.value.trim(),
+    asin: asinInput.value.trim(),
+    cover: coverInput.value.trim(),
+    year: Number(yearValue),
     authors: getCategoriesArray(authorsInput.value),
     narrators: getCategoriesArray(narratorsInput.value),
     series: getSeriesArray(seriesInput.value),
     genres: getCategoriesArray(genresInput.value),
     tags: tagsInput.value ? tagsInput.value.split(',').map(tag => tag.trim()).filter(tag => tag) : null,
+    move_files: props.isEditMode ? moveFiles.value : null
   }
 
   if (params.year !== null && Number.isNaN(params.year)) {
@@ -124,7 +135,7 @@ function handleModalClick(e: Event) {
 
 function getDeleteConfirmText(): string {
 
-  if (!props.hasFiles) {
+  if (!!props.bookRoot) {
     return 'Are you sure you want to delete this book?'
   }
 
@@ -140,6 +151,39 @@ function getDeleteConfirmText(): string {
   }
 }
 
+function requireMoveFiles(): boolean {
+  return !!props.bookRoot && (
+    (authorsInput.value !== authorsStr) ||
+    (seriesInput.value !== seriesStr) ||
+    (titleInput.value !== props.params?.title) ||
+    hasOddPath
+  )
+}
+function getNewPath(): string {
+  const authors = getCategoriesArray(authorsInput.value);
+  const series = getSeriesArray(seriesInput.value);
+
+  var titlePath = titleInput.value;
+  var seriesPath = '';
+  if (series.length > 0) {
+    seriesPath = series[0]?.name + "/";
+
+    if (series[0]?.index) {
+      titlePath = series[0].index + " - " + titlePath
+    }
+  }
+
+  var authorPath = 'Unknown/';
+  if (authors.length > 0) {
+    authorPath = authors[0]?.name + "/";
+  }
+
+  return "/" + authorPath + seriesPath + titlePath
+}
+function getOldPath(): string {
+  return props.bookRoot == null? "" : props.bookRoot.replace("/media/library", "")
+}
+
 const modalTitle = computed(() => (props.isEditMode ? 'Edit Book' : 'Add Book'))
 
 watch(
@@ -147,6 +191,9 @@ watch(
   ([params, visible]) => {
     if (visible) {
       resetFormFields()
+      if (props.isEditMode && (getNewPath() !== getOldPath())) {
+        hasOddPath = true;
+      } 
     }
   },
   { immediate: true }
@@ -164,7 +211,9 @@ watch(
         <label>Title: <input v-model="titleInput" type="text" required /></label>
         <label>Subtitle: <input v-model="subtitleInput" type="text" /></label>
         <label>Series (comma-separated, use #1 for first in series): <input v-model="seriesInput" type="text" /></label>
-        <label>Description: <textarea v-model="descriptionInput"></textarea></label>
+        <label>Description:
+          <QuillEditor v-model:content="descriptionContent" contentType="html" theme="snow" />
+        </label>
         <label>Year: <input v-model="yearInput" type="number" /></label>
         <label>ISBN: <input v-model="isbnInput" type="text" /></label>
         <label>ASIN: <input v-model="asinInput" type="text" /></label>
@@ -179,10 +228,29 @@ watch(
           <img :src="coverInput" />
         </div>
 
+        <div v-if="requireMoveFiles()" class="delete-confirmation">
+          <div class="delete-confirmation-row">            
+            <div class="delete-confirmation-copy">
+              <div class="path-box path-box--old">
+                <strong>Old Path</strong>
+                <span>{{ getOldPath() }}</span>
+              </div>
+              <div class="path-box path-box--new">
+                <strong>New Path</strong>
+                <span>{{ getNewPath() }}</span>
+              </div>
+            </div>
+          </div>
+          <label class="delete-files-checkbox">
+              <input type="checkbox" v-model="moveFiles" />
+              Move Files
+            </label>
+        </div>
+
         <!-- Action buttons -->
         <div class="modal-buttons">
           <button type="button" @click="handleOverlayClick">Cancel</button>
-          <button type="submit">{{props.isEditMode ? 'Save Changes' : 'Add Book'}}</button>
+          <button type="submit">{{ props.isEditMode ? 'Save Changes' : 'Add Book' }}</button>
         </div>
 
         <div v-if="props.params && props.isEditMode" class="modal-delete-wrap">
@@ -193,7 +261,7 @@ watch(
               <p class="delete-confirmation-copy">{{ getDeleteConfirmText() }}</p>
               <button type="button" class="confirm-delete-button" @click="confirmDelete">Delete</button>
             </div>
-            <label class="delete-files-checkbox" v-if="props.hasFiles">
+            <label class="delete-files-checkbox" v-if="!!props.bookRoot">
               <select class="dropdown-select" v-model="deleteModeSelection" aria-label="Delete Mode">
                 <option v-for="(type, value) in deleteMode" :key="value" :value="type">
                   {{ type }}
@@ -209,7 +277,6 @@ watch(
 </template>
 
 <style scoped>
-
 .modal input,
 .modal textarea {
   width: 100%;
@@ -319,7 +386,7 @@ watch(
 .delete-files-checkbox {
   display: inline-flex;
   align-items: center;
-  gap: 1rem;
+  gap: 0.5rem;
   font-weight: 500;
   margin-top: 1rem;
 }
@@ -330,7 +397,52 @@ watch(
   flex-shrink: 0;
 }
 
-.cover img{
+.delete-confirmation-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.path-box {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding: 0.75rem 0.9rem;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  color: inherit;
+}
+
+.path-box strong,
+.path-box span {
+  color: inherit;
+}
+
+.path-box span {
+  word-break: break-word;
+}
+
+.path-box--old {
+  background: rgba(212, 63, 58, 0.12);
+  border: 1px solid rgba(212, 63, 58, 0.35);
+}
+
+.path-box--new {
+  background: rgba(56, 161, 105, 0.12);
+  border: 1px solid rgba(56, 161, 105, 0.35);
+}
+
+@media (min-width: 700px) {
+  .delete-confirmation-copy {
+    flex-direction: row;
+  }
+
+  .path-box {
+    flex: 1;
+  }
+}
+
+.cover img {
   width: 100%;
   max-height: 250px;
   object-fit: contain;
@@ -340,10 +452,53 @@ watch(
   box-shadow: 0 18px 40px rgba(0, 0, 0, 0.08);
 }
 
+:deep(.ql-container) {
+  font-size: 0.95rem;
+  border-radius: 0 0 6px 6px;
+  border: 1px solid var(--vt-c-divider-light-1);
+  background: var(--vt-c-white);
+}
+
+:deep(.ql-editor) {
+  min-height: 100px;
+  color: var(--vt-c-text-light-1);
+  padding: 0.75rem 1rem;
+}
+
+:deep(.ql-toolbar) {
+  background: var(--vt-c-white);
+  border: 1px solid var(--vt-c-divider-light-1);
+  border-radius: 6px 6px 0 0;
+  border-bottom: 1px solid var(--vt-c-divider-light-1);
+}
+
+:deep(.ql-toolbar.ql-snow .ql-stroke) {
+  stroke: var(--vt-c-text-light-1);
+}
+
+:deep(.ql-toolbar.ql-snow .ql-fill) {
+  fill: var(--vt-c-text-light-1);
+}
+
+:deep(.ql-toolbar.ql-snow button:hover .ql-stroke) {
+  stroke: var(--color-primary-green);
+}
+
+:deep(.ql-toolbar.ql-snow button:hover .ql-fill) {
+  fill: var(--color-primary-green);
+}
+
+:deep(.ql-toolbar.ql-snow button.ql-active .ql-stroke) {
+  stroke: var(--color-primary-green);
+}
+
+:deep(.ql-toolbar.ql-snow button.ql-active .ql-fill) {
+  fill: var(--color-primary-green);
+}
+
 @media (max-width: 768px) {
   .modal {
     overflow: scroll;
   }
 }
-
 </style>
