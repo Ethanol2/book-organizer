@@ -31,6 +31,8 @@ const region = ref<AudibleRegion>(AudibleRegion.US)
 const libraryPage = ref(1);
 const libraryPageSize = 10;
 
+const copyFiles = ref(false);
+
 const downloadName = computed(() => getDownloadName(props.download));
 const isImporting = ref(false);
 
@@ -38,7 +40,7 @@ const metadataSearchBufferTime = 500;
 let waitingForInputStop = true;
 
 const associateDownload = async (book: BookSummary | BookParams, isSummary: boolean) => {
-  
+
   if (isImporting.value) {
     return;
   }
@@ -47,14 +49,12 @@ const associateDownload = async (book: BookSummary | BookParams, isSummary: bool
   let id;
   var notifId;
 
-  if (isSummary) 
-  {
+  if (isSummary) {
     id = (book as BookSummary).id;
-  } 
-  else
-  {
+  }
+  else {
     notifId = notificationsStore.notifyInfo(`Fetching book details from ${source.value}...`);
-    const bookDetails = await getMetadataDetails(book as BookParams);    
+    const bookDetails = await getMetadataDetails(book as BookParams);
     notificationsStore.removeNotification(notifId);
     if (bookDetails == null) {
       notificationsStore.notifyError(`Failed to fetch book details from ${source.value}`);
@@ -78,22 +78,23 @@ const associateDownload = async (book: BookSummary | BookParams, isSummary: bool
   }
 
   notifId = notificationsStore.notifyInfo(`Associating "${book.title}" with the download...`);
-  
+
   try {
     await api.post(`/api/downloads/${props.download.id}/associate`, {
       book_id: id,
       use_downloaded_cover: useDownloadedCover.value,
+      move_files: !copyFiles.value
     });
 
     notificationsStore.notifySuccess(`Successfully associated "${book.title}" with the download`);
     closeModal();
     await router.push({ name: 'book-details', params: { id: id } });
-    
+
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Failed to associate download';
     notificationsStore.notifyError(message);
     closeModal();
-    
+
   } finally {
     notificationsStore.removeNotification(notifId);
     isImporting.value = false;
@@ -111,7 +112,7 @@ const performSearch = async () => {
   if (isLoading.value) return
 
   isLoading.value = true;
-  
+
   // A timeout to prevent spamming endpoints
   while (waitingForInputStop) {
     waitingForInputStop = false;
@@ -120,8 +121,7 @@ const performSearch = async () => {
     });
   }
 
-  if (source.value !== "Library")
-  {
+  if (source.value !== "Library") {
     if (searchQuery.value.trim() === "") {
       searchResults.value = [];
       isLoading.value = false;
@@ -132,14 +132,13 @@ const performSearch = async () => {
     searchParams.search = searchQuery.value;
     searchParams.metadataSource = source.value as MetadataSource;
     searchParams.audibleRegion = region.value;
-    
+
     const metadataResults = await searchMetadataSource(searchParams, 10, 1);
 
     if (metadataResults == null) {
       searchResults.value = [];
-    } 
-    else
-    {
+    }
+    else {
       searchResults.value = metadataResults.items;
     }
 
@@ -180,7 +179,7 @@ const performSearch = async () => {
 function getCover(book: BookSummary | BookParams, isSummary: boolean): string {
 
   if (isSummary) {
-    const summary = book as BookSummary; 
+    const summary = book as BookSummary;
     return '/media/metadata/' + summary.id + '.jpg'
   }
 
@@ -205,27 +204,32 @@ watch(() => props.show, (newVal) => {
     <div class="modal" @click.stop>
       <h3>Import Download - <strong>{{ downloadName }}</strong></h3>
 
-      <!-- Cover preview -->
-      <div v-if="download.files.cover != null && download.files.cover !== ''" class="download-cover">
+      <!-- Import Controls -->
+      <div class="import-controls">
+        <!-- Cover preview -->
+        <div v-if="download.files.cover != null && download.files.cover !== ''" class="download-cover">
+          <label>
+            <div>
+              <input type="checkbox" v-model="useDownloadedCover" />
+              Use this cover
+            </div>
+            <img :src="download.files.cover" alt="no cover found">
+          </label>
+        </div>
+
+
+        <!-- Copy Controls -->
         <label>
-          <div>
-            <input type="checkbox" v-model="useDownloadedCover" />
-            Use this cover
-          </div>
-          <img :src="download.files.cover" alt="no cover found">
+          <input type="checkbox" v-model="copyFiles" />
+          Copy Files to Library
         </label>
       </div>
 
       <!-- Search bar -->
       <div class="search-section">
         <label>Select Book:</label>
-        <input
-        class="text-input"
-          v-model="searchQuery"
-          type="text"
-          @input="performSearch"
-          placeholder="Search for books..."
-        />
+        <input class="text-input" v-model="searchQuery" type="text" @input="performSearch"
+          placeholder="Search for books..." />
       </div>
 
       <!-- Search results -->
@@ -239,40 +243,22 @@ watch(() => props.show, (newVal) => {
         </div>
         <div v-else>
           <div v-if="source === 'Library'">
-          <button
-              v-for="book in searchResults as BookSummary[]"
-              :key="book.id"
-              @click="associateDownload(book, true)"
-              :disabled="isImporting"
-              class="result-item result-button"
-            >
-              <img
-                :src="getCover(book, true)"
-                alt=""
-                class="book-cover"
-              />
+            <button v-for="book in searchResults as BookSummary[]" :key="book.id" @click="associateDownload(book, true)"
+              :disabled="isImporting" class="result-item result-button">
+              <img :src="getCover(book, true)" alt="" class="book-cover" />
               <div class="book-info">
                 <h4>{{ book.title }}</h4>
                 <p v-if="book.subtitle">{{ book.subtitle }}</p>
                 <p v-if="book.authors.length > 0">
-                  By: {{ book.authors.map(a => a.name).join(', ') }}
+                  By: {{book.authors.map(a => a.name).join(', ')}}
                 </p>
               </div>
             </button>
           </div>
           <div v-else>
-            <button
-              v-for="(book, index) in searchResults as BookParams[]"
-              :key="index"
-              @click="associateDownload(book, false)"
-              :disabled="isImporting"
-              class="result-item result-button"
-            >
-              <img
-                :src="getCover(book, false)"
-                alt=""
-                class="book-cover"
-              />
+            <button v-for="(book, index) in searchResults as BookParams[]" :key="index"
+              @click="associateDownload(book, false)" :disabled="isImporting" class="result-item result-button">
+              <img :src="getCover(book, false)" alt="" class="book-cover" />
               <div class="book-info">
                 <h4>{{ book.title }}</h4>
                 <p v-if="book.subtitle">{{ book.subtitle }}</p>
@@ -289,21 +275,23 @@ watch(() => props.show, (newVal) => {
       <div class="modal-buttons">
 
         <label class="search-field">
-            <select class="dropdown-select" v-model="source" @change="performSearch">
-                <option value='Library'>Library</option>
-                <option v-for="(type, value) in MetadataSource" :key="value" :value="type">
-                  {{ type }}
-                </option>
-            </select>
+          <select class="dropdown-select" v-model="source" @change="performSearch">
+            <option value='Library'>Library</option>
+            <option v-for="(type, value) in MetadataSource" :key="value" :value="type">
+              {{ type }}
+            </option>
+          </select>
 
-            <select class="dropdown-select region" v-model="region" aria-label="Audible Region" v-show="source == MetadataSource.Audible" @change="performSearch">
+          <select class="dropdown-select region" v-model="region" aria-label="Audible Region"
+            v-show="source == MetadataSource.Audible" @change="performSearch">
             <option v-for="(type, value) in AudibleRegion" :key="value" :value="type">
               .{{ type }}
             </option>
           </select>
         </label>
 
-        <span v-if="source !== 'Library'" style="color: var(--vt-c-text-subtle);">Use the Add Book page for more control</span>
+        <span v-if="source !== 'Library'" style="color: var(--vt-c-text-subtle);">Use the Add Book page for more
+          control</span>
         <span v-else style="color: var(--vt-c-text-subtle);">Results don't include books with files</span>
 
         <button class="delete-button" type="button" @click="closeModal">Cancel</button>
@@ -321,9 +309,8 @@ watch(() => props.show, (newVal) => {
 </template>
 
 <style scoped>
-
 /* Checkbox label */
-.modal > label {
+.modal>label {
   margin-bottom: 1.5rem;
 }
 
@@ -367,7 +354,8 @@ watch(() => props.show, (newVal) => {
   margin-bottom: 1rem;
 }
 
-.loading, .no-results {
+.loading,
+.no-results {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -435,6 +423,12 @@ watch(() => props.show, (newVal) => {
   flex-shrink: 0;
 }
 
+.import-controls {
+  display: flex;
+  gap: 1rem;
+  justify-content: space-around;
+}
+
 /* Modal action buttons */
 .modal-buttons {
   display: flex;
@@ -495,20 +489,29 @@ watch(() => props.show, (newVal) => {
 }
 
 @keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
+  0% {
+    transform: rotate(0deg);
+  }
+
+  100% {
+    transform: rotate(360deg);
+  }
 }
 
 @media (max-width: 768px) {
   .modal-buttons {
     flex-direction: column;
   }
-  
+
   .download-cover label {
     align-items: center;
     justify-content: space-between;
     display: flex;
     margin-bottom: 0;
+  }
+
+  .import-controls {
+    flex-direction: column;
   }
 
   .modal-buttons {

@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"path"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -17,6 +16,7 @@ import (
 type Scanner struct {
 	Frequency    time.Duration
 	Directory    string
+	DepthLimit   int
 	IncludeEmpty bool
 	running      bool
 
@@ -91,32 +91,53 @@ func (scan *Scanner) Scan() error {
 
 func (scan *Scanner) ScanNew(toIgnore []string) error {
 
-	if _, err := os.Stat(scan.Directory); os.IsNotExist(err) {
-		return fmt.Errorf("directory does not exist -> %s", scan.Directory)
-	}
-
-	dirItems, err := os.ReadDir(scan.Directory)
-	if err != nil {
-		return err
+	if stat, err := os.Stat(scan.Directory); os.IsNotExist(err) {
+		return fmt.Errorf("scan directory does not exist: %s", scan.Directory)
+	} else if !stat.IsDir() {
+		return fmt.Errorf("scan path points to a file: %s", scan.Directory)
 	}
 
 	filesList := []Files{}
 
-	for _, item := range dirItems {
+	var scanFunc func(string, string, int) error
+	scanFunc = func(path, relativePath string, depth int) error {
 
-		if !item.Type().IsDir() || slices.Contains(toIgnore, item.Name()) {
-			continue
+		if depth >= scan.DepthLimit || slices.Contains(toIgnore, relativePath) {
+			return nil
 		}
 
-		files, err := getFolderContents(scan.Directory, item.Name())
+		dirContents, err := getFolderContents(path, relativePath)
 		if err != nil {
-			log.Println(err)
-			continue
+			return err
 		}
 
-		if !files.HasNoFiles() || scan.IncludeEmpty {
-			filesList = append(filesList, files)
+		if len(*dirContents.Directories) > 0 {
+			for _, subDir := range *dirContents.Directories {
+
+				err = scanFunc(
+					filepath.Join(path, subDir),
+					filepath.Join(relativePath, subDir),
+					depth+1,
+				)
+				if err != nil {
+					log.Println(err)
+					continue
+				}
+			}
+		} else {
+			isEmpty := dirContents.HasNoFiles()
+
+			if (isEmpty && scan.IncludeEmpty) || !isEmpty {
+				filesList = append(filesList, dirContents)
+			}
 		}
+
+		return nil
+	}
+
+	err := scanFunc(scan.Directory, "", 0)
+	if err != nil {
+		return err
 	}
 
 	err = scan.AddHandler(filesList)
@@ -131,7 +152,7 @@ func (scan *Scanner) ScanExisting(ids []uuid.UUID, dirs []string) error {
 
 	for i, dir := range dirs {
 
-		path := path.Join(scan.Directory, dir)
+		path := filepath.Join(scan.Directory, dir)
 
 		if _, err := os.Stat(path); os.IsNotExist(err) {
 			err = scan.DeleteHandler(ids[i])
@@ -142,7 +163,7 @@ func (scan *Scanner) ScanExisting(ids []uuid.UUID, dirs []string) error {
 			continue
 		}
 
-		newFiles, err := getFolderContents(scan.Directory, dir)
+		newFiles, err := getFolderContents(filepath.Join(scan.Directory, dir), dir)
 		if err != nil {
 			log.Println(err)
 			continue
@@ -190,9 +211,7 @@ func getFileType(filename string) FileType {
 	return Other
 }
 
-func getFolderContents(root, folder string) (Files, error) {
-
-	p := path.Join(root, folder)
+func getFolderContents(path, relativePath string) (Files, error) {
 
 	hasMD := false
 	var audio []string
@@ -201,7 +220,7 @@ func getFolderContents(root, folder string) (Files, error) {
 	var others []string
 	var dirs []string
 
-	bookItems, err := os.ReadDir(p)
+	bookItems, err := os.ReadDir(path)
 	if err != nil {
 		log.Println(err)
 		return Files{}, nil
@@ -220,19 +239,19 @@ func getFolderContents(root, folder string) (Files, error) {
 		switch fileType {
 
 		case Image:
-			images = append(images, path.Join(folder, item.Name()))
+			images = append(images, filepath.Join(relativePath, item.Name()))
 
 		case Text:
-			text = append(text, path.Join(folder, item.Name()))
+			text = append(text, filepath.Join(relativePath, item.Name()))
 
 		case Audio:
-			audio = append(audio, path.Join(folder, item.Name()))
+			audio = append(audio, filepath.Join(relativePath, item.Name()))
 
 		case Metadata:
 			hasMD = true
 
 		case Other:
-			others = append(others, path.Join(folder, item.Name()))
+			others = append(others, filepath.Join(relativePath, item.Name()))
 		}
 
 	}
@@ -260,7 +279,7 @@ func getFolderContents(root, folder string) (Files, error) {
 	}
 
 	return Files{
-		Root:        &folder,
+		Root:        &relativePath,
 		AudioFiles:  &audio,
 		TextFiles:   &text,
 		OtherFiles:  &others,

@@ -140,8 +140,9 @@ func main() {
 
 	// Downloads Scanner
 	scanner := fileManagement.Scanner{
-		Frequency: time.Duration(cfg.Env.GetInt(env.ScanFrequency)) * time.Second,
-		Directory: cfg.Env.Get(env.DownloadsPath),
+		Frequency:  time.Duration(cfg.Env.GetInt(env.ScanFrequency)) * time.Second,
+		Directory:  cfg.Env.Get(env.DownloadsPath),
+		DepthLimit: 3,
 
 		AddHandler:    cfg.db.AddDownloads,
 		UpdateHandler: cfg.db.UpdateDownloadFiles,

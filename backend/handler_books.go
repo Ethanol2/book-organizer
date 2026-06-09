@@ -8,7 +8,7 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"path"
+	"path/filepath"
 	"strings"
 
 	"github.com/Ethanol2/book-organizer/internal/database"
@@ -76,7 +76,7 @@ func (cfg *apiConfig) handlerGetBooks(w http.ResponseWriter, r *http.Request) {
 		for i := range results.Items {
 			if results.Items[i].Cover != nil {
 				cover := *results.Items[i].Cover
-				cover = path.Join(cfg.libraryName, cover)
+				cover = filepath.Join(cfg.libraryName, cover)
 				results.Items[i].Cover = &cover
 			}
 		}
@@ -150,7 +150,7 @@ func (cfg *apiConfig) handlerPostBook(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if coverFile != nil {
-		err = fileManagement.MoveFiles(coverFile.Name(), path.Join(cfg.metadataPath, book.Id.String()+path.Ext(coverFile.Name())))
+		err = fileManagement.MoveFiles(coverFile.Name(), filepath.Join(cfg.metadataPath, book.Id.String()+filepath.Ext(coverFile.Name())))
 		if err != nil {
 			respondWithError(w, http.StatusInternalServerError, FileMoveError, err)
 			return
@@ -231,7 +231,7 @@ func (cfg *apiConfig) handlerUpdateBook(id uuid.UUID, w http.ResponseWriter, r *
 
 			libPath := cfg.Env.Get(env.LibraryPath)
 
-			err = fileManagement.MoveFiles(path.Join(libPath, *oldPath), path.Join(libPath, newPath))
+			err = fileManagement.MoveFiles(filepath.Join(libPath, *oldPath), filepath.Join(libPath, newPath))
 			if err != nil {
 				respondWithError(w, http.StatusInternalServerError, FileMoveError, err)
 				return
@@ -244,9 +244,9 @@ func (cfg *apiConfig) handlerUpdateBook(id uuid.UUID, w http.ResponseWriter, r *
 		coverPath := ""
 
 		if book.Files.Root == nil {
-			coverPath = path.Join(cfg.metadataPath, book.Id.String()+path.Ext(newCover.Name()))
+			coverPath = filepath.Join(cfg.metadataPath, book.Id.String()+filepath.Ext(newCover.Name()))
 		} else {
-			coverPath = path.Join(cfg.Env.Get(env.LibraryPath), *book.Files.Root, "cover.jpg")
+			coverPath = filepath.Join(cfg.Env.Get(env.LibraryPath), *book.Files.Root, "cover.jpg")
 		}
 
 		err = fileManagement.DeleteFiles(coverPath)
@@ -268,7 +268,7 @@ func (cfg *apiConfig) handlerUpdateBook(id uuid.UUID, w http.ResponseWriter, r *
 	}
 
 	if book.Files.Root != nil {
-		fileManagement.CreateMetadataFile(*metadata.BookToMetadata(book), path.Join(cfg.Env.Get(env.LibraryPath), *book.Files.Root))
+		fileManagement.CreateMetadataFile(*metadata.BookToMetadata(book), filepath.Join(cfg.Env.Get(env.LibraryPath), *book.Files.Root))
 	}
 
 	book.Files.Prepend(cfg.libraryName)
@@ -293,7 +293,7 @@ func (cfg *apiConfig) handlerDeleteBook(id uuid.UUID, w http.ResponseWriter, r *
 			return
 		}
 		if dir != nil {
-			err = fileManagement.DeleteFiles(path.Join(cfg.Env.Get(env.LibraryPath), *dir))
+			err = fileManagement.DeleteFiles(filepath.Join(cfg.Env.Get(env.LibraryPath), *dir))
 			if err != nil {
 				respondWithError(w, http.StatusInternalServerError, FileDeleteError, err)
 				return
@@ -310,7 +310,7 @@ func (cfg *apiConfig) handlerDeleteBook(id uuid.UUID, w http.ResponseWriter, r *
 	if deleteBook := r.URL.Query().Get("book"); deleteBook == "true" {
 
 		// Delete metedata cover
-		err := fileManagement.DeleteFiles(path.Join(cfg.metadataPath, id.String()+".jpg"))
+		err := fileManagement.DeleteFiles(filepath.Join(cfg.metadataPath, id.String()+".jpg"))
 		if err != nil {
 			log.Println(err)
 		}
@@ -343,11 +343,19 @@ func (cfg *apiConfig) handlerGetScanLibrary(w http.ResponseWriter, r *http.Reque
 
 	// Global vars
 	libraryParams := map[database.BookParams]fileManagement.Files{} // New Books in the library
-	knownDirs := map[string]foldersIds{}                            // Known directories in the library, mapped to their parent folders
 	scanErrors := []scanError{}                                     // Errors that occur during the scan that aren't cause for panic. The list is returned in the response
 
 	// Start the transaction
 	err := cfg.db.HandleTransaction(func(c *database.Client) error {
+
+		fmt.Println()
+		log.Println("Starting library scan")
+
+		// Get existing library to prevent duplicates
+		libraryIds, libraryDirs, err := c.GetAllBooksDirectories()
+		if err != nil {
+			return err
+		}
 
 		// Functions ======================================================================
 
@@ -356,166 +364,105 @@ func (cfg *apiConfig) handlerGetScanLibrary(w http.ResponseWriter, r *http.Reque
 			return c.UpdateBookFiles(id, fileManagement.Files{})
 		}
 
-		// Used by the scanner to post file changes. Adds the full path to the files before being forwarded to the actual update
-		updateHandler := func(prefix string) func(id uuid.UUID, files fileManagement.Files) error {
-			return func(id uuid.UUID, files fileManagement.Files) error {
-				files.Prepend(prefix)
-				return c.UpdateBookFiles(id, files)
-			}
+		// List for the current folder
+		dirItems := []fileManagement.Files{}
+
+		// handler functions
+		addHandler := func(files []fileManagement.Files) error {
+			dirItems = append(dirItems, files...)
+			return nil
 		}
 
-		// The main scanning logic. The function is declared and defined seperately to allow recursion.
-		var folderScan func(string, string, []string)
-		folderScan = func(pathPrefix string, currentDirectory string, pathComponents []string) {
+		// Initialize the scanner
+		scanner := fileManagement.Scanner{
+			Directory:  cfg.Env.Get(env.LibraryPath),
+			DepthLimit: 5,
 
-			// Check the recursion hasn't gone too deep -> Author/Series/Book -> max 3 folder levels
-			if len(pathComponents) > 3 {
-				err := fmt.Sprintf("scan max depth (3) exceeded: %d", len(pathComponents))
-				log.Println(err)
-				scanErrors = append(scanErrors,
-					scanError{
-						Type:  "Processing",
-						Path:  path.Join(pathPrefix, currentDirectory),
-						Error: "maximum recursion depth exceeded",
-					})
-				return
-			}
+			AddHandler:    addHandler,
+			UpdateHandler: c.UpdateBookFiles,
+			DeleteHandler: deleteHandler,
+		}
 
-			// Create the current path using the prefix and the current directory.
-			// If the current directory isn't empty, add it to the list of path components
-			currentPath := path.Join(pathPrefix, currentDirectory)
-			if currentDirectory != "" {
-				pathComponents = append(pathComponents, currentDirectory)
-			}
+		// Scan new folders. Use the known folders as the ignore list
+		err = scanner.ScanNew(libraryDirs)
+		if err != nil {
+			scanErrors = append(scanErrors, scanError{
+				Type:  "Scan Error",
+				Error: err.Error(),
+			})
+			return err
+		}
 
-			// List for the current folder
-			dirItems := []fileManagement.Files{}
+		// Scan known folders
+		err = scanner.ScanExisting(libraryIds, libraryDirs)
+		if err != nil {
+			scanErrors = append(scanErrors, scanError{
+				Type:  "Scan Error",
+				Error: err.Error(),
+			})
+			return err
+		}
 
-			// handler functions
-			addHandler := func(files []fileManagement.Files) error {
-				dirItems = append(dirItems, files...)
-				return nil
-			}
+		// For each item in the folder
+		for _, item := range dirItems {
 
-			relativePath := path.Join(pathComponents...)
-
-			// Initialize the scanner
-			scanner := fileManagement.Scanner{
-				Directory:     currentPath,
-				AddHandler:    addHandler,
-				UpdateHandler: updateHandler(relativePath),
-				DeleteHandler: deleteHandler,
-
-				IncludeEmpty: true,
-			}
-
-			// Scan new folders. Use the known folders as the ignore list
-			err := scanner.ScanNew(knownDirs[currentPath].Folders)
-			if err != nil {
-				strErr := fmt.Sprintln("Error trying to read the folder at \"", currentPath, "\" =>", err)
-				log.Print(strErr)
-				scanErrors = append(scanErrors, scanError{
-					Type:  "Read Error",
-					Path:  currentPath,
-					Error: err.Error(),
-				})
-				return
-			}
-
-			// Scan known folders
-			err = scanner.ScanExisting(knownDirs[currentPath].Ids, knownDirs[currentPath].Folders)
-			if err != nil {
-				strErr := fmt.Sprintln("Error trying to update books at \"", currentPath, "\" =>", err)
-				log.Print(strErr)
-				scanErrors = append(scanErrors, scanError{
-					Type:  "Read Error",
-					Path:  currentPath,
-					Error: err.Error(),
-				})
-				return
-			}
-
-			// For each item in the folder
-			for _, item := range dirItems {
-
-				// If the item has no audio or text files then scan nested folders, since we aren't in a book
-				if item.HasNoFiles() {
-					// Check if the folder has sub folders
-					if item.Directories != nil {
-						folderScan(currentPath, *item.Root, pathComponents)
-					}
-					continue
-				}
-
-				// This shouldn't happen
-				if item.Root == nil {
-					err := fmt.Sprintln("An item with no root appeared in \"", pathPrefix, "\"")
-					log.Print(err)
+			// If the item has a metadata file then import that and continue
+			if item.HasMetadata {
+				md, err := fileManagement.OpenMetadataFile(filepath.Join(cfg.Env.Get(env.LibraryPath), *item.Root, "metadata.json"))
+				if err != nil {
+					strErr := fmt.Sprintln("Error trying to open metadata file in \"", *item.Root, "\" =>", err)
+					log.Print(strErr)
 					scanErrors = append(scanErrors, scanError{
-						Type:  "Invalid Data",
-						Path:  currentPath,
-						Error: "item found with no root",
+						Type:  "Read Error",
+						Path:  *item.Root,
+						Error: err.Error(),
 					})
 					continue
 				}
 
-				// Get the path to this item
-				root := path.Join(relativePath, *item.Root)
-				item.Root = &root
+				libraryParams[metadata.MetadataToBookParams(*md)] = item
+				continue
+			}
 
-				// If there's a cover present, get the path for that
-				if item.Cover != nil {
-					c := path.Join(relativePath, *item.Cover)
-					item.Cover = &c
-				}
+			pathComponents := strings.Split(*item.Root, string(filepath.Separator))
 
-				// If the item has a metadata file then import that and continue
-				if item.HasMetadata {
-					md, err := fileManagement.OpenMetadataFile(path.Join(cfg.Env.Get(env.LibraryPath), *item.Root, "metadata.json"))
-					if err != nil {
-						strErr := fmt.Sprintln("Error trying to open metadata file in \"", *item.Root, "\" =>", err)
-						log.Print(strErr)
-						scanErrors = append(scanErrors, scanError{
-							Type:  "Read Error",
-							Path:  *item.Root,
-							Error: err.Error(),
-						})
-						continue
-					}
+			// Get the book title from the folder
+			title := pathComponents[len(pathComponents)-1]
 
-					libraryParams[metadata.MetadataToBookParams(*md)] = item
-					continue
-				}
+			var authors []database.Category
+			var index *string
+			var series []database.Category
 
-				// Get the book title from the folder
-				title := path.Base(*item.Root)
+			// Check for a series index
+			titleSplit := strings.SplitN(title, " - ", 2)
+			if len(titleSplit) > 1 {
+				index = &titleSplit[0]
+				title = titleSplit[1]
+			}
 
-				// Get the author from the topmost folder
-				authors := []database.Category{}
-				if len(pathComponents) > 0 {
+			if index != nil {
+				// If there's an index then the top folder is probably the series
+				if len(pathComponents) == 2 {
+					series = []database.Category{{Name: pathComponents[0], Index: index}}
+				} else if len(pathComponents) > 2 {
 					authors = append(authors, database.Category{Name: pathComponents[0]})
-				}
-
-				// Get the series from the second folder. Extract the series index from the title, if it exists.
-				var series []database.Category
-				if len(pathComponents) > 1 {
-
-					var index *string
-					split := strings.SplitN(title, " - ", 2)
-					if len(split) > 1 {
-						index = &split[0]
-						title = split[1]
-					}
-
 					series = []database.Category{{Name: pathComponents[1], Index: index}}
 				}
-
-				libraryParams[database.BookParams{
-					Title:   &title,
-					Authors: &authors,
-					Series:  &series,
-				}] = item
+			} else {
+				// If there's no index then the top folder might be the author
+				if len(pathComponents) == 2 {
+					authors = append(authors, database.Category{Name: pathComponents[0]})
+				} else if len(pathComponents) > 2 {
+					authors = append(authors, database.Category{Name: pathComponents[0]})
+					series = []database.Category{{Name: pathComponents[1], Index: index}}
+				}
 			}
+
+			libraryParams[database.BookParams{
+				Title:   &title,
+				Authors: &authors,
+				Series:  &series,
+			}] = item
 		}
 
 		// Used when a book is matched to an untracked folder
@@ -542,34 +489,6 @@ func (cfg *apiConfig) handlerGetScanLibrary(w http.ResponseWriter, r *http.Reque
 
 			return nil
 		}
-
-		// Main Logic ======================================================================
-
-		fmt.Println()
-		log.Println("Starting library scan")
-
-		// Get existing library to prevent duplicates
-		if ids, knownDirsList, err := c.GetAllBooksDirectories(); err != nil {
-			return err
-		} else {
-			// Format known directories to be handled by the scan function
-			for i := range knownDirsList {
-				dir, name := path.Split(knownDirsList[i])
-				dir = path.Join(cfg.Env.Get(env.LibraryPath), dir)
-				if item, ok := knownDirs[dir]; ok {
-					item.Folders = append(item.Folders, name)
-					item.Ids = append(item.Ids, ids[i])
-					knownDirs[dir] = item
-				} else {
-					knownDirs[dir] = foldersIds{
-						Folders: []string{name},
-						Ids:     []uuid.UUID{ids[i]},
-					}
-				}
-			}
-		}
-
-		folderScan(cfg.Env.Get(env.LibraryPath), "", []string{})
 
 		// Handle new books
 		for params, files := range libraryParams {
@@ -666,7 +585,7 @@ func (cfg *apiConfig) handlerGetScanLibrary(w http.ResponseWriter, r *http.Reque
 	for i := range results.Items {
 		if results.Items[i].Cover != nil {
 			cover := *results.Items[i].Cover
-			cover = path.Join(cfg.libraryName, cover)
+			cover = filepath.Join(cfg.libraryName, cover)
 			results.Items[i].Cover = &cover
 		}
 	}

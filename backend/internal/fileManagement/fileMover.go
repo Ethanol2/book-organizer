@@ -8,7 +8,19 @@ import (
 	"path/filepath"
 )
 
+func CopyFiles(oldPath, newPath string) error {
+	return moveCopyFiles(oldPath, newPath, false)
+}
+
 func MoveFiles(oldPath, newPath string) error {
+	return moveCopyFiles(oldPath, newPath, true)
+}
+
+func MoveOrCopyFiles(oldPath, newPath string, isMoving bool) error {
+	return moveCopyFiles(oldPath, newPath, isMoving)
+}
+
+func moveCopyFiles(oldPath, newPath string, deleteOld bool) error {
 
 	oldPath = filepath.Clean(oldPath)
 	newPath = filepath.Clean(newPath)
@@ -18,10 +30,12 @@ func MoveFiles(oldPath, newPath string) error {
 		return err
 	}
 
-	// If this succeeds then we don't have to stream the file
-	err = os.Rename(oldPath, newPath)
-	if err == nil {
-		return nil
+	// If we aren't copying, we can try moving the file directly. If it fails then we're in an environment where streaming is required
+	if deleteOld {
+		err = os.Rename(oldPath, newPath)
+		if err == nil {
+			return nil
+		}
 	}
 
 	if stat, err := os.Stat(oldPath); err == nil {
@@ -43,20 +57,22 @@ func MoveFiles(oldPath, newPath string) error {
 					return os.MkdirAll(targetPath, info.Mode())
 				}
 
-				return moveFile(path, targetPath)
+				return streamFile(path, targetPath, deleteOld)
 			})
 			if err != nil {
 				return err
 			}
 
-			err = os.Remove(oldPath)
-			if err != nil {
-				log.Println("Failed to clean up old directory at \"", oldPath, "\"")
-				return err
+			if deleteOld {
+				err = os.Remove(oldPath)
+				if err != nil {
+					log.Println("Failed to clean up old directory at \"", oldPath, "\"")
+					return err
+				}
 			}
 
 		} else {
-			err = moveFile(oldPath, newPath)
+			err = streamFile(oldPath, newPath, deleteOld)
 		}
 		if err != nil {
 			return err
@@ -67,7 +83,7 @@ func MoveFiles(oldPath, newPath string) error {
 	return nil
 }
 
-func moveFile(oldPath, newPath string) error {
+func streamFile(oldPath, newPath string, removeOldFile bool) error {
 	srcFile, err := os.Open(oldPath)
 	if err != nil {
 		log.Println("Failed to open file at \"", oldPath, "\"")
@@ -88,9 +104,12 @@ func moveFile(oldPath, newPath string) error {
 		return err
 	}
 
-	if err = os.Remove(oldPath); err != nil {
-		log.Println("Failed to remove old file after copying from \"", oldPath, "\" to \"", newPath, "\"")
-		return err
+	if removeOldFile {
+		err = os.Remove(oldPath)
+		if err != nil {
+			log.Println("Failed to remove old file after copying from \"", oldPath, "\" to \"", newPath, "\"")
+			return err
+		}
 	}
 
 	return nil

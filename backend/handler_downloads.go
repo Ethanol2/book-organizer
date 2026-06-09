@@ -64,12 +64,15 @@ func (cfg *apiConfig) handlerAssociateDownloadToBook(downloadId uuid.UUID, w htt
 	var bookIdStruct struct {
 		BookId             uuid.UUID `json:"book_id"`
 		UseDownloadedCover bool      `json:"use_downloaded_cover"`
+		MoveFiles          bool      `json:"move_files"`
 	}
 	err = json.NewDecoder(r.Body).Decode(&bookIdStruct)
 	if err != nil {
 		respondWithError(w, http.StatusBadRequest, BodyDecodeError, err)
 		return
 	}
+
+	log.Println("Moving files:", bookIdStruct.MoveFiles)
 
 	bookExists, err := cfg.db.CheckBookExistsID(bookIdStruct.BookId)
 	if err != nil {
@@ -90,10 +93,10 @@ func (cfg *apiConfig) handlerAssociateDownloadToBook(downloadId uuid.UUID, w htt
 	oldPath := path.Join(cfg.Env.Get(env.DownloadsPath), downloadDir)
 	newPath := path.Join(cfg.Env.Get(env.LibraryPath), bookPath)
 
-	err = fileManagement.MoveFiles(oldPath, newPath)
+	err = fileManagement.MoveOrCopyFiles(oldPath, newPath, bookIdStruct.MoveFiles)
 	if err != nil {
 		if os.IsExist(err) {
-			respondWithError(w, http.StatusConflict, "The library already has files at the book's location", err)
+			respondWithError(w, http.StatusConflict, "The library already has files where the book was meant to go", err)
 			return
 		}
 		respondWithError(w, http.StatusInternalServerError, FileMoveError, err)
